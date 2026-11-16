@@ -8,12 +8,15 @@ import { lireDemande, type Banc } from './banc.js';
 import { aiguiller } from '../run/aiguillage.js';
 import { COMPACTAGE, doitCompacter, type Suite } from '../run/suite.js';
 import { lireFlux, type Message } from '../rapport.js';
+import { ajouterSession, claudeVide, reglagesClaude, type ClaudeBras } from './environnement.js';
 
 export interface DefBras { nom: string; modele: string; brief: string; settings?: string; aiguillage?: boolean; suite?: Suite } // aiguillage : le bras de cadence run ; suite (L690) : reprend la session de l'étape d'avant // settings : réglages Claude Code du bras (hooks)
 export interface Mesure { bras: string; banc: string; debut: string; fin: string; duree_s: number; releve?: Releve; // releve (L703) : ce que claude -p a rendu en dernier pour la dernière session (coût et tokens CUMULÉS depuis son début, reprises et /compact compris), repris par l'étape suivante d'un bras « suite »
   tokens: number; cout_usd: number; questions: number; questions_texte: string[]; sessions: string[]; echec: string | null; taille_declaree?: string;
   /** L737 : empreinte de ce que le bras a reçu (brief hors chemins du clone, modèle, réglages, pièces) ; deux bras de même empreinte sont identiques et mesurent le bruit du banc. */
-  empreinte_bras?: string } export type Releve = { session: string; cout: number; tokens: number };
+  empreinte_bras?: string;
+  /** L742 : version, modèle exact, contexte max et réglages, tels que les sessions du bras les ont dits (./environnement.ts). */
+  claude?: ClaudeBras } export type Releve = { session: string; cout: number; tokens: number };
 export type Executeur = (args: string[], o: { cwd: string; env: NodeJS.ProcessEnv }) => { stdout: string; code: number; erreur?: string; delaiMs?: number }; // delaiMs : la session a dépassé ce délai et l'exécuteur l'a arrêtée
 
 export const OUTILS_INTERDITS = ['Bash(kubectl:*)', 'Bash(helm:*)', 'Bash(gh:*)', 'Bash(ssh:*)', 'Bash(scp:*)',
@@ -90,18 +93,19 @@ export function lancerBras(b: Banc, d: DefBras, clone: string, exec: Executeur, 
   const commun = argsClaude(d, clone);
   const o = { cwd: clone, env: { ...environnementNeutre(process.env), ...(d.settings ? { CADENCE_CLONE: clone, CADENCE_PIECES: JSON.stringify(garde.pieces), CADENCE_BANC_RACINE: garde.racine } : {}) } };
   const reponse = b.reponses ? readFileSync(join(b.dir, 'reponses.md'), 'utf8') : SANS_REPONSE;
+  const claude = claudeVide(reglagesClaude(o.env, d.settings)), ex = (a: string[]) => { const s = exec(a, o); ajouterSession(claude, s.stdout); return s; };
   const debut = horloge();
   const suite = d.suite ? reprise?.session : undefined, derniers = new Map<string, Releve>(suite ? [[suite, reprise!]] : []), m = { tokens: 0, cout: 0, questions: 0, textes: [] as string[], sessions: [] as string[], echec: null as string | null };
   const compter = (x: ReturnType<typeof lire>) => { const p = derniers.get(x.session), cumul = !!p && x.cout >= p.cout && x.tokens >= p.tokens; m.tokens += x.tokens - (cumul ? p!.tokens : 0); m.cout += x.cout - (cumul ? p!.cout : 0); if (x.session) derniers.set(x.session, { session: x.session, cout: x.cout, tokens: x.tokens }); return x; }; // L703 : seul l'écart au dernier relevé de la même session compte (un relevé plus bas : session repartie de zéro)
-  const c = doitCompacter(d.suite, suite) ? compter(lire(exec(['-p', COMPACTAGE, '--resume', suite!, ...commun], o))) : undefined; // L690 : compactée avant le lot
-  let r = compter(lire(exec(['-p', brief, ...(suite ? ['--resume', c?.session || suite] : []), ...commun], o))); m.sessions = r.session ? [r.session] : []; m.echec = c?.echec ?? r.echec;
+  const c = doitCompacter(d.suite, suite) ? compter(lire(ex(['-p', COMPACTAGE, '--resume', suite!, ...commun]))) : undefined; // L690 : compactée avant le lot
+  let r = compter(lire(ex(['-p', brief, ...(suite ? ['--resume', c?.session || suite] : []), ...commun]))); m.sessions = r.session ? [r.session] : []; m.echec = c?.echec ?? r.echec;
   while (!m.echec && existsSync(question)) {
     if (m.questions >= QUESTIONS_MAX) { rmSync(question); m.echec = `question ouverte après ${QUESTIONS_MAX} réponses`; break; }
     m.textes.push(readFileSync(question, 'utf8')); rmSync(question); m.questions++;
-    r = compter(lire(exec(['-p', `Réponse de Sylvain : ${reponse}`, '--resume', r.session, ...commun], o))); m.echec = r.echec;
+    r = compter(lire(ex(['-p', `Réponse de Sylvain : ${reponse}`, '--resume', r.session, ...commun]))); m.echec = r.echec;
     if (r.session && !m.sessions.includes(r.session)) m.sessions.push(r.session);
   }
   const fin = horloge();
   return { bras: d.nom, banc: b.id, debut: debut.toISOString(), fin: fin.toISOString(),
-    duree_s: Math.round((fin.getTime() - debut.getTime()) / 1000), tokens: m.tokens, cout_usd: m.cout, questions: m.questions, questions_texte: m.textes, sessions: m.sessions, echec: m.echec, empreinte_bras, ...(derniers.has(m.sessions.at(-1) ?? '') ? { releve: derniers.get(m.sessions.at(-1)!) } : {}) };
+    duree_s: Math.round((fin.getTime() - debut.getTime()) / 1000), tokens: m.tokens, cout_usd: m.cout, questions: m.questions, questions_texte: m.textes, sessions: m.sessions, echec: m.echec, empreinte_bras, claude, ...(derniers.has(m.sessions.at(-1) ?? '') ? { releve: derniers.get(m.sessions.at(-1)!) } : {}) };
 }

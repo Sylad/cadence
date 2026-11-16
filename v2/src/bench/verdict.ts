@@ -223,7 +223,7 @@ export function verdict(res: ResultatBanc[], ref: string, cand: string, barre: B
 const okRouge = (x: boolean | null | undefined) => (x === null || x === undefined ? '–' : x ? 'ok' : 'ROUGE');
 
 /** `niveau` (L689) : micro ou mécanique ; `depot` : le dépôt dont le banc a lancé le code ; `duree_s` : durée du passage entier. */
-export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdict, e: { date: string; empreinte: string; repetitions?: number; eclair?: string[]; niveau?: string; depot?: string; duree_s?: number }): string {
+export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdict, e: { date: string; empreinte: string; repetitions?: number; eclair?: string[]; niveau?: string; depot?: string; duree_s?: number; environnement?: string[] }): string {
   const lignes = res.map((r) => {
     const j = r.jugement; const sj = r.sans_juge; const m = (b: string) => r.mesures[b]; const deux = (f: (x: Meca) => string) => (j ? `${f(j.meca[ref])} · ${f(j.meca[cand])}` : '–');
     const sans = (f: 'suite_ok' | 'caches_ok') => (sj ? [ref, cand].map((b) => `${okRouge(sj[b]?.[f])}${sj[b]?.rejoue && sj[b].rejoue![f] === false ? ' (rejoué)' : ''}`).join(' · ') : '–');
@@ -236,7 +236,7 @@ export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdi
   const lectures = res.flatMap((r) => Object.entries(r.fuites_a_verifier ?? {}).flatMap(([b, ps]) => ps.map((p) => `- ${r.banc}/${b} : ${p}`)));
   const nonLivres = res.flatMap((r) => Object.entries(r.non_livre ?? {}).map(([b, x]) => `- ${r.banc}/${b} : ${x}`));
   const rejoues = res.flatMap((r) => Object.entries(r.sans_juge ?? {}).flatMap(([b, x]) => (x.rejoue ? [`- ${r.banc}/${b} : ${x.suite_ok && x.caches_ok !== false ? 'vert' : 'ROUGE'} au rejeu seul (sous charge : suite ${okRouge(x.rejoue.suite_ok)}, tests d'origine ${okRouge(x.rejoue.caches_ok)})`] : [])));
-  return [`# Banc ${e.date} — ${cand} contre ${ref} — ${titreVerdict(v)}`, '', `Empreinte de v2 : ${e.empreinte}`, `Répétitions : ${e.repetitions ?? 1}`,
+  return [`# Banc ${e.date} — ${cand} contre ${ref} — ${titreVerdict(v)}`, '', ...(e.environnement ? [...e.environnement, ''] : []), `Empreinte de v2 : ${e.empreinte}`, `Répétitions : ${e.repetitions ?? 1}`,
     ...(e.niveau === 'bruit' ? [`Niveau : bruit, ${ref} contre son jumeau sans juge IA (L738) : remesure de l'écart de temps de chaque banc ; ce verdict n'entre ni dans l'historique ni dans la garde`]
       : e.niveau ? [`Niveau : ${e.niveau}, sans juge IA (n'autorise pas la publication)`] : []),
     ...(e.depot ? [`Dépôt mesuré : ${e.depot}`] : []),

@@ -7,6 +7,7 @@ import type { Io } from '../cli.js';
 import { ajouterBanc } from './ajouter.js';
 import { chargerBanc, listerBancs, piecesBanc, racineBanc, type Banc } from './banc.js';
 import { chargerBras, executeurClaude, lancerBras, libererReglages, type DefBras, type Executeur, type Mesure } from './bras.js';
+import { enteteEnvironnement, environnement, ligneComparaison, passagePrecedent, versionClaude, type Environnement } from './environnement.js';
 import { fuitesDuBras } from './fuites.js';
 import { etatGit, juger, travailNonLivre, type Jugement } from './juges.js';
 import { preparer } from './preparer.js';
@@ -96,7 +97,7 @@ export type Enfants = { lanceur: string[]; paralleles: number; env?: NodeJS.Proc
 
 type OptPassage = { racine: string; numeros?: string[]; ref: string; cand: string; hebdo: boolean; juge: string; repetitions?: number; garderClones?: boolean;
   exec: Executeur; prep: typeof preparer; maintenant: Date; empreinte: string; home: string; out: (l: string) => void; eclair?: boolean;
-  niveau?: Niveau; enfants?: Enfants; depot?: string; bruitCompte?: boolean };
+  niveau?: Niveau; enfants?: Enfants; depot?: string; bruitCompte?: boolean; version?: () => string }; // version (L742) : claude --version, remplacée par les tests
 
 /** Un banc (une répétition) à jouer, sérialisable pour un processus enfant. `joues` (L737) : passages antérieurs de ce banc, pour alterner l'ordre des bras. */
 export type Tache = { racine: string; dirRun: string; run: string; ref: string; cand: string; N: number; juge: string; garderClones: boolean;
@@ -246,6 +247,7 @@ async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?:
   const ids = listerBancs(o.racine, o.numeros);
   const passes = lirePassages(o.racine);
   const dejaJoues = (bid: string) => passes.filter((p) => p.resultats.some((r) => banBase(r.banc) === bid)).length;
+  const version = (o.version ?? versionClaude)(); // L742 : au lancement, avant toute session
   const debut = new Date(); const phases: Record<string, string> = {}; let termines = 0;
   const taches: Tache[] = ids.flatMap((bid, i) => Array.from({ length: N }, (_, k) => ({
     racine: o.racine, dirRun, run: id, ref: o.ref, cand: o.cand, N, juge: o.juge, garderClones: o.garderClones ?? false,
@@ -275,8 +277,11 @@ async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?:
   const duree_s = Math.round((Date.now() - debut.getTime()) / 1000);
   mkdirSync(join(o.racine, 'rapports'), { recursive: true });
   const base = join(o.racine, 'rapports', id);
-  writeFileSync(`${base}.md`, rapport(res, o.ref, o.cand, v, { date, empreinte: o.empreinte, repetitions: N, eclair: e?.lignes, niveau: o.niveau, depot: o.depot, duree_s }));
-  writeFileSync(`${base}.json`, JSON.stringify({ verdict: v, resultats: res.map((r, i) => ({ ...r, clones: joues[i].clones })) }, null, 2));
+  const env = environnement(version, Object.fromEntries([o.ref, o.cand].map((n) => [n, bras[n].modele])), res.flatMap((r) => Object.values(r.mesures)));
+  const entete = enteteEnvironnement(env, passagePrecedent(o.racine, id));
+  writeFileSync(`${base}.md`, rapport(res, o.ref, o.cand, v, { date, empreinte: o.empreinte, repetitions: N, eclair: e?.lignes, niveau: o.niveau, depot: o.depot, duree_s, environnement: entete }));
+  writeFileSync(`${base}.json`, JSON.stringify({ verdict: v, environnement: env, resultats: res.map((r, i) => ({ ...r, clones: joues[i].clones })) }, null, 2));
+  if (entete[0].startsWith('⚠')) o.out(entete[0]);
   if (o.niveau === 'bruit') { // L738 : seul l'écart compte, lu au prochain passage dans rapports/<run>.json ; la garde ne voit pas ce passage
     const ecarts = res.map((r) => ecartPaire(r)); // correctif L738 : toujours montré, compté pour le seuil seulement quand le banc complet l'a joué
     o.out(`bruit remesuré, ${o.ref} contre ${o.cand} : ${res.map((r, i) => `${r.banc} ${ecarts[i]?.toFixed(2) ?? 'non mesuré'}`).join(' ; ')} — ${duree_s} s — rapport : ${base}.md`);
@@ -375,6 +380,19 @@ export function alertesGarde(s: ReturnType<typeof statut>): string[] {
 
 export const SOUS: Record<string, { numeros?: string[]; niveau?: Niveau }> = { court: { numeros: BANCS_COURT }, hebdo: {}, eclair: { numeros: ['1'] }, micro: { numeros: ['1'], niveau: 'micro' }, mecanique: { numeros: BANCS_COURT, niveau: 'mecanique' } };
 
+/** L742 : `cadence2 bench comparer <a> <b>` (noms de rapports/, .json ou .md tolérés) dit d'abord si l'environnement de b diffère de celui de a, puis le titre de
+ * chaque rapport. 0 environnements identiques, 1 différents ou non comparables, 2 usage ou rapport illisible. */
+function comparer(racine: string, [a, b]: string[], io: Io): number {
+  if (!a || !b) { io.err('usage : cadence2 bench comparer <passage-a> <passage-b> (noms des rapports de ~/bench-cadence/rapports/)'); return 2; }
+  const nom = (r: string) => r.replace(/\.(json|md)$/, ''), f = (r: string, ext: string) => join(racine, 'rapports', `${nom(r)}.${ext}`);
+  let x: { environnement?: Environnement }, y: typeof x;
+  try { [x, y] = [a, b].map((r) => JSON.parse(readFileSync(f(r, 'json'), 'utf8'))); } catch (e) { io.err(`bench comparer : ${e instanceof Error ? e.message : String(e)}`); return 2; }
+  const ligne = y.environnement ? ligneComparaison(nom(a), x.environnement, y.environnement) : `Environnement non comparable : ${nom(b)} ne le note pas (rapport d'avant L742)`;
+  io.out(`${nom(b)} contre ${nom(a)} — ${ligne}`);
+  for (const r of [a, b]) io.out(`${nom(r)} : ${existsSync(f(r, 'md')) ? readFileSync(f(r, 'md'), 'utf8').split('\n')[0].replace(/^#\s*/, '') : 'rapport .md absent'}`);
+  return ligne.startsWith('Environnement identique') ? 0 : 1;
+}
+
 export async function bench(args: string[], io: Io, repo = REPO): Promise<number> {
   const [sous, ...reste] = args;
   if (sous === '_banc' && reste[0]) return bancEnfant(reste[0], io.out);
@@ -408,11 +426,12 @@ export async function bench(args: string[], io: Io, repo = REPO): Promise<number
       return 0;
     } catch (e) { io.err(`cadence2 bench ajouter : ${e instanceof Error ? e.message : String(e)}`); return 1; }
   }
+  if (sous === 'comparer') return comparer(racine, reste, io);
   const bancs = option(reste, 'bancs');
   if (sous === 'bruit') return remesurerBruit(racine, bancs, emp, repo, io);
   const choix = sous === 'lancer' ? (bancs ? { numeros: bancs.split(',') } : null) : Object.hasOwn(SOUS, sous ?? '') ? SOUS[sous!] : null;
   if (choix === null) {
-    io.err('usage : cadence2 bench micro|mecanique|court|hebdo|eclair|lancer --bancs 1,3|bruit [--bancs 3,7]|complet|statut|verifier-publication|ajouter [--candidat c] [--reference r] [--repetitions N] [--paralleles N] [--garder-clones]');
+    io.err('usage : cadence2 bench micro|mecanique|court|hebdo|eclair|lancer --bancs 1,3|bruit [--bancs 3,7]|complet|statut|verifier-publication|comparer <a> <b>|ajouter [--candidat c] [--reference r] [--repetitions N] [--paralleles N] [--garder-clones]');
     return 2;
   }
   const rep = entierOption(reste, 'repetitions', 1);

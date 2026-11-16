@@ -124,6 +124,7 @@ const FLAGS_CLI: Record<string, string[]> = {
   'src/run/escalade.ts': ['json'], // L726 : raf list --json, la revue de code du lot dans le plan
   'src/registre.ts': ['name-only', 'diff-filter'], // git diff --name-only, --diff-filter=A (L701 : le registre touché sans option, entrée neuve avec --registre)
   'src/bench/sans-juge.ts': ['name-only'], // L733 : git diff --name-only base..HEAD, les fichiers que le bras a livrés
+  'src/bench/environnement.ts': ['version'], // L742 : claude --version au lancement du passage
   'src/bench/cli.ts': ['porcelain', 'oneline', 'reverse', 'format', 'binary'], // git status --porcelain, git log --oneline, git log --reverse --format=%s (Taille déclarée)
 };
 const prefixe = (k: string) => (k.startsWith('src/bench/') || k === 'src/sequence/cli.ts' || k === 'src/cli.ts' ? 'bench' : 'cadence2'); // l'aide de cli.ts et le banc séquence décrivent les options de « bench »
@@ -139,7 +140,7 @@ const BUDGET_R29: Record<string, { total: number; modules: Record<string, number
   // L728 (revue) : run 569 (+7), --liste sur cinq lignes et la ligne de fin sur deux au lieu d'une chacune (lignes détassées), Etat étend EtatRapport
   // L726 : run 670 (+101), aiguillage de modèle : escalade.ts (passes de correction et revues non conformes du lot, Fable d'office) et la ligne des modèles de chaque passe, sans ligne tassée
   // L726 (revue) : run 695 (+25), correction après revue seulement sur une revue non conforme neuve (revueApresIntegre), lignes à deux instructions détassées (run.ts, escalade.ts)
-  mesure: { total: 2043, modules: { bench: 1343, sequence: 700 } }, // L689 : bench relevé de 800 à 984 plutôt que tassé (décision de Sylvain du 13-11) ; issue #57 : 998, bras.ts détassé, erreur nommée
+  mesure: { total: 2195, modules: { bench: 1493, sequence: 702 } }, // L689 : bench relevé de 800 à 984 plutôt que tassé (décision de Sylvain du 13-11) ; issue #57 : 998, bras.ts détassé, erreur nommée
   // L730 (D-22) : bench 1080, garde proportionnée (banc mécanique avant publication, alerte du banc complet du samedi) et complet.ts, sans ligne tassée
   // L730 (revue) : bench 1090, l'alerte ne tombe que sur un banc complet vert qui rejoue chaque rouge en attente (même séquence)
   // L730 (revue 2) : bench 1100, la garde en quatre règles (le banc rouge rejoué sur l'empreinte à publier, refus nommant les bancs à rejouer)
@@ -153,6 +154,7 @@ const BUDGET_R29: Record<string, { total: number; modules: Record<string, number
   // L738 : bench 1320 (+80), le bruit d'un banc expire 14 jours après sa dernière paire A contre A et le banc complet du samedi le remesure (bench bruit, A contre son jumeau), sans ligne tassée
   // L738 (revue 1) : bench 1340 (+20), seules les paires A contre A du banc complet comptent pour le bruit (bruitDuSamedi, ecartPaire) et le seuil est la médiane des 3 dernières, sans ligne tassée
   // L739 : bench 1343 (+3), les bancs du court (1, 3 et 7) dans une seule constante, BANCS_COURT
+  // L742 (D-23 B) : bench 1493 (+150), sequence 702 (+2), l'environnement de chaque rapport (Claude Code, modèle exact, réglages) comparé au précédent, sans ligne tassée
 };
 function reglesBudget(f: Fichiers): string[] {
   const b = JSON.parse(f['budget.json']) as Record<string, { total: number; modules: Record<string, number> }>;
@@ -247,13 +249,13 @@ const mutations: [string, string, string, (t: string) => string][] = [
   ['C2', "modele: 'sonnet'", 'src/bench/bras.ts', ajout("const d = { modele: 'sonnet' };")],
   ['C3', 'trois portes', 'src/bench/banc.ts', ajout('porte(1);\ngate(2);\nverifyAll(3);')],
   ['C3', 'budget porte 400', 'budget.json', remplace('"porte": 250', '"porte": 400')],
-  ['C4', 'total mesure relevé', 'budget.json', remplace('"total": 2043', '"total": 2100')],
+  ['C4', 'total mesure relevé', 'budget.json', remplace('"total": 2195', '"total": 2300')],
   ['C4', 'total noyau relevé', 'budget.json', remplace('"total": 3000', '"total": 3500')],
-  ['C4', 'budget sequence relevé', 'budget.json', remplace('"sequence": 700', '"sequence": 900')],
+  ['C4', 'budget sequence relevé', 'budget.json', remplace('"sequence": 702', '"sequence": 900')],
   ['C4', 'budget plan relevé sous le total', 'budget.json', remplace('"plan": 350', '"plan": 1000')],
   ['C4', 'budget hooks relevé (R32)', 'budget.json', remplace('"hooks": 200', '"hooks": 300')],
-  ['C4', 'hooks déplacé dans la mesure', 'budget.json', (t) => t.replace('"deliver": 450, "hooks": 200', '"deliver": 450').replace('"sequence": 700', '"sequence": 700, "hooks": 200')],
-  ['C4', 'module sans budget R29', 'budget.json', remplace('"bench": 1343', '"bench": 1343, "outil": 100')],
+  ['C4', 'hooks déplacé dans la mesure', 'budget.json', (t) => t.replace('"deliver": 450, "hooks": 200', '"deliver": 450').replace('"sequence": 702', '"sequence": 702, "hooks": 200')],
+  ['C4', 'module sans budget R29', 'budget.json', remplace('"bench": 1493', '"bench": 1493, "outil": 100')],
   ['C4', 'groupe de budget ajouté', 'budget.json', remplace(/\n}\s*$/, ',\n  "autre": { "total": 900, "modules": {} }\n}')],
   ['C4', "option(reste,'zzz') sans entrée", 'src/bench/cli.ts', remplace("option(reste, 'taille')", "option(reste, 'zzz')")],
   ['C4', 'chemin options.json inexistant', 'options.json', remplace('"bench --juge": "docs/v2/2026-11-07-cadence-2-design.md"', '"bench --juge": "docs/v2/mesures/rien.md"')],

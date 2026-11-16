@@ -126,6 +126,17 @@ Les chiffres absolus du 07-11 (304 tests cachés, 79 % de mutations) sont affich
 - Refus (code 2) si `v2/src` ou `v2/briefs` a des changements non commités, ou si `v2/dist/cli.js` est absent ou plus ancien que les sources.
 - **Publication** (L730, section « Garde proportionnée », quatre règles) : refusée tant qu'une alerte du banc complet tient ; hors alerte, permise par le dernier banc mécanique vert de l'empreinte, ou par le banc complet : le **dernier** passage avec juges de l'empreinte courante qui couvre les bancs 1, 3 et 7 est vert, oppose `cadence-run` à `A` (L689, décision de Sylvain du 13-11 : la garde mesure le mode par défaut contre Claude seul ; la séquence aussi), oppose un candidat à une référence distincte (`--candidat` égal à `--reference` est refusé, code 2), avec le modèle que le `bras.yaml` courant donne au candidat (le modèle est hors de l'empreinte : chaque ligne d'historique porte `reference` et `modele_candidat`), et si aucun passage rouge de cette empreinte, éclair compris, ne le suit.
 
+## Environnement d'un passage (L742)
+
+Le 16-11, Claude Code est passé de 2.1.293 à 2.1.325 sur Big-Blue, et l'alias `fable` désigne Fable 5.2 depuis le 09-11 : l'empreinte de v2 ne change pas, aucun rapport ne le voyait (D-23). Chaque rapport (banc court, mécanique, micro, bruit, éclair, séquence) porte donc en tête, `.md` et `.json` (`environnement`) :
+
+- **Claude Code** : `claude --version` au lancement du passage, et la version que chaque session a annoncée (`claude_code_version` de l'événement `system/init` du flux) si elle diffère ;
+- **modèle exact de chaque bras** : l'alias de `bras.yaml` et l'identifiant que ses sessions ont annoncé (`model` de `system/init`, par exemple `claude-opus-5-5`), jamais l'alias seul ; les autres modèles facturés (`modelUsage` : sous-agents) à part ; « non lu » si aucune session n'a démarré ;
+- **contexte max** de chaque modèle, lu dans `modelUsage.contextWindow` ;
+- **réglages suivis** (`bench/environnement.ts`, liste fermée) : variables d'environnement qui changent le coût ou le comportement (`CLAUDE_CODE_EFFORT_LEVEL`, `CLAUDE_EFFORT`, `CLAUDE_CODE_DISABLE_*`, `CLAUDE_CODE_MAX_OUTPUT_TOKENS`, `MAX_THINKING_TOKENS`, `CLAUDE_CODE_SUBAGENT_MODEL`, `ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_*_MODEL`, `ANTHROPIC_BASE_URL`, `DISABLE_*`…), et clés `effortLevel`, `model`, `fastMode`, `alwaysThinkingEnabled` et bloc `env` des réglages utilisateur (`$CLAUDE_CONFIG_DIR/settings.json`, sinon `~/.claude/settings.json`) et du fichier `settings` du bras. Un effort réglé nulle part s'écrit « non réglé (défaut de Claude Code) », `CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES` absente « non posée ». Les identifiants de session, de compte, les courriels, clés et jetons n'y entrent jamais.
+
+La première ligne après le titre compare au rapport précédent de `rapports/` (ordre des noms) : `⚠ Environnement différent de <passage> : Claude Code : 2.1.293 → 2.1.325 ; alias fable : … → …`, `Environnement identique à <passage>`, ou « non comparable » face à un rapport d'avant L742. La ligne ⚠ est aussi écrite sur la sortie du passage. Pour deux rapports quelconques : `cadence2 bench comparer <a> <b>`. Test : `v2/test/environnement-l742.test.ts` (dont une capture réelle du flux de `claude -p` 2.1.325).
+
 ## Limites connues des garde-fous
 
 Les outils interdits aux bras et aux juges (`--disallowedTools`, `OUTILS_INTERDITS` de `bras.ts`) sont des motifs sur le **début** de la commande : `Bash(git push:*)` n'arrête pas `git -C x push`, ni `Bash(ssh:*)` un `ssh` lancé par `env`, `bash -c` ou un script. Ce qui protège vraiment : les clones n'ont aucun remote (supprimé à la préparation), `SSH_AUTH_SOCK`, `GH_TOKEN` et `GITHUB_TOKEN` sont vides et `KUBECONFIG` pointe sur `/nonexistent`. Restent possibles un `git push` vers une URL explicite ou un `ssh` qui lit une clé de `~/.ssh` sans phrase de passe ; le contrôle des fuites ne les voit pas. Le banc suppose des bras de bonne foi ; le durcir demanderait un utilisateur ou un conteneur séparé.
@@ -153,6 +164,7 @@ La racine est `~/bench-cadence` (ou `$BENCH_ROOT`).
 | `cadence2 bench lancer --bancs 1,4` | les bancs choisis |
 | `cadence2 bench statut` | dernier passage, banc qu'exige la garde (`mecanique`, ou `complet` pendant une alerte), publication permise ou non (avec les bancs rouges à rejouer et la commande à lancer si elle est refusée), lignes ⚠ : alerte du banc complet, banc complet absent ou de plus de 8 jours, aucun banc frais ; toujours code 0 |
 | `cadence2 bench verifier-publication` | code 0 si la publication est permise (L730, quatre règles : aucune alerte en attente, et banc mécanique ou banc complet vert de l'empreinte ; pendant une alerte, rien ne publie tant que chaque banc rouge n'est pas rejoué vert) |
+| `cadence2 bench comparer <a> <b>` | l'environnement de deux rapports de `rapports/` (section « Environnement d'un passage ») : la première ligne dit s'ils diffèrent et en quoi, puis le titre de chaque rapport ; code 0 identiques, 1 différents ou non comparables (rapport d'avant L742), 2 usage ou rapport illisible |
 | `cadence2 bench ajouter <projet> <lot> <demande.md> --install c --tests c [--taille retouche\|fonction\|grosse] [--visible]` | fabrique un banc frais à partir d'un lot livré |
 | `cadence2 bench sequence <id> [--candidat c] [--reference r] [--repetitions N]` | le banc séquence (section ci-dessous) ; défauts : candidat `sequence-v2`, référence `A`, 1 répétition ; pour la garde : `--candidat cadence-run --reference A` |
 
@@ -208,6 +220,7 @@ Chaque samedi à 10 h, le service lance `cadence2 bench complet` : le passage A 
 ## Où lire les rapports
 
 - `~/bench-cadence/rapports/<passage>.md` (et `.json`) : par banc, temps, jetons, préféré, tests cachés, mutations, suite du projet (`ok` ou `ROUGE`) et réponse à la demande (`oui`, `en partie`, `non`) de chaque bras ;
+- en tête de chaque rapport, l'environnement du passage (Claude Code, modèle exact de chaque bras, contexte max, réglages) et sa comparaison au rapport précédent (L742) ;
 - `~/bench-cadence/historique.jsonl`, une ligne par passage ;
 - `~/bench-cadence/runs/<passage>/<banc>/resultat.json` pour le détail.
 - `~/bench-cadence/en-cours.json` : écrit à chaque changement de phase pendant un passage (banc, répétition, phase, termines), effacé avec le verrou ; le HUD le montre.

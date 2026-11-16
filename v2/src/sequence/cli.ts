@@ -1,5 +1,6 @@
 import { chargerBras, executeurClaude, type Executeur } from '../bench/bras.js';
 import { racineBanc } from '../bench/banc.js';
+import { versionClaude } from '../bench/environnement.js';
 import { empreinte } from '../bench/cli.js';
 import type { Io } from '../cli.js';
 import type { preparer } from '../bench/preparer.js';
@@ -13,7 +14,7 @@ const REPO = new URL('../../../', import.meta.url).pathname;
 const option = (args: string[], nom: string): string | undefined => { const i = args.indexOf(`--${nom}`); return i >= 0 ? args[i + 1] : undefined; };
 
 /** Substitutions des tests : faux claude, « prêt à passer », jscpd. */
-export type Dep = { exec?: Executeur; prep?: typeof preparer; pret?: () => string | null; jscpd?: string[]; delaiMs?: number; empreinte?: string; horloge?: () => Date };
+export type Dep = { version?: string; exec?: Executeur; prep?: typeof preparer; pret?: () => string | null; jscpd?: string[]; delaiMs?: number; empreinte?: string; horloge?: () => Date };
 
 /** `cadence2 bench sequence` : N répétitions sous un seul run id ; 0 seulement si toutes sont vertes, 2 pour un refus ou un usage faux. */
 export async function sequence(args: string[], io: Io, dep: Dep = {}): Promise<number> {
@@ -23,13 +24,13 @@ export async function sequence(args: string[], io: Io, dep: Dep = {}): Promise<n
   const racine = racineBanc(io.env), emp = dep.empreinte ?? empreinte(REPO), maintenant = io.now();
   if (ref === cand) { io.err(`sequence refusée : --candidat et --reference désignent le même bras (${ref})`); return 2; }
   if (emp === 'inconnue' || !io.env.HOME) { io.err(`sequence refusée : ${io.env.HOME ? 'empreinte inconnue (pas de dépôt git)' : 'HOME vide, les réglages utilisateur ne peuvent pas être contrôlés (R36)'}`); return 2; }
-  let modele = '';
-  try { modele = chargerBras(racine)[cand]?.modele ?? ''; } catch { /* bras.yaml illisible : passageSequences le dira */ }
+  let modele = '', alias: Record<string, string> = {}; const version = dep.version ?? versionClaude(); // L742 : version au lancement
+  try { alias = Object.fromEntries(Object.values(chargerBras(racine)).map((d) => [d.nom, d.modele])); modele = alias[cand] ?? ''; } catch { /* bras.yaml illisible : passageSequences le dira */ }
   const verts: boolean[] = [];
   try {
     passageSequences({ racine, id, ref, cand, juge: option(args, 'juge') ?? 'opus', exec: dep.exec ?? executeurClaude, maintenant, empreinte: emp, home: io.env.HOME,
       out: io.out, ...(dep.pret && { pret: dep.pret }), jscpd: dep.jscpd, prep: dep.prep, delaiMs: dep.delaiMs, horloge: dep.horloge, garderClones: args.includes('--garder-clones') }, n, (r, repetition) => {
-      const v = conclureSequence(racine, r, ref, cand, { maintenant: io.now(), empreinte: emp, modele_candidat: modele, repetition, repetitions: n });
+      const v = conclureSequence(racine, r, ref, cand, { maintenant: io.now(), empreinte: emp, modele_candidat: modele, repetition, repetitions: n, alias, version });
       verts.push(v.vert);
       io.out(`${v.vert ? 'VERT' : 'ROUGE'} — séquence ${id}, répétition ${repetition}/${n}, run ${r.run} : ${racine}/rapports/${r.run}-${r.sequence}-r${repetition}.md`);
     }, (message, repetition, run) => {

@@ -2,6 +2,7 @@ import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BARRE_SPEC, ligneHistorique, parisJour, type Critere, type Verdict } from '../bench/verdict.js';
 import { avisLu } from '../bench/juges.js';
+import { enteteEnvironnement, environnement, passagePrecedent, versionClaude } from '../bench/environnement.js';
 import type { MesureEtape, ResultatSequence } from './passage.js';
 
 type Maint = NonNullable<MesureEtape['maintenabilite']>;
@@ -76,7 +77,7 @@ function cellule(r: ResultatSequence, ref: string, cand: string, k: number, f: (
 const pct = (m?: Maint) => (m ? (m.duplication_pct === null ? 'n.m.' : `${+m.duplication_pct.toFixed(1)} %`) : '–');
 const affaiblis = (e: MesureEtape) => (e.tests_affaiblis ? `${somme(Object.values(e.tests_affaiblis).map((l) => l.length))}` : '–');
 
-export function rapportSequence(r: ResultatSequence, ref: string, cand: string, v: Verdict, e: { date: string; empreinte: string; repetition?: number; repetitions?: number }): string {
+export function rapportSequence(r: ResultatSequence, ref: string, cand: string, v: Verdict, e: { date: string; empreinte: string; repetition?: number; repetitions?: number; environnement?: string[] }): string {
   const ks = [...new Set([ref, cand].flatMap((b) => (r.etapes[b] ?? []).map((x) => x.k)))].sort((a, b) => a - b);
   const bc = (f: (b: string) => string) => `${f(ref)} · ${f(cand)}`, j = r.jugement;
   const zero = `| 0 | – · – | – · – | – · – | – · – | ${bc((b) => (r.base[b] ? (r.base[b].build_ok ? 'ok' : 'ko') : '–'))} | ${bc((b) => pct(r.base[b]?.maintenabilite))} | ${bc((b) => `${r.base[b]?.maintenabilite?.fichiers_400 ?? '–'}`)} | – · – |`;
@@ -94,7 +95,7 @@ export function rapportSequence(r: ResultatSequence, ref: string, cand: string, 
   });
   const sorties = [ref, cand].flatMap((b) => (r.jugement?.meca[b]?.sorties ?? []).filter((x) => x.verdict !== 'oui').map((x) => `- ${b} étape ${x.k} : ${x.verdict} — ${x.sortie} (${x.preuve})`));
   const remplaces = !r.jugement ? ['- juge absent'] : (r.jugement.remplaces ?? []).length ? r.jugement.remplaces!.map((t) => `- ${t}`) : ['- aucun'];
-  return [`# Séquence ${r.sequence} ${e.date} — ${cand} contre ${ref} — ${v.vert ? 'VERT' : 'ROUGE'}`, '', `Empreinte de v2 : ${e.empreinte}`, `Passage : ${r.run}`, `Répétition ${e.repetition ?? 1}/${e.repetitions ?? 1}`, '',
+  return [`# Séquence ${r.sequence} ${e.date} — ${cand} contre ${ref} — ${v.vert ? 'VERT' : 'ROUGE'}`, '', ...(e.environnement ? [...e.environnement, ''] : []), `Empreinte de v2 : ${e.empreinte}`, `Passage : ${r.run}`, `Répétition ${e.repetition ?? 1}/${e.repetitions ?? 1}`, '',
     j ? `Juge aveugle (deux ordres, R39) : préféré ${avisLu(j, 'prefere')} ; écran ${avisLu(j, 'ui')} ; défauts bloquants/majeurs/mineurs ${bc((b) => (j.defauts[b] ? `${j.defauts[b].bloquants}/${j.defauts[b].majeurs}/${j.defauts[b].mineurs}` : '–'))}` : 'Juge aveugle : absent', '',
     `| Étape | Régressions ${ref} · ${cand} (rouges/disparus) | Affaiblis ${ref} · ${cand} | Nouveaux ${ref} · ${cand} | Lecture ${ref} · ${cand} | Build ${ref} · ${cand} | Duplication ${ref} · ${cand} | Fichiers > 400 ${ref} · ${cand} | Temps ${ref} · ${cand} |`,
     '|---|---|---|---|---|---|---|---|---|', zero, ...lignes, '', '| Critère | Valeur | Seuil | Résultat |', '|---|---|---|---|',
@@ -108,12 +109,12 @@ export const ligneSequence = (v: Verdict, e: { date: string; empreinte: string; 
   ligneHistorique(v, { type: 'sequence', ...e, bancs: [e.sequence], hebdo: false, frais: 0 });
 
 /** Verdict, rapport (md et json) dans `rapports/` et ligne d'historique d'une séquence passée. */
-export function conclureSequence(racine: string, r: ResultatSequence, ref: string, cand: string, e: { maintenant: Date; empreinte: string; modele_candidat: string; repetition?: number; repetitions?: number }): Verdict {
-  const v = verdictSequence(r, ref, cand), repetition = e.repetition ?? 1, repetitions = e.repetitions ?? 1;
-  const base = join(racine, 'rapports', `${r.run}-${r.sequence}-r${repetition}`);
+export function conclureSequence(racine: string, r: ResultatSequence, ref: string, cand: string, e: { maintenant: Date; empreinte: string; modele_candidat: string; repetition?: number; repetitions?: number; alias?: Record<string, string>; version?: string }): Verdict {
+  const v = verdictSequence(r, ref, cand), repetition = e.repetition ?? 1, repetitions = e.repetitions ?? 1, nom = `${r.run}-${r.sequence}-r${repetition}`, base = join(racine, 'rapports', nom);
+  const env = environnement(e.version ?? versionClaude(), e.alias ?? {}, [ref, cand].flatMap((b) => (r.etapes[b] ?? []).map((x) => ({ ...x.mesure, bras: b })))); // L742
   mkdirSync(join(racine, 'rapports'), { recursive: true });
-  writeFileSync(`${base}.md`, rapportSequence(r, ref, cand, v, { date: parisJour(e.maintenant).jour, empreinte: e.empreinte, repetition, repetitions }));
-  writeFileSync(`${base}.json`, JSON.stringify({ verdict: v, resultat: r }, null, 2));
+  writeFileSync(`${base}.md`, rapportSequence(r, ref, cand, v, { date: parisJour(e.maintenant).jour, empreinte: e.empreinte, repetition, repetitions, environnement: enteteEnvironnement(env, passagePrecedent(racine, nom)) }));
+  writeFileSync(`${base}.json`, JSON.stringify({ verdict: v, environnement: env, resultat: r }, null, 2));
   appendFileSync(join(racine, 'historique.jsonl'), `${ligneSequence(v, { date: e.maintenant.toISOString(), empreinte: e.empreinte, candidat: cand, reference: ref, modele_candidat: e.modele_candidat, sequence: r.sequence, run: r.run, repetition, repetitions })}\n`);
   return v;
 }

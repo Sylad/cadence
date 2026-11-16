@@ -41,3 +41,9 @@
 
 - Décision : `lead.ux` absent du brief vaut `human` (défaut de docs/lead.md), jamais « brief incomplet ». Sans clé `deliver:` dans cadence.yaml (lue par `grep -n '^deliver:'` avant toute commande), le livreur pousse le sha puis le commit du plan par son propre sha (seulement s'il est posé juste sur le sha), ne lance jamais `cadence deliver`, et rend `L84 poussé 3d6edf4 avec le commit du plan 9a1b2c3, rien à déployer (pas de clé deliver)`.
 - Revue r1 : la fiche docs/specs/livreur-delegue/fiche.yaml (C1, R3, R10, R14, contrat A1), docs/skills.md et skills/lead/SKILL.md disent la même chose qu'agents/livreur.md. Test : test/livreur-delegue.test.ts lit la fiche (YAML) et les deux docs.
+
+## cadence run --clore : run intégré à la main (L745, revue)
+
+- `--liste` dit `integre a la main` un run fini non intégré dont les commits sont sur la cible (`git cherry`) **ou** dont chaque fichier changé a sur la cible le contenu de sa tête (conflit résolu à la main, patch-id différent ; v2/src/run/clore.ts).
+- Décision : une résolution qui diffère du run n'est pas reconnue (pas de preuve) ; `--clore` nomme les fichiers différents et propose `--clore <id> --force`, qui clôt sans preuve (`clos.force`, tête du run imprimée ; `--liste` : « clos le … par --force, sans preuve d'intégration »). `--force` ne passe que le refus « commits absents » (pas un run qui se reprend, un worktree sale, une tête inconnue).
+- `--reponse` refuse un run clos. `fichierRun` et `retirerRun` (run.ts) sont partagés par cli.ts, clore.ts et l'intégration du run. Budget run 800.

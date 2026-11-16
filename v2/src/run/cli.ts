@@ -1,10 +1,10 @@
 import { existsSync, mkdirSync, openSync, readdirSync, readFileSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
 import type { Io } from '../cli.js';
 import type { Executeur } from '../bench/bras.js';
 import { MODELES, modeleRun } from './aiguillage.js';
-import { etatVu, executerRun, occupantRun, repondreRun, type Etat } from './run.js';
+import { etatVu, executerRun, fichierRun, occupantRun, repondreRun, type Etat } from './run.js';
 import { heureLocale, type Quota } from './quota.js';
 import { clore, etatListe } from './clore.js';
 import { origineRapport } from '../rapport.js';
@@ -18,7 +18,9 @@ export const AIDE_RUN = `  cadence run "<demande>" [--piece chemin]… [--lot L1
   cadence run --reponse <id> "<texte>"   reprend un run en attente, en quota ou rendu, dans la même session
   cadence run --liste                    les runs du dépôt et leur état ; « interrompu » : en-cours, processus mort (L709) : --reponse reprend la même session ;
                                          « integre a la main » : run fini non intégré (conflit, refus…) dont tous les commits sont sur la cible (L745)
-  cadence run --clore <id>               retire le worktree et la branche d'un run « integre a la main » et le note clos ; refusé sinon, avec la raison
+  cadence run --clore <id> [--force]     retire le worktree et la branche d'un run « integre a la main » et le note clos ; refusé sinon, avec la raison
+                                         « integre a la main » : même commit ou même patch (git cherry), ou même contenu de ses fichiers (conflit résolu à la main) ;
+                                         --force : clos sans preuve, quand la résolution a changé ses fichiers exprès (noté « par --force » dans --liste)
   cadence run --help | -h                cette aide, sans rien créer
   registre (L701) : sans --demande-humaine ni --registre D-n, la demande est une consigne du lead : rien n'est inscrit au registre (.cadence/demandes/)
            --demande-humaine l'inscrit (texte mot pour mot, D-<n> suivant) ; --registre D-n rattache le run à cette entrée existante
@@ -47,12 +49,11 @@ export async function cmdRun(a: string[], io: Io, exec?: Executeur): Promise<num
       }
       if (!etats.length) out('aucun run'); return 0;
     }
-    if (a[0] === '--clore') { // L745 (issue #62)
-      if (!a[1] || a.length > 2) { io.err('usage : cadence run --clore <id>'); return 2; }
-      const racine = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: io.cwd, encoding: 'utf8' }).trim();
-      const f = join(dirname(racine), '.cadence-run', `${basename(racine)}-${a[1]}.json`);
+    if (a[0] === '--clore') { // L745 (issue #62) ; revue M1 : --force clôt un run dont les commits manquent à la cible, sans preuve d'intégration
+      if (!a[1] || a.length > 3 || (a[2] !== undefined && a[2] !== '--force')) { io.err('usage : cadence run --clore <id> [--force]'); return 2; }
+      const f = fichierRun(io.cwd, a[1]);
       if (!existsSync(f)) { io.err(`cadence run : run inconnu : ${a[1]} (${f})`); return 1; }
-      return clore(JSON.parse(readFileSync(f, 'utf8')) as Etat, out);
+      return clore(JSON.parse(readFileSync(f, 'utf8')) as Etat, out, a[2] === '--force');
     }
     if (a[0] === '--veilleur') return veiller(['run', ...a.slice(1)], io.env, io.cwd, out); // L711 : le parent d'un run --fond, lancé par --fond seul
     if (a[0] === '--reponse') {

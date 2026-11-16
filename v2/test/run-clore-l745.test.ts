@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { cmdRun } from '../src/run/cli.js';
-import { executerRun, type Etat } from '../src/run/run.js';
+import { executerRun, repondreRun, type Etat } from '../src/run/run.js';
 import { commite, depot, fauxClaude, git } from './run-outils.js';
 
 const ID = ['-c', 'user.email=t@t', '-c', 'user.name=t'];
@@ -19,6 +19,13 @@ function runEnConflit(): { repo: string; e: Etat } {
   expect(e.etat).toBe('conflit');
   expect(existsSync(e.worktree)).toBe(true);
   return { repo, e };
+}
+
+/** Le conflit résolu à la main : cherry-pick du run sur main, fait.txt écrit avec `contenu` (le contenu du run par défaut), cherry-pick --continue. */
+function resoudreALaMain(repo: string, e: Etat, contenu = git(repo, 'show', `${e.branche}:fait.txt`)): void {
+  expect(() => git(repo, ...ID, 'cherry-pick', e.branche)).toThrow(); // le patch ne s'applique pas tel quel : c'est le conflit du run
+  writeFileSync(join(repo, 'fait.txt'), contenu); git(repo, 'add', 'fait.txt');
+  git(repo, ...ID, '-c', 'core.editor=true', 'cherry-pick', '--continue');
 }
 
 describe('cadence run --liste et --clore : un run intégré à la main (L745, issue #62)', () => {
@@ -73,5 +80,58 @@ describe('cadence run --liste et --clore : un run intégré à la main (L745, is
     expect(await lancer(repo, '--clore', e.id)).toMatchObject({ code: 1, texte: expect.stringMatching(/le run est attente : il se reprend/) });
     expect((await lancer(repo, '--clore', 'inconnu')).code).toBe(1);
     expect((await lancer(repo, '--clore')).code).toBe(2);
+  });
+  it('revue M1 : conflit résolu à la main (cherry-pick, patch-id différent) avec le contenu du run : reconnu par le contenu, --clore le retire', async () => {
+    const { repo, e } = runEnConflit();
+    resoudreALaMain(repo, e);
+    expect(git(repo, 'cherry', 'main', e.branche)).toMatch(/^\+ /); // git cherry seul ne le reconnaît pas
+    expect((await lancer(repo, '--liste')).texte).toMatch(new RegExp(`^${e.id}  integre a la main \\(était conflit ; worktree et branche : cadence run --clore ${e.id}\\)`, 'm'));
+    const r = await lancer(repo, '--clore', e.id);
+    expect(r).toMatchObject({ code: 0, texte: expect.stringMatching(/clos — les fichiers du run \(fait\.txt\) ont sur main le contenu de sa tête/) });
+    expect(existsSync(e.worktree)).toBe(false);
+    expect(branche(repo, e.branche)).toBe(false);
+  });
+
+  it('revue M1 : résolution qui diffère du run : --clore refuse en nommant le fichier et dit comment clore (--force) ; --force le clôt, --liste le dit forcé', async () => {
+    const { repo, e } = runEnConflit();
+    resoudreALaMain(repo, e, 'ok et autre');
+    expect((await lancer(repo, '--liste')).texte).toMatch(new RegExp(`^${e.id}  conflit  `, 'm'));
+    const r = await lancer(repo, '--clore', e.id);
+    expect(r.code).toBe(1);
+    expect(r.texte).toMatch(/absent\(s\) de main : [0-9a-f]{7} ajoute fait\.txt ; intègre-les d'abord \(contenu différent sur main : fait\.txt ; si ta résolution/);
+    expect(r.texte).toContain(`cadence run --clore ${e.id} --force`);
+    expect(existsSync(e.worktree)).toBe(true);
+    const f = await lancer(repo, '--clore', e.id, '--force');
+    expect(f).toMatchObject({ code: 0, texte: expect.stringMatching(/clos sans preuve d'intégration \(--force\)/) });
+    expect(existsSync(e.worktree)).toBe(false);
+    expect(branche(repo, e.branche)).toBe(false);
+    expect((await lancer(repo, '--liste')).texte).toMatch(new RegExp(`^${e.id}  clos le \\d{4}-\\d\\d-\\d\\d par --force, sans preuve d'intégration \\(était conflit\\)`, 'm'));
+  });
+
+  it('revue M2 : --reponse sur un run clos est refusé, sans session, et l\'état reste celui du run clos', async () => {
+    const { repo, e } = runEnConflit();
+    git(repo, ...ID, 'merge', '-q', '-X', 'theirs', '--no-edit', e.branche);
+    expect((await lancer(repo, '--clore', e.id)).code).toBe(0);
+    const avant = readFileSync(e.fichier, 'utf8'), appels: { args: string[]; env: NodeJS.ProcessEnv }[] = [];
+    expect(() => repondreRun(e.id, repo, 'reprends', { exec: fauxClaude([], appels), out: () => {}, attendre: null }))
+      .toThrow(new RegExp(`${e.id} est clos \\(--clore\\) le \\d{4}-\\d\\d-\\d\\d : worktree et branche retirés, rien à reprendre`));
+    expect(appels).toHaveLength(0);
+    expect(readFileSync(e.fichier, 'utf8')).toBe(avant);
+    expect(await lancer(repo, '--reponse', e.id, 'reprends')).toMatchObject({ code: 1, texte: expect.stringMatching(/est clos/) });
+  });
+
+  it('revue m1 : refus de --clore pour un run intégré par cadence run, un run sans commit, une tête inconnue ; --force ne passe pas un worktree sale', async () => {
+    const { repo, e } = runEnConflit();
+    const etat = JSON.parse(readFileSync(e.fichier, 'utf8')) as Etat, ecrire = (x: Partial<Etat>) => writeFileSync(e.fichier, JSON.stringify({ ...etat, ...x }));
+    ecrire({ etat: 'integre' });
+    expect(await lancer(repo, '--clore', e.id)).toMatchObject({ code: 1, texte: expect.stringMatching(/intégré par cadence run/) });
+    ecrire({ base: git(repo, 'rev-parse', e.branche) });
+    expect(await lancer(repo, '--clore', e.id)).toMatchObject({ code: 1, texte: expect.stringMatching(/aucun commit/) });
+    ecrire({});
+    writeFileSync(join(e.worktree, 'brouillon.txt'), 'x');
+    expect(await lancer(repo, '--clore', e.id, '--force')).toMatchObject({ code: 1, texte: expect.stringMatching(/non commitées : brouillon\.txt/) });
+    git(repo, 'worktree', 'remove', '--force', e.worktree); git(repo, 'branch', '-D', e.branche); ecrire({ tete: undefined });
+    expect(await lancer(repo, '--clore', e.id)).toMatchObject({ code: 1, texte: expect.stringMatching(/tête du run inconnue/) });
+    expect((await lancer(repo, '--clore', e.id, '--autre')).code).toBe(2);
   });
 });

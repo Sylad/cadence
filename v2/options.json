@@ -23,6 +23,7 @@
     "cadence2 --reponse": "docs/v2/2026-11-09-cadence-run.md",
     "cadence2 --liste": "docs/v2/2026-11-09-cadence-run.md",
     "cadence2 --clore": "docs/v2/2026-11-09-cadence-run.md",
+    "cadence2 --force": "docs/v2/2026-11-09-cadence-run.md",
     "cadence2 --complet": "docs/v2/2026-11-09-cadence-run.md",
     "cadence2 --lot": "docs/v2/2026-11-09-cadence-run.md",
     "cadence2 --demande-humaine": "docs/v2/2026-11-09-cadence-run.md",

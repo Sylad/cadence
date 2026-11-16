@@ -40,12 +40,14 @@ export interface Etat extends EtatRapport { id: string; repo: string; branche: s
    * revue non conforme du plan au lancement ; chaque session jouée, son modèle et pourquoi. */
   modele_raison?: string; correction_revue?: boolean; corrections_avant?: number; revue?: Revue; passes?: Passe[];
   /** L745 (clore.ts) : la tête du worktree à la fin d'un run non intégré (l'intégration à la main se vérifie même branche retirée) ; `clos` : posé par --clore. */
-  tete?: string; clos?: { date: string; cible: string; tete: string } }
+  tete?: string; clos?: { date: string; cible: string; tete: string; force?: true } }
 /** `maintenant` et `attendre` : l'horloge et l'attente du quota (D-15), simulées par les tests ; `attendre: null` rend la main sans attendre la remise à zéro. */
 interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null }
 
 const git = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 const essaiGit = (cwd: string, ...a: string[]) => spawnSync('git', a, { cwd, encoding: 'utf8' }), dossierRuns = (repo: string) => join(dirname(repo), '.cadence-run');
+/** Le fichier d'état du run `id` du dépôt qui contient `repo` (--reponse, --clore). */
+export const fichierRun = (repo: string, id: string) => { const racine = git(repo, 'rev-parse', '--show-toplevel'); return join(dossierRuns(racine), `${basename(racine)}-${id}.json`); };
 const sauver = (e: Etat) => { writeFileSync(e.fichier, JSON.stringify(e, null, 1)); return e; }, lireEtat = (f: string) => JSON.parse(readFileSync(f, 'utf8')) as Etat;
 
 // L695 (D-9) : le run tient la branche cible du début à la fin ; le pre-commit de raf (raf hook install) y refuse un commit du lead, qui le ferait
@@ -285,9 +287,19 @@ function suite(e: Etat, o: Opts): Etat {
   // L723 : intégré, mais une fusion écrite par la session est à relire ; L724 : de même pour une correction après porte rouge
   e.detail = [...(e.conflits ?? []).filter((c) => c.resolu).map((c) => conflitResolu(e, c)), ...(e.corrections ?? []).filter((c) => c.verte).map(correctionFaite)].join('\n');
   const registre = registreOuvert(e.worktree);
-  essaiGit(e.repo, 'worktree', 'remove', '--force', e.worktree); essaiGit(e.repo, 'branch', '-D', br);
-  libererReglages(e.worktree); rmSync(`${e.worktree}.reglages`, { recursive: true, force: true });
+  retirerRun(e);
   return fin(e, o, registre);
+}
+
+/** Retire le worktree, la branche et les réglages d'un run (intégré, ou clos par --clore) ; rend l'échec de git en une phrase, '' sinon. */
+export function retirerRun(e: Etat): string {
+  const w = essaiGit(e.repo, 'worktree', 'remove', '--force', e.worktree);
+  if (w.status !== 0 && existsSync(e.worktree)) return `git worktree remove a échoué : ${w.stderr.trim()}`;
+  essaiGit(e.repo, 'worktree', 'prune');
+  const b = essaiGit(e.repo, 'branch', '-D', e.branche);
+  if (b.status !== 0 && essaiGit(e.repo, 'rev-parse', '--verify', '-q', `refs/heads/${e.branche}`).status === 0) return `git branch -D ${e.branche} a échoué : ${b.stderr.trim()}`;
+  libererReglages(e.worktree); rmSync(`${e.worktree}.reglages`, { recursive: true, force: true });
+  return '';
 }
 
 function fin(e: Etat, o: Opts, registre = registreOuvert(e.worktree)): Etat {
@@ -341,14 +353,15 @@ export function executerRun(a: { repo: string; demande: string; pieces?: string[
 
 /** Reprend un run en attente (question) ou rendu (porte rouge, conflit, sans porte) : la réponse va à la même session. */
 export function repondreRun(id: string, repo: string, reponse: string, o: Opts): Etat {
-  const racine = git(repo, 'rev-parse', '--show-toplevel');
-  const f = join(dossierRuns(racine), `${basename(racine)}-${id}.json`);
+  const f = fichierRun(repo, id);
   if (!existsSync(f)) throw new Error(`cadence run : run inconnu : ${id} (${f})`);
   const coupe = etatVu(lireEtat(f)) === 'interrompu' ? 'Ta session a été interrompue (le processus du run est mort) : reprends là où tu t\'étais arrêté, dans le même dossier. ' : '';
   verrouiller(lireEtat(f)); // D-18 : refusé si un processus vivant joue ou attend ce run ; l'état est relu sous le verrou
   try {
     const e = lireEtat(f);
     if (e.etat === 'integre') throw new Error(`cadence run : ${id} est déjà intégré`);
+    // Revue L745 (M2) : un run clos n'a plus de worktree ; la session partirait pour rien et réécrirait son état
+    if (e.clos) throw new Error(`cadence run : ${id} est clos (--clore) le ${e.clos.date.slice(0, 10)} : worktree et branche retirés, rien à reprendre ; une suite : cadence run "<demande>"`);
     if (e.etat === 'porte-rouge') ouvrirCorrection(e, e.detail, o.out); // L724 : la réponse du lead à une porte rouge est une correction, pas le travail
     e.etat = 'en-cours'; delete e.quota; sauver(e); // L709 : un run interrompu reprend la même session (son id est dans l'état dès le lancement), même worktree
     return attendreQuota(tenu(e, o, () => (session(e, `${coupe}Réponse de Sylvain : ${reponse}`, o, false, sujetEnCours(e)) ? suite(e, o) : fin(e, o))), o);

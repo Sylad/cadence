@@ -118,10 +118,10 @@ const FLAGS_CLI: Record<string, string[]> = {
   'src/bench/preparer.ts': ['no-hardlinks', 'format', 'is-ancestor', 'all', 'expire', 'prune', 'not'],
   'src/bench/ajouter.ts': ['format', 'reverse', 'grep', 'verify', 'name-only'],
   'src/sequence/mesures.ts': ['porcelain', 'others', 'exclude-standard', 'reporter', 'outputFile', 'yes', 'reporters', 'output', 'silent', 'ignore', 'name-only', 'gitignore'], // flags git, vitest et jscpd (S2, S7 : --gitignore), aucune option de cadence2
-  'src/run/run.ts': ['show-toplevel', 'count', 'abort', 'abbrev-ref', 'short', 'ff-only', 'force', 'resume', 'session-id', 'git-path', 'continue', 'skip', 'name-only', 'diff-filter', 'is-ancestor'], // git, claude --resume (reprise de la même session) et --session-id (L709 : id écrit dès le lancement) ; L722 : git status au départ du run lu par scripts/arbre-non-commite.mjs
+  'src/run/run.ts': ['verify', 'show-toplevel', 'count', 'abort', 'abbrev-ref', 'short', 'ff-only', 'force', 'resume', 'session-id', 'git-path', 'continue', 'skip', 'name-only', 'diff-filter', 'is-ancestor'], // git, claude --resume (reprise de la même session) et --session-id (L709 : id écrit dès le lancement) ; L722 : git status au départ du run lu par scripts/arbre-non-commite.mjs
   // L723 : rebase seul (--git-path, --diff-filter=U, --is-ancestor ; --continue et --skip dans la consigne de résolution), fichiers que le run modifie (--name-only)
   'src/run/cli.ts': ['show-toplevel'],
-  'src/run/clore.ts': ['verify', 'count', 'porcelain', 'force'], // L745 : rev-parse --verify, rev-list --count, status --porcelain du worktree, worktree remove --force
+  'src/run/clore.ts': ['verify', 'count', 'porcelain', 'force', 'name-only', 'no-renames'], // L745 : rev-parse --verify, rev-list --count, status --porcelain du worktree, --clore --force ; revue M1 : diff --name-only --no-renames
   'src/run/escalade.ts': ['json'], // L726 : raf list --json, la revue de code du lot dans le plan
   'src/registre.ts': ['name-only', 'diff-filter'], // git diff --name-only, --diff-filter=A (L701 : le registre touché sans option, entrée neuve avec --registre)
   'src/bench/sans-juge.ts': ['name-only'], // L733 : git diff --name-only base..HEAD, les fichiers que le bras a livrés
@@ -131,7 +131,7 @@ const FLAGS_CLI: Record<string, string[]> = {
 const prefixe = (k: string) => (k.startsWith('src/bench/') || k === 'src/sequence/cli.ts' || k === 'src/cli.ts' ? 'bench' : 'cadence2'); // l'aide de cli.ts et le banc séquence décrivent les options de « bench »
 // Budgets de R29 : relever un total ou un module (même sous le total) est une violation ; le baisser est permis.
 const BUDGET_R29: Record<string, { total: number; modules: Record<string, number> }> = {
-  noyau: { total: 3000, modules: { plan: 350, accueil: 200, run: 777, porte: 250, deliver: 450, hooks: 200 } }, // R32 : hooks, mécanisme du bras candidat ; issue #57 : run 455, run.ts détassé, messages gardés à toute fin ; L722 : run 466 (+11), le départ nomme les fichiers non commités de l'arbre principal (pas de ligne tassée)
+  noyau: { total: 3000, modules: { plan: 350, accueil: 200, run: 800, porte: 250, deliver: 450, hooks: 200 } }, // R32 : hooks, mécanisme du bras candidat ; issue #57 : run 455, run.ts détassé, messages gardés à toute fin ; L722 : run 466 (+11), le départ nomme les fichiers non commités de l'arbre principal (pas de ligne tassée)
   // L723 : run 520, rebase seul quand la cible avance pendant la porte (conflit rendu à la session, porte rejouée, arbre principal sale nommé), sans ligne tassée
   // L723 (revue, M1) : run 539, un conflit de rebase résolu est ajouté à l'état (conflits, détail de fin) et au journal sans remplacer le rapport du travail, sans ligne tassée
   // L722 (revue r1) : run 532 (-7), la lecture des fichiers non commités vient de scripts/arbre-non-commite.mjs, partagée avec src (copie retirée de run.ts)
@@ -142,6 +142,8 @@ const BUDGET_R29: Record<string, { total: number; modules: Record<string, number
   // L726 : run 670 (+101), aiguillage de modèle : escalade.ts (passes de correction et revues non conformes du lot, Fable d'office) et la ligne des modèles de chaque passe, sans ligne tassée
   // L726 (revue) : run 695 (+25), correction après revue seulement sur une revue non conforme neuve (revueApresIntegre), lignes à deux instructions détassées (run.ts, escalade.ts)
   // L745 (issue #62) : run 777 (+82), clore.ts : --liste dit « integre a la main » un run fini dont tous les commits sont sur la cible, --clore retire son worktree et sa branche, sans ligne tassée
+  // L745 (revue, M1 et M2) : run 800 (+23), un conflit résolu à la main est reconnu par le contenu de ses fichiers, --clore --force, --reponse refuse un run clos ;
+  // fichierRun et retirerRun (run.ts) partagés avec cli.ts et clore.ts au lieu de deux copies, sans ligne tassée
   mesure: { total: 2195, modules: { bench: 1493, sequence: 702 } }, // L689 : bench relevé de 800 à 984 plutôt que tassé (décision de Sylvain du 13-11) ; issue #57 : 998, bras.ts détassé, erreur nommée
   // L730 (D-22) : bench 1080, garde proportionnée (banc mécanique avant publication, alerte du banc complet du samedi) et complet.ts, sans ligne tassée
   // L730 (revue) : bench 1090, l'alerte ne tombe que sur un banc complet vert qui rejoue chaque rouge en attente (même séquence)

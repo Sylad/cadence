@@ -39,8 +39,9 @@ export interface Etat extends EtatRapport { id: string; repo: string; branche: s
   /** L726 (escalade.ts) : pourquoi `modele` ; le run est une correction après revue (un run du lot déjà intégré) ; passes de correction du lot avant ce run ;
    * revue non conforme du plan au lancement ; chaque session jouée, son modèle et pourquoi. */
   modele_raison?: string; correction_revue?: boolean; corrections_avant?: number; revue?: Revue; passes?: Passe[];
-  /** L745 (clore.ts) : la tête du worktree à la fin d'un run non intégré (l'intégration à la main se vérifie même branche retirée) ; `clos` : posé par --clore. */
-  tete?: string; clos?: { date: string; cible: string; tete: string; force?: true } }
+  /** L745 (clore.ts) : la tête du worktree à la fin d'un run non intégré (archivée par --clore, lue par --liste quand la branche est retirée) ; `clos` : posé par
+   * --clore, avec ses archives et ce qui est resté (worktree non propre, branche) ; `force` : un état clos avant la 5e passe, sans preuve d'intégration. */
+  tete?: string; clos?: { date: string; cible: string; tete: string; integre?: boolean; archives?: string[]; restes?: string[]; force?: true } }
 /** `maintenant` et `attendre` : l'horloge et l'attente du quota (D-15), simulées par les tests ; `attendre: null` rend la main sans attendre la remise à zéro. */
 interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null }
 
@@ -291,15 +292,14 @@ function suite(e: Etat, o: Opts): Etat {
   return fin(e, o, registre);
 }
 
-/** Retire le worktree, la branche et les réglages d'un run (intégré, ou clos par --clore) ; rend l'échec de git en une phrase, '' sinon. */
-export function retirerRun(e: Etat): string {
-  const w = essaiGit(e.repo, 'worktree', 'remove', '--force', e.worktree);
-  if (w.status !== 0 && existsSync(e.worktree)) return `git worktree remove a échoué : ${w.stderr.trim()}`;
+/** Les réglages de session d'un worktree retiré (aussi par --clore, clore.ts). */
+export const oublierReglages = (worktree: string) => { libererReglages(worktree); rmSync(`${worktree}.reglages`, { recursive: true, force: true }); };
+/** Retire le worktree, la branche et les réglages d'un run intégré : tout son travail est sur la cible. */
+function retirerRun(e: Etat): void {
+  essaiGit(e.repo, 'worktree', 'remove', '--force', e.worktree);
   essaiGit(e.repo, 'worktree', 'prune');
-  const b = essaiGit(e.repo, 'branch', '-D', e.branche);
-  if (b.status !== 0 && essaiGit(e.repo, 'rev-parse', '--verify', '-q', `refs/heads/${e.branche}`).status === 0) return `git branch -D ${e.branche} a échoué : ${b.stderr.trim()}`;
-  libererReglages(e.worktree); rmSync(`${e.worktree}.reglages`, { recursive: true, force: true });
-  return '';
+  essaiGit(e.repo, 'branch', '-D', e.branche);
+  oublierReglages(e.worktree);
 }
 
 function fin(e: Etat, o: Opts, registre = registreOuvert(e.worktree)): Etat {
@@ -360,8 +360,8 @@ export function repondreRun(id: string, repo: string, reponse: string, o: Opts):
   try {
     const e = lireEtat(f);
     if (e.etat === 'integre') throw new Error(`cadence run : ${id} est déjà intégré`);
-    // Revue L745 (M2) : un run clos n'a plus de worktree ; la session partirait pour rien et réécrirait son état
-    if (e.clos) throw new Error(`cadence run : ${id} est clos (--clore) le ${e.clos.date.slice(0, 10)} : worktree et branche retirés, rien à reprendre ; une suite : cadence run "<demande>"`);
+    // Revue L745 (M2) : un run clos n'a plus sa branche ; la session partirait pour rien et réécrirait son état
+    if (e.clos) throw new Error(`cadence run : ${id} est clos (--clore) le ${e.clos.date.slice(0, 10)} : sa branche est retirée, son travail archivé (cadence run --archives), rien à reprendre ; une suite : cadence run "<demande>"`);
     if (e.etat === 'porte-rouge') ouvrirCorrection(e, e.detail, o.out); // L724 : la réponse du lead à une porte rouge est une correction, pas le travail
     e.etat = 'en-cours'; delete e.quota; sauver(e); // L709 : un run interrompu reprend la même session (son id est dans l'état dès le lancement), même worktree
     return attendreQuota(tenu(e, o, () => (session(e, `${coupe}Réponse de Sylvain : ${reponse}`, o, false, sujetEnCours(e)) ? suite(e, o) : fin(e, o))), o);

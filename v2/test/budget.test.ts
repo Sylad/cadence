@@ -53,6 +53,8 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // L745 (revue r2) : run 802 (+2), noms lus avec -z et comparés en JS (un nom accentué, « : » initial ou « \ » ne passe plus pour intégré), git diff en échec = non intégré.
   // L745 (4e passe) : run 846 (+44), clore.ts réécrit en contrat, une fonction par ligne du tableau de la doc (têtes du run, worktree, commits hors cible, patch-id
   // sans git cherry), la reconnaissance par contenu retirée, sans ligne tassée.
+  // L745 (5e passe, changement de conception) : run 845 (-1), --clore archive avant de retirer (refs/cadence/archive/), --liste ne fait qu'afficher, cadence run
+  // --archives ; patch-id, tableau de reconnaissance et --force retirés, sans ligne tassée.
   it('les totaux sont ceux de R29 : noyau 3000, mesure 2195 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
     expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2195]);

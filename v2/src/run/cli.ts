@@ -6,7 +6,7 @@ import type { Executeur } from '../bench/bras.js';
 import { MODELES, modeleRun } from './aiguillage.js';
 import { etatVu, executerRun, fichierRun, occupantRun, repondreRun, type Etat } from './run.js';
 import { heureLocale, type Quota } from './quota.js';
-import { clore, etatListe } from './clore.js';
+import { archives, clore, etatListe } from './clore.js';
 import { origineRapport } from '../rapport.js';
 import { causeListe, identite, veiller } from '../trace.js';
 
@@ -17,11 +17,11 @@ const quotaListe = (e: Etat, q: Quota, l = `limite ${q.limite === 'hebdo' ? 'heb
 export const AIDE_RUN = `  cadence run "<demande>" [--piece chemin]… [--lot L12] [--demande-humaine | --registre D-n] [--taille retouche|fonction] [--complet] [--modele ${MODELES.join('|')}] [--sans-porte] [--fond]   une demande, une session (mode complet si références), porte, intégration
   cadence run --reponse <id> "<texte>"   reprend un run en attente, en quota ou rendu, dans la même session
   cadence run --liste                    les runs du dépôt et leur état ; « interrompu » : en-cours, processus mort (L709) : --reponse reprend la même session ;
-                                         « integre a la main » : run fini non intégré (conflit, refus…) dont tous les commits sont sur la cible (L745)
-  cadence run --clore <id> [--force]     retire le worktree et la branche d'un run « integre a la main » et le note clos ; refusé sinon, avec la raison
-                                         « integre a la main » : chaque commit du run (branche et HEAD du worktree, fusions comprises) est un ancêtre de la cible
-                                         ou y a le même patch-id ; git en échec, worktree avec un fichier modifié ou non suivi, tout autre cas : non intégré ;
-                                         --force : seul moyen de clore un run non intégré (conflit résolu à la main…), il nomme les commits perdus
+                                         « integre a la main » : run fini sans intégration dont la tête de branche est un ancêtre de la cible (L745) ; sinon son état
+                                         et une ligne « commits absents de la cible : N »
+  cadence run --clore <id>               clôt un run fini, intégré ou non : archive la tête de sa branche et le HEAD de son worktree (refs/cadence/archive/), puis
+                                         retire la branche, et le dossier du worktree seulement s'il est propre (sinon il reste, et la commande le dit)
+  cadence run --archives                 les archives posées par --clore, et la commande git qui en refait une branche
   cadence run --help | -h                cette aide, sans rien créer
   registre (L701) : sans --demande-humaine ni --registre D-n, la demande est une consigne du lead : rien n'est inscrit au registre (.cadence/demandes/)
            --demande-humaine l'inscrit (texte mot pour mot, D-<n> suivant) ; --registre D-n rattache le run à cette entrée existante
@@ -43,19 +43,21 @@ export async function cmdRun(a: string[], io: Io, exec?: Executeur): Promise<num
       const racine = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: io.cwd, encoding: 'utf8' }).trim(), d = join(dirname(racine), '.cadence-run');
       const etats = existsSync(d) ? readdirSync(d).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(d, f), 'utf8')) as Etat).filter((e) => e.repo === racine) : [];
       for (const e of etats) {
-        const vu = etatVu(e), interrompu = vu === 'interrompu';
+        const vu = etatVu(e), interrompu = vu === 'interrompu', l = etatListe(e);
         const notes = [e.etat === 'quota' && e.quota ? quotaListe(e, e.quota) : '', e.rapport_tour ? origineRapport(e) : ''].filter(Boolean);
-        out(`${e.id}  ${etatListe(e)}${interrompu ? ` (reprendre : cadence run --reponse ${e.id} "reprends")` : ''}  ${e.demande.split('\n')[0].slice(0, 80)}`
+        out(`${e.id}  ${l.etat}${interrompu ? ` (reprendre : cadence run --reponse ${e.id} "reprends")` : ''}  ${e.demande.split('\n')[0].slice(0, 80)}`
           + `${notes.map((n) => `  · ${n}`).join('')}${interrompu ? causeListe(e.journal) : ''}`);
+        if (l.absents) out(`    commits absents de la cible : ${l.absents} — ${e.cible} ; clore en archivant son travail : cadence run --clore ${e.id}`);
       }
       if (!etats.length) out('aucun run'); return 0;
     }
-    if (a[0] === '--clore') { // L745 (issue #62) ; revue M1 : --force clôt un run dont les commits manquent à la cible, sans preuve d'intégration
-      if (!a[1] || a.length > 3 || (a[2] !== undefined && a[2] !== '--force')) { io.err('usage : cadence run --clore <id> [--force]'); return 2; }
+    if (a[0] === '--clore') { // L745 (issue #62) ; 5e passe : plus de --force, --clore archive avant de retirer
+      if (!a[1] || a.length > 2) { io.err('usage : cadence run --clore <id>'); return 2; }
       const f = fichierRun(io.cwd, a[1]);
       if (!existsSync(f)) { io.err(`cadence run : run inconnu : ${a[1]} (${f})`); return 1; }
-      return clore(JSON.parse(readFileSync(f, 'utf8')) as Etat, out, a[2] === '--force');
+      return clore(JSON.parse(readFileSync(f, 'utf8')) as Etat, out);
     }
+    if (a[0] === '--archives') { for (const l of archives(io.cwd)) out(l); return 0; }
     if (a[0] === '--veilleur') return veiller(['run', ...a.slice(1)], io.env, io.cwd, out); // L711 : le parent d'un run --fond, lancé par --fond seul
     if (a[0] === '--reponse') {
       if (!a[1] || !a[2]) { io.err('usage : cadence run --reponse <id> "<texte>"'); return 2; }

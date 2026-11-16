@@ -43,7 +43,9 @@ commands (its CLAUDE.md names them), never with `raf start|done|note|ux|review`.
   of the main tree, which that integration refuses as modified. Likewise, in a repository **without worktrees** `raf done` is refused (exit 2, `done différé`) while a session of the wave works in the main tree: the plan it would write is a modified file that hands the next lot back (« dépôt sale après implement »). Safe order: wait for the end of that step (`cadence orchestrate --status`), then `raf done <lot>`; `--now` writes at once and accepts the lots being handed back. Brief: the absolute project folder, the lot, the sha to deliver
   (« livrable jusqu'à »), the value of `lead.ux` (absent: `human`), the base URL of the delivered app (the `deliver` configuration of `cadence.yaml`),
   and for a visible lot with `lead.ux: lead` the `ux-reviewer`'s report and the folder of its captures. It hands back one line
-  (`L84 livré 3d6edf4, QA à lancer <url>`) or one `Question : …`; the lead itself launches the `qa-reviewer` with the URL of the line
+  (`L84 livré 3d6edf4, QA à lancer <url>`) or one `Question : …`. In a repository without a `deliver` key (L744) it pushes the sha and the plan
+  commit, runs no `cadence deliver`, nothing to deploy, no QA: `L84 poussé 3d6edf4 avec le commit du plan 9a1b2c3, rien à déployer (pas de clé deliver)`.
+  After a `livré` line, the lead itself launches the `qa-reviewer` with the URL of the line
   (section 4), then the `livreur` of the next ready lot.
 - A subagent cannot ask the human anything. When it hits an ambiguity it stops and reports; the lead
   brings the question to the human.

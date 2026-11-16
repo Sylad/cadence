@@ -36,3 +36,8 @@
 - Écran : la ligne `⚠ Environnement différent de <passage> : …` s'imprime sur la sortie du passage, **séquences comprises** (`conclureSequence` reçoit `out`, une fois par répétition).
 - Décision revue r1 : les autres modèles facturés (sous-agents, `modelUsage`) sont écrits mais **jamais comparés** — lancer un sous-agent dépend de la session, pas de l'environnement ; `CLAUDE_CODE_SUBAGENT_MODEL` reste un réglage suivi, comparé.
 - Tests : v2/test/environnement-l742.test.ts (« sessions : », « Réglages de », CLAUDE_CONFIG_DIR, fichier illisible, claude absent ou muet, contexte max, sous-agent sans ⚠), v2/test/sequence-cli.test.ts (⚠ sur la sortie d'une séquence).
+
+## Livreur sans clé deliver et lead.ux absent (L744, revue r1)
+
+- Décision : `lead.ux` absent du brief vaut `human` (défaut de docs/lead.md), jamais « brief incomplet ». Sans clé `deliver:` dans cadence.yaml (lue par `grep -n '^deliver:'` avant toute commande), le livreur pousse le sha puis le commit du plan par son propre sha (seulement s'il est posé juste sur le sha), ne lance jamais `cadence deliver`, et rend `L84 poussé 3d6edf4 avec le commit du plan 9a1b2c3, rien à déployer (pas de clé deliver)`.
+- Revue r1 : la fiche docs/specs/livreur-delegue/fiche.yaml (C1, R3, R10, R14, contrat A1), docs/skills.md et skills/lead/SKILL.md disent la même chose qu'agents/livreur.md. Test : test/livreur-delegue.test.ts lit la fiche (YAML) et les deux docs.

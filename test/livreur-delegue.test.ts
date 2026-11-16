@@ -355,7 +355,7 @@ describe('skills/lead/SKILL.md et documentation — livreur délégué (L439)', 
 })
 
 describe('agent livreur — remarques du compte pro (L744)', () => {
-  it('lead.ux absent du brief : le défaut human, jamais « brief incomplet »', () => {
+  it('R14 — lead.ux absent du brief : le défaut human, jamais « brief incomplet »', () => {
     const c = section('Before any command')
     const check1 = c.slice(c.indexOf('1. Complete brief'), c.indexOf('2. The lot'))
     expect(check1).not.toMatch(/Complete brief:[^.]*lead\.ux/)
@@ -376,7 +376,7 @@ describe('agent livreur — remarques du compte pro (L744)', () => {
     expect(chain).toMatch(/5\. With the `deliver` key only: `cadence deliver --dry-run --sha <sha>`/)
   })
 
-  it('sans clé deliver : le sha puis le commit du plan sont poussés, par leur sha, jamais HEAD, et la ligne le dit', () => {
+  it('R10 — sans clé deliver : le sha puis le commit du plan sont poussés, par leur sha, jamais HEAD, et la ligne le dit', () => {
     const chain = section('The chain')
     before(chain, 'git push origin <sha>:main', 'git push origin <plan>:main')
     expect(chain).toMatch(/never the word `HEAD`/)
@@ -390,5 +390,65 @@ describe('agent livreur — remarques du compte pro (L744)', () => {
   it('le message de la clé absente est celui que rend parseDeliverConfig', () => {
     expect(readFileSync(join(root, 'src/deliver.ts'), 'utf8')).toContain('clé deliver absente')
     expect(section('Before any command')).toContain('`clé deliver absente`')
+  })
+})
+
+describe('fiche livreur-delegue et docs alignées sur le livreur (revue L744)', () => {
+  type Regle = { id: string; enonce: string; tests?: string[] }
+  type Cas = { id: string; nominal: string[]; alternatives: { si: string; alors: string; regles: string[] }[] }
+  const fiche = parse(readFileSync(join(root, 'docs/specs/livreur-delegue/fiche.yaml'), 'utf8')) as {
+    cas: Cas[]
+    regles: Regle[]
+    contrats: { entree: string; sortie: string; erreurs: { message: string }[] }[]
+  }
+  const regle = (id: string) => flat(fiche.regles.find((r) => r.id === id)!.enonce)
+  const c1 = fiche.cas.find((c) => c.id === 'C1')!
+
+  it('R14 — lead.ux absent du brief vaut human, ce n\'est jamais « brief incomplet »', () => {
+    const r14 = regle('R14')
+    expect(r14).not.toMatch(/Brief incomplet : dossier, lot, sha, valeur de lead\.ux absents/)
+    expect(r14).toMatch(/Brief incomplet : dossier, lot ou sha absents/)
+    expect(r14).toMatch(/lead\.ux absente du brief vaut human/)
+    const alt = flat(c1.alternatives[0].si)
+    expect(alt).not.toMatch(/valeur de lead\.ux/)
+    expect(flat(c1.nominal.join(' ') + ' ' + c1.alternatives.map((a) => a.si + a.alors).join(' '))).not.toMatch(/lead\.ux absents?\b/)
+    expect(flat(fiche.contrats[0].entree)).toMatch(/lead\.ux \(absente : human\)/)
+  })
+
+  it('R14 — sans clé deliver, « déjà livré » se lit sans journal (origin/main et lot done)', () => {
+    expect(regle('R14')).toMatch(/clé deliver/)
+    expect(fiche.contrats[0].erreurs.map((e) => e.message)).toContain(
+      'Question : <lot> déjà clos et sha <sha> déjà dans origin/main (pas de clé deliver)',
+    )
+  })
+
+  it('R10 — sans clé deliver, le commit du plan est poussé par son sha et cadence deliver ne tourne pas (R3 aussi)', () => {
+    const r10 = regle('R10')
+    expect(r10).toMatch(/Avec la clé deliver, le livreur ne pousse pas le commit du plan/)
+    expect(r10).toMatch(/Sans clé deliver .*git push origin <plan>:main/)
+    expect(r10).toMatch(/git rev-parse <plan>\^ vaut le sha/)
+    expect(regle('R3')).toMatch(/avec la clé deliver seulement/)
+    const nominal = flat(c1.nominal.join(' '))
+    expect(nominal).toMatch(/grep -n '\^deliver:' cadence\.yaml/)
+    expect(nominal).toMatch(/Avec la clé deliver, il lance cadence deliver --dry-run --sha <sha>/)
+    expect(nominal).toMatch(/Avec la clé deliver, le commit du plan reste au-dessus de origin\/main/)
+    expect(c1.alternatives.some((a) => /pas de clé deliver/.test(a.si) && /git push origin <plan>:main/.test(a.alors))).toBe(true)
+  })
+
+  it('la sortie du contrat porte la ligne sans clé deliver, mot pour mot comme agents/livreur.md', () => {
+    const l = '<lot> poussé <sha court> avec le commit du plan <plan court>, rien à déployer (pas de clé deliver)'
+    expect(section('The line')).toContain(l)
+    expect(flat(fiche.contrats[0].sortie)).toContain(l)
+  })
+
+  it('docs/skills.md et skills/lead/SKILL.md disent ce que fait le livreur sans clé deliver', () => {
+    const skills = flat(readFileSync(join(root, 'docs/skills.md'), 'utf8'))
+    const ligne = skills.slice(skills.indexOf('- **livreur**'))
+    expect(ligne.slice(0, ligne.indexOf(' - **', 5) > 0 ? ligne.indexOf(' - **', 5) : undefined)).toMatch(
+      /without a `deliver` key .*pushes the sha and the plan commit.*nothing to deploy/,
+    )
+    expect(skills).toContain('L84 poussé 3d6edf4 avec le commit du plan 9a1b2c3, rien à déployer (pas de clé deliver)')
+    expect(lead).toMatch(/without a `deliver` key .*pushes the sha and the plan commit.*nothing to deploy/)
+    expect(lead).toContain('L84 poussé 3d6edf4 avec le commit du plan 9a1b2c3, rien à déployer (pas de clé deliver)')
   })
 })

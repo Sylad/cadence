@@ -1,0 +1,17 @@
+{
+ "id": "D-23",
+ "texte": "Oui, A, B et C",
+ "date": "2026-11-16",
+ "etat": "ouverte",
+ "preuve": "",
+ "lots": [
+  "L742",
+  "L743"
+ ],
+ "precisions": [
+  {
+   "date": "2026-11-16",
+   "texte": "Réponse au tri de la veille #61. A : mettre Claude Code à jour sur Big-Blue avant le banc complet du samedi 21-11 et noter le passage de version dans le rapport (geste du lead, critère : claude --version ≥ 2.1.325 et version écrite dans le rapport de samedi). B : chaque rapport de banc note la version de Claude Code, l'identifiant exact du modèle et les réglages (L742, critère : un rapport réel porte ces champs). C : bras Fable 5.2 effort medium puis high contre Opus 5.5 après le banc du 21-11 (L743, critère : qualité au moins égale à Opus sur tests cachés et mutations, pour un coût plus bas)."
+  }
+ ]
+}

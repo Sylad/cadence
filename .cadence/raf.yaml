@@ -3628,6 +3628,17 @@ lots:
     notes:
       - { date: 2026-11-16, text: "mineur de revue (16-11) : « traitée après la vague » compare la fin du lot à la date des pertes ; sur une vague reprise plusieurs jours après, un lot clos entre lancement et reprise peut masquer une récidive" }
     finished: 2026-11-16
+  - id: L742
+    title: "Fiche de version par mesure : chaque rapport de banc note la version de Claude Code, l'identifiant exact du modèle de chaque bras et les réglages d'environnement (D-23, veille #61)"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-16
+  - id: L743
+    title: "Banc : bras Fable 5.2 (effort medium puis high) contre Opus 5.5, après le banc complet du 21-11 (D-23, veille #61)"
+    status: todo
+    estimate: 0.5
+    planned: { from: 2026-11-21, to: 2026-11-23 }
+    created: 2026-11-16
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

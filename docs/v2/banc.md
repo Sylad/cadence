@@ -139,10 +139,10 @@ La première ligne après le titre compare au rapport précédent de `rapports/`
 
 **Id exact partout (L756, issue #61).** L'alias seul ne dit plus quel modèle a joué : depuis Claude Code 2.1.321 (09-11), `fable` a changé sous nos pieds. L'identifiant vient toujours de la sortie des sessions, jamais de l'alias passé à `--model` :
 
-- la ligne de `historique.jsonl` de chaque passage (banc et séquence) porte `modeles_exacts` (`{ "A": ["claude-opus-5-5"], "cadence-run": ["claude-fable-5-2"], "juges": [...] }`) à côté de `modele_candidat`, qui reste l'alias de `bras.yaml` que compare la garde ; un bras dont aucune session n'a démarré a une liste vide ;
-- les **juges** (`--juge`, `opus` par défaut) notent les modèles que leurs sessions ont facturés (`modelUsage` de leur sortie JSON, `modeles_juge` du jugement) ; l'en-tête du rapport le dit (`Juges : alias opus → claude-opus-5-5`, « non lu » si aucune session ne l'a rendu), l'environnement du `.json` le garde (`juges`) et la comparaison au passage précédent signale un changement. Un passage sans juge (micro, mécanique, bruit) n'a pas de ligne Juges.
+- la ligne de `historique.jsonl` de chaque passage (banc et séquence) porte `modeles_exacts` (`{ "A": ["claude-opus-5-5"], "cadence-run": ["claude-fable-5-2"], "juges": [...] }`) à côté de `modele_candidat`, qui reste l'alias de `bras.yaml` que compare la garde ; un bras (ou des juges) dont aucune session n'a dit son modèle porte `"id non lu"`, jamais une liste vide ni l'alias. Une répétition de séquence interrompue écrit aussi `modeles_exacts`, lus dans les étapes jouées avant l'interruption (l'exception de `passer` les emporte) ;
+- les **juges** (`--juge`, `opus` par défaut) tournent en `stream-json --verbose`, comme les bras : le modèle juge est le modèle principal de leurs sessions (`system/init`, `modeles_juge` du jugement) ; les modèles auxiliaires facturés (`modelUsage` sans le principal, souvent un petit modèle d'appoint) sont nommés à part (`autres_modeles_juge`). L'en-tête du rapport le dit (`Juges : alias opus → claude-opus-5-5 ; autres modèles facturés : <id>`, « non lu » si aucune session n'a rendu son `system/init`), l'environnement du `.json` le garde (`juges`), et la comparaison au passage précédent ne signale que le modèle juge : un auxiliaire qui apparaît ou disparaît n'est pas un changement d'environnement (revue L756). Un passage sans juge (micro, mécanique, bruit) n'a pas de ligne Juges.
 
-Test : `v2/test/id-modele-exact-l756.test.ts` (rouge avant le changement).
+Tests : `v2/test/id-modele-exact-l756.test.ts`, `v2/test/revue-l756.test.ts` (rouges avant le changement).
 
 ## Limites connues des garde-fous
 

@@ -60,9 +60,11 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // L752 : bench 1500 (+7), mesure 2202 : horlogeAPas exportée (tests en ligne et enfants) et Enfants.pas_horloge_ms passée aux bras des enfants, sans ligne tassée.
   // L756 (issue #61) : bench 1517 (+17), mesure 2219, run 885 (+4) : l'id exact du modèle (sortie des sessions, jamais l'alias) dans la ligne d'historique de chaque
   // passage, pour les juges (modelUsage) et pour chaque passe de cadence run, sans ligne tassée.
-  it('les totaux sont ceux de R29 : noyau 3000, mesure 2219 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742, L752, L756)', () => {
+  // L756 (revue) : bench 1526 (+9), sequence 715 (+13), mesure 2241 : juges lus en stream-json (le juge à part des modèles auxiliaires facturés), une répétition
+  // de séquence interrompue emporte ses étapes jouées et écrit modeles_exacts, sans ligne tassée.
+  it('les totaux sont ceux de R29 : noyau 3000, mesure 2241 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742, L752, L756)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
-    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2219]);
+    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2241]);
   });
   for (const [nom, g] of Object.entries(budget)) {
     it(`groupe ${nom} : la somme des budgets ne dépasse pas ${g.total}`, () =>

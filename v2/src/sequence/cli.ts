@@ -33,8 +33,8 @@ export async function sequence(args: string[], io: Io, dep: Dep = {}): Promise<n
       const v = conclureSequence(racine, r, ref, cand, { maintenant: io.now(), empreinte: emp, modele_candidat: modele, repetition, repetitions: n, alias, version, juge, out: io.out });
       verts.push(v.vert);
       io.out(`${v.vert ? 'VERT' : 'ROUGE'} — séquence ${id}, répétition ${repetition}/${n}, run ${r.run} : ${racine}/rapports/${r.run}-${r.sequence}-r${repetition}.md`);
-    }, (message, repetition, run) => {
-      verts.push(echecRepetition(racine, { message, run, sequence: id, repetition, repetitions: n, maintenant: io.now(), empreinte: emp, candidat: cand, reference: ref, modele_candidat: modele }).vert);
+    }, (message, repetition, run, etapes) => {
+      verts.push(echecRepetition(racine, { message, run, sequence: id, repetition, repetitions: n, maintenant: io.now(), empreinte: emp, candidat: cand, reference: ref, modele_candidat: modele, etapes }).vert);
       io.err(`ROUGE — séquence ${id}, répétition ${repetition}/${n} non terminée : ${message}`);
     });
   } catch (e) {

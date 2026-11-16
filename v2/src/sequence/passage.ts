@@ -76,8 +76,15 @@ export function passageSequence(o: Opt): ResultatSequence {
   return passageSequences(o, 1)[0];
 }
 
+/** Revue L756 : une répétition interrompue emporte les étapes déjà jouées (leurs mesures disent le modèle exact de chaque bras). */
+export class RepetitionInterrompue extends Error {
+  readonly etapes: Record<string, MesureEtape[]>; // champ déclaré : les processus enfants chargent v2 en effaçant les types, sans propriété de paramètre
+  constructor(cause: unknown, etapes: Record<string, MesureEtape[]>) { super(cause instanceof Error ? cause.message : String(cause)); this.etapes = etapes; }
+}
+
 /** `n` répétitions sous UN run id, UN verrou et UNE vérification de prêt ; `apres` reçoit chaque répétition dès qu'elle est finie (rapport, historique). */
-export function passageSequences(o: Opt, n: number, apres?: (r: ResultatSequence, repetition: number) => void, echec?: (message: string, repetition: number, run: string) => void): ResultatSequence[] {
+export function passageSequences(o: Opt, n: number, apres?: (r: ResultatSequence, repetition: number) => void,
+  echec?: (message: string, repetition: number, run: string, etapes: Record<string, MesureEtape[]>) => void): ResultatSequence[] {
   const bras = chargerBras(o.racine);
   for (const b of [o.ref, o.cand]) if (!bras[b]) throw new Error(`bras « ${b} » absent de ${o.racine}/bras.yaml`);
   const pret = o.pret ?? ((x) => pretAPasser(REPO, x, o.racine));
@@ -89,7 +96,7 @@ export function passageSequences(o: Opt, n: number, apres?: (r: ResultatSequence
     const rs: ResultatSequence[] = [];
     for (let k = 1; k <= n; k++) {
       try { const r = passer({ ...o, repetition: k, repetitions: n }, bras, s); rs.push(r); apres?.(r, k); } // `echec` : la répétition qui lève est notée rouge, les suivantes sont jouées
-      catch (e) { if (!echec) throw e; echec(e instanceof Error ? e.message : String(e), k, runId(o)); }
+      catch (e) { if (!echec) throw e; echec(e instanceof Error ? e.message : String(e), k, runId(o), e instanceof RepetitionInterrompue ? e.etapes : {}); }
     }
     return rs;
   } finally {
@@ -251,11 +258,10 @@ function passer(o: Opt, bras: Record<string, DefBras>, s: Sequence): ResultatSeq
   const x: Ctx = { o, s, bras, run, dir, debut: new Date().toISOString(), delai: o.delaiMs ?? 30 * 60_000, noms, clones: {}, prec: {}, reglages: empreinteUtilisateur(o.home) };
   for (const b of noms) x.clones[b] = join(dir, nomClone(x, b));
   mkdirSync(dir, { recursive: true });
-  const heads: Record<string, string> = {};
+  const heads: Record<string, string> = {}, etapes: Record<string, MesureEtape[]> = Object.fromEntries(noms.map((b) => [b, []]));
   try {
     const base: Record<string, Base> = {};
     for (const b of noms) { base[b] = preparerBras(x, b); heads[b] = etatGit(x.clones[b]).head; }
-    const etapes: Record<string, MesureEtape[]> = Object.fromEntries(noms.map((b) => [b, []]));
     for (const e of s.etapes) {
       const ordre = e.k % 2 ? [o.ref, o.cand] : [o.cand, o.ref];
       for (const b of ordre) etapes[b].push(jouerEtape(x, e, b));
@@ -267,6 +273,8 @@ function passer(o: Opt, bras: Record<string, DefBras>, s: Sequence): ResultatSeq
     const res: ResultatSequence = { run, sequence: s.id, clones, base, etapes, jugement, reglages_utilisateur, sorties_attendues: s.sorties.length };
     writeFileSync(join(dir, 'resultat.json'), JSON.stringify(res, null, 2));
     return res;
+  } catch (e) {
+    throw new RepetitionInterrompue(e, etapes);
   } finally {
     for (const b of noms) if (o.garderClones) libererReglages(x.clones[b]); else archiver(x.clones[b], heads[b]);
   }

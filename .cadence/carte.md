@@ -73,3 +73,9 @@
 
 - Décision : `livreur` et `precheck-reader` déclarent `model: sonnet` ; les 9 autres agents (juges compris) n'en déclarent aucun et héritent du modèle de la session. Test : test/modele-agents-l757.test.ts (liste exacte, recopie par `cadence skills install`, `readAgents` ne passe pas `model` à `--agents` : dans une vague le `--model` de l'étape décide).
 - Workflow de mesure : `node scripts/jetons-agents.mjs [--agent livreur] [--since|--until ISO] [--dernieres 5] [--json]` relie chaque sous-agent (`<session>/subagents/*.jsonl`) à son appel Agent par le prompt, compte les jetons par modèle (message.id une fois) et marque `RATÉE` une réponse « Question » ou sans « livré »/« poussé ». Lecture et critère : docs/mesures/modele-agents-l757.md.
+
+## Banc : id exact du modèle, juges et répétitions interrompues (L756, revue)
+
+- Décision : les juges tournent en `stream-json --verbose` comme les bras ; le juge = modèle principal (`system/init`, `modeles_juge`), les auxiliaires facturés (`modelUsage` sans lui) à part (`autres_modeles_juge`). Le dernier `result` du flux fait foi (une sortie JSON d'un seul objet reste lue).
+- Écran (en-tête de rapport) : `Juges : alias opus → claude-opus-5-5 ; autres modèles facturés : claude-haiku-5-5` ; « non lu (aucune session de juge n'a rendu son system/init) » sans init. La comparaison au passage précédent ne regarde que le juge.
+- `modeles_exacts` de l'historique : `"id non lu"` (chaîne) pour un bras ou des juges sans id lu, jamais `[]`. Une répétition de séquence interrompue (`echecRepetition`) l'écrit aussi : `passer` lève `RepetitionInterrompue` qui emporte les étapes jouées. Tests : v2/test/revue-l756.test.ts.

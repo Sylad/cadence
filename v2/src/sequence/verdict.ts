@@ -5,6 +5,8 @@ import { avisLu } from '../bench/juges.js';
 import { enteteEnvironnement, environnement, modelesExacts, passagePrecedent, versionClaude } from '../bench/environnement.js';
 import type { MesureEtape, ResultatSequence } from './passage.js';
 
+type ModelesExacts = ReturnType<typeof modelesExacts>;
+
 type Maint = NonNullable<MesureEtape['maintenabilite']>;
 const somme = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 const signe = (x: number) => `${x >= 0 ? '+' : ''}${+x.toFixed(1)}`;
@@ -105,7 +107,7 @@ export function rapportSequence(r: ResultatSequence, ref: string, cand: string, 
 }
 
 /** Ligne `historique.jsonl` d'une séquence : `bancs` = [id de la séquence], jamais hebdo ni frais. */
-export const ligneSequence = (v: Verdict, e: { date: string; empreinte: string; candidat: string; reference: string; modele_candidat: string; sequence: string; run: string; repetition: number; repetitions: number; modeles_exacts?: Record<string, string[]> }) =>
+export const ligneSequence = (v: Verdict, e: { date: string; empreinte: string; candidat: string; reference: string; modele_candidat: string; sequence: string; run: string; repetition: number; repetitions: number; modeles_exacts?: ModelesExacts }) =>
   ligneHistorique(v, { type: 'sequence', ...e, bancs: [e.sequence], hebdo: false, frais: 0 });
 
 /** Verdict, rapport (md et json) dans `rapports/` et ligne d'historique d'une séquence passée. */
@@ -119,9 +121,12 @@ export function conclureSequence(racine: string, r: ResultatSequence, ref: strin
   return v;
 }
 
-/** Une répétition qui n'a pas pu se terminer : ligne rouge dans l'historique (un run sans ses N lignes n'autorise jamais la publication). */
-export function echecRepetition(racine: string, e: { message: string; run: string; sequence: string; repetition: number; repetitions: number; maintenant: Date; empreinte: string; candidat: string; reference: string; modele_candidat: string }): Verdict {
+/** Une répétition qui n'a pas pu se terminer : ligne rouge dans l'historique (un run sans ses N lignes n'autorise jamais la publication).
+ * Revue L756 : `modeles_exacts` lus dans les étapes jouées avant l'interruption, « id non lu » pour un bras qu'aucune session n'a fait parler. */
+export function echecRepetition(racine: string, e: { message: string; run: string; sequence: string; repetition: number; repetitions: number; maintenant: Date; empreinte: string; candidat: string; reference: string; modele_candidat: string;
+  etapes?: Record<string, MesureEtape[]> }): Verdict {
+  const modeles_exacts = modelesExacts(environnement('', {}, [e.reference, e.candidat].flatMap((b) => [{ bras: b }, ...(e.etapes?.[b] ?? []).map((x) => ({ ...x.mesure, bras: b }))])));
   const v: Verdict = { vert: false, criteres: [{ nom: `répétition non terminée : ${e.message.split('\n')[0]}`, valeur: 'interrompue', seuil: 'terminée', ok: false, bloquant: true }] };
-  appendFileSync(join(racine, 'historique.jsonl'), `${ligneSequence(v, { date: e.maintenant.toISOString(), empreinte: e.empreinte, candidat: e.candidat, reference: e.reference, modele_candidat: e.modele_candidat, sequence: e.sequence, run: e.run, repetition: e.repetition, repetitions: e.repetitions })}\n`);
+  appendFileSync(join(racine, 'historique.jsonl'), `${ligneSequence(v, { date: e.maintenant.toISOString(), empreinte: e.empreinte, candidat: e.candidat, reference: e.reference, modele_candidat: e.modele_candidat, sequence: e.sequence, run: e.run, repetition: e.repetition, repetitions: e.repetitions, modeles_exacts })}\n`);
   return v;
 }

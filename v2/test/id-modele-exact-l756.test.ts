@@ -102,7 +102,7 @@ describe('banc : la ligne d\'historique porte l\'id exact de chaque bras', () =>
 });
 
 describe('juges : l\'id exact des modèles qu\'ils ont facturés', () => {
-  it('juger() rend modeles_juge lu dans modelUsage de chaque session, sans doublon', () => {
+  it('juger() sur une sortie sans system/init : aucun modèle affirmé comme juge, les facturés (modelUsage) rangés à part, sans doublon (revue L756)', () => {
     const r = dossierTemp('juges-l756-');
     const dir = join(r, 'bancs', '1-t'); mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, 'demande.md'), 'd');
     const secrets = join(r, 'secrets', '1-t'); mkdirSync(secrets, { recursive: true }); writeFileSync(join(secrets, 'mesure.md'), 'm');
@@ -121,7 +121,8 @@ describe('juges : l\'id exact des modèles qu\'ils ont facturés', () => {
       return { stdout: JSON.stringify({ session_id: `j${i}`, total_cost_usd: 0, modelUsage: usage }), code: 0 };
     };
     const j = juger(b, { A, cand }, join(r, 'eval'), 'opus', exec, () => 0.2);
-    expect(j!.modeles_juge).toEqual(['claude-opus-5-5', 'claude-haiku-5-5']);
+    expect(j!.modeles_juge).toEqual([]);
+    expect(j!.autres_modeles_juge).toEqual(['claude-opus-5-5', 'claude-haiku-5-5']);
   });
 
   it('l\'environnement porte les juges ; l\'en-tête et la comparaison les disent', () => {
@@ -131,6 +132,6 @@ describe('juges : l\'id exact des modèles qu\'ils ont facturés', () => {
     expect(ecartsEnvironnement(avant, apres)).toEqual(['juges (alias opus) : claude-opus-5-5 → claude-opus-5-6']);
     expect(modelesExacts(apres)).toEqual({ juges: ['claude-opus-5-6'] });
     expect(environnement('2.1.325', {}, [], { alias: 'opus', jugements: [null] }).juges).toBeUndefined(); // aucun jugement : rien n'est affirmé
-    expect(enteteEnvironnement(environnement('2.1.325', {}, [], { alias: 'opus', jugements: [{}] }), null)).toContain('Juges : alias opus → non lu (aucune session de juge n\'a rendu de modelUsage)');
+    expect(enteteEnvironnement(environnement('2.1.325', {}, [], { alias: 'opus', jugements: [{}] }), null)).toContain('Juges : alias opus → non lu (aucune session de juge n\'a rendu son system/init)');
   });
 });

@@ -12,8 +12,11 @@ import { basename, join } from 'node:path';
 
 /** Ce que les sessions d'un bras ont dit d'elles-mêmes (system/init et modelUsage de chaque result) et les réglages qu'elles ont reçus. */
 export interface ClaudeBras { versions: string[]; modeles: string[]; autres_modeles: string[]; contexte_max: Record<string, number>; reglages: Record<string, string> }
-/** L'environnement d'un passage : `claude --version` au lancement, et pour chaque bras son alias de bras.yaml et ce que ses sessions ont dit. */
-export interface Environnement { claude_code: string; bras: Record<string, ClaudeBras & { alias: string }> }
+/** L'environnement d'un passage : `claude --version` au lancement, et pour chaque bras son alias de bras.yaml et ce que ses sessions ont dit.
+ * L756 (issue #61) : `juges`, l'alias passé aux juges (--juge) et les modèles que leurs sessions ont facturés (modelUsage), absent sans juge. */
+export interface Environnement { claude_code: string; bras: Record<string, ClaudeBras & { alias: string }>; juges?: Juges }
+/** L756 : les juges d'un passage, alias demandé et identifiants exacts lus dans la sortie de leurs sessions. */
+export interface Juges { alias: string; modeles: string[] }
 
 /** Variables d'environnement qui changent le coût ou le comportement d'une session (liste fermée : les autres CLAUDE_* sont des identifiants
  * de session, de compte ou de socket, qui changeraient à chaque passage). Les clés et jetons n'y sont jamais. */
@@ -63,7 +66,7 @@ export function ajouterSession(c: ClaudeBras, stdout: string): ClaudeBras {
 export const claudeVide = (reglages: Record<string, string> = {}): ClaudeBras => ({ versions: [], modeles: [], autres_modeles: [], contexte_max: {}, reglages });
 
 /** L'environnement d'un passage, à partir des mesures de chaque bras (tous bancs, répétitions et étapes). */
-export function environnement(claude_code: string, alias: Record<string, string>, mesures: { bras: string; claude?: ClaudeBras }[]): Environnement {
+export function environnement(claude_code: string, alias: Record<string, string>, mesures: { bras: string; claude?: ClaudeBras }[], juges?: { alias: string; jugements: ({ modeles_juge?: string[] } | null | undefined)[] }): Environnement {
   const bras: Environnement['bras'] = {};
   for (const m of mesures) {
     const b = bras[m.bras] ??= { alias: alias[m.bras] ?? '?', ...claudeVide() };
@@ -71,7 +74,15 @@ export function environnement(claude_code: string, alias: Record<string, string>
     for (const k of ['versions', 'modeles', 'autres_modeles'] as const) for (const x of m.claude[k]) ajouter(b[k], x);
     Object.assign(b.contexte_max, m.claude.contexte_max); Object.assign(b.reglages, m.claude.reglages);
   }
-  return { claude_code, bras };
+  if (!juges?.jugements.some(Boolean)) return { claude_code, bras };
+  const modeles: string[] = [];
+  for (const j of juges.jugements) for (const m of j?.modeles_juge ?? []) ajouter(modeles, m);
+  return { claude_code, bras, juges: { alias: juges.alias, modeles } };
+}
+
+/** L756 (issue #61) : l'identifiant exact du modèle de chaque bras (system/init de ses sessions), pour la ligne d'historique ; `juges` en plus s'ils ont jugé. */
+export function modelesExacts(e: Environnement): Record<string, string[]> {
+  return { ...Object.fromEntries(Object.entries(e.bras).map(([n, x]) => [n, [...x.modeles]])), ...(e.juges ? { juges: [...e.juges.modeles] } : {}) };
 }
 
 const liste = (l: string[]) => (l.length ? l.join(', ') : 'non lu (aucune session n\'a démarré)');
@@ -86,6 +97,7 @@ export function ecartsEnvironnement(a: Environnement, b: Environnement): string[
   const parAlias = (e: Environnement) => Object.values(e.bras).reduce<Record<string, string[]>>((m, x) => { for (const id of x.modeles) ajouter(m[x.alias] ??= [], id); return m; }, {});
   const ma = parAlias(a), mb = parAlias(b);
   for (const al of Object.keys(mb).filter((k) => ma[k])) diff(`alias ${al}`, ma[al].sort().join(', '), mb[al].sort().join(', '));
+  if (a.juges && b.juges && a.juges.alias === b.juges.alias) diff(`juges (alias ${b.juges.alias})`, [...a.juges.modeles].sort().join(', '), [...b.juges.modeles].sort().join(', ')); // L756
   for (const n of Object.keys(b.bras).filter((k) => a.bras[k])) {
     const x = a.bras[n], y = b.bras[n];
     for (const m of Object.keys(y.contexte_max).filter((k) => x.contexte_max[k] !== undefined)) diff(`contexte max de ${m} (${n})`, nombre(x.contexte_max[m]), nombre(y.contexte_max[m]));
@@ -121,6 +133,7 @@ export function enteteEnvironnement(e: Environnement, precedent: { run: string; 
     ...(precedent ? [ligneComparaison(precedent.run, precedent.environnement, e)] : ['Environnement : premier rapport de cette racine, rien à comparer']),
     `Claude Code : ${e.claude_code} (claude --version au lancement)${versionsSessions.length && versionsSessions.join(', ') !== e.claude_code ? ` ; sessions : ${versionsSessions.join(', ')}` : ''}`,
     ...bras.map(([n, x]) => `Bras ${n} : alias ${x.alias} → ${liste(x.modeles)}${x.autres_modeles.length ? ` ; autres modèles facturés : ${x.autres_modeles.join(', ')}` : ''}${ctx(x) ? ` ; contexte max : ${ctx(x)}` : ''}`),
+    ...(e.juges ? [`Juges : alias ${e.juges.alias} → ${e.juges.modeles.length ? e.juges.modeles.join(', ') : 'non lu (aucune session de juge n\'a rendu de modelUsage)'}`] : []),
     ...(memes ? [`Réglages (les deux bras) : ${reglages(bras[0][1])}`] : bras.map(([n, x]) => `Réglages de ${n} : ${reglages(x)}`)),
   ];
 }

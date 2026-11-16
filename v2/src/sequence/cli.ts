@@ -26,11 +26,11 @@ export async function sequence(args: string[], io: Io, dep: Dep = {}): Promise<n
   if (emp === 'inconnue' || !io.env.HOME) { io.err(`sequence refusée : ${io.env.HOME ? 'empreinte inconnue (pas de dépôt git)' : 'HOME vide, les réglages utilisateur ne peuvent pas être contrôlés (R36)'}`); return 2; }
   let modele = '', alias: Record<string, string> = {}; const version = dep.version ?? versionClaude(); // L742 : version au lancement
   try { alias = Object.fromEntries(Object.values(chargerBras(racine)).map((d) => [d.nom, d.modele])); modele = alias[cand] ?? ''; } catch { /* bras.yaml illisible : passageSequences le dira */ }
-  const verts: boolean[] = [];
+  const verts: boolean[] = [], juge = option(args, 'juge') ?? 'opus';
   try {
-    passageSequences({ racine, id, ref, cand, juge: option(args, 'juge') ?? 'opus', exec: dep.exec ?? executeurClaude, maintenant, empreinte: emp, home: io.env.HOME,
+    passageSequences({ racine, id, ref, cand, juge, exec: dep.exec ?? executeurClaude, maintenant, empreinte: emp, home: io.env.HOME,
       out: io.out, ...(dep.pret && { pret: dep.pret }), jscpd: dep.jscpd, prep: dep.prep, delaiMs: dep.delaiMs, horloge: dep.horloge, garderClones: args.includes('--garder-clones') }, n, (r, repetition) => {
-      const v = conclureSequence(racine, r, ref, cand, { maintenant: io.now(), empreinte: emp, modele_candidat: modele, repetition, repetitions: n, alias, version, out: io.out });
+      const v = conclureSequence(racine, r, ref, cand, { maintenant: io.now(), empreinte: emp, modele_candidat: modele, repetition, repetitions: n, alias, version, juge, out: io.out });
       verts.push(v.vert);
       io.out(`${v.vert ? 'VERT' : 'ROUGE'} — séquence ${id}, répétition ${repetition}/${n}, run ${r.run} : ${racine}/rapports/${r.run}-${r.sequence}-r${repetition}.md`);
     }, (message, repetition, run) => {

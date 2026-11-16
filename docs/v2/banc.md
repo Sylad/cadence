@@ -137,6 +137,13 @@ Le 16-11, Claude Code est passé de 2.1.293 à 2.1.325 sur Big-Blue, et l'alias 
 
 La première ligne après le titre compare au rapport précédent de `rapports/` (ordre des noms) : `⚠ Environnement différent de <passage> : Claude Code : 2.1.293 → 2.1.325 ; alias fable : … → …`, `Environnement identique à <passage>`, ou « non comparable » face à un rapport d'avant L742. La ligne ⚠ est aussi écrite sur la sortie du passage, séquences comprises (une fois par répétition). Pour deux rapports quelconques : `cadence2 bench comparer <a> <b>`. Test : `v2/test/environnement-l742.test.ts` (dont une capture réelle du flux de `claude -p` 2.1.325).
 
+**Id exact partout (L756, issue #61).** L'alias seul ne dit plus quel modèle a joué : depuis Claude Code 2.1.321 (09-11), `fable` a changé sous nos pieds. L'identifiant vient toujours de la sortie des sessions, jamais de l'alias passé à `--model` :
+
+- la ligne de `historique.jsonl` de chaque passage (banc et séquence) porte `modeles_exacts` (`{ "A": ["claude-opus-5-5"], "cadence-run": ["claude-fable-5-2"], "juges": [...] }`) à côté de `modele_candidat`, qui reste l'alias de `bras.yaml` que compare la garde ; un bras dont aucune session n'a démarré a une liste vide ;
+- les **juges** (`--juge`, `opus` par défaut) notent les modèles que leurs sessions ont facturés (`modelUsage` de leur sortie JSON, `modeles_juge` du jugement) ; l'en-tête du rapport le dit (`Juges : alias opus → claude-opus-5-5`, « non lu » si aucune session ne l'a rendu), l'environnement du `.json` le garde (`juges`) et la comparaison au passage précédent signale un changement. Un passage sans juge (micro, mécanique, bruit) n'a pas de ligne Juges.
+
+Test : `v2/test/id-modele-exact-l756.test.ts` (rouge avant le changement).
+
 ## Limites connues des garde-fous
 
 Les outils interdits aux bras et aux juges (`--disallowedTools`, `OUTILS_INTERDITS` de `bras.ts`) sont des motifs sur le **début** de la commande : `Bash(git push:*)` n'arrête pas `git -C x push`, ni `Bash(ssh:*)` un `ssh` lancé par `env`, `bash -c` ou un script. Ce qui protège vraiment : les clones n'ont aucun remote (supprimé à la préparation), `SSH_AUTH_SOCK`, `GH_TOKEN` et `GITHUB_TOKEN` sont vides et `KUBECONFIG` pointe sur `/nonexistent`. Restent possibles un `git push` vers une URL explicite ou un `ssh` qui lit une clé de `~/.ssh` sans phrase de passe ; le contrôle des fuites ne les voit pas. Le banc suppose des bras de bonne foi ; le durcir demanderait un utilisateur ou un conteneur séparé.

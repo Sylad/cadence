@@ -11,7 +11,9 @@ export interface Defauts { bloquants: number; majeurs: number; mineurs: number }
 /** `remplaces` (R28, R30) : tests cachés remplacés par une demande ultérieure, une liste UNIQUE décidée avant X et Y, non comptée pour les deux. */
 /** R39 : `prefere` et `ui` valent « indécis » quand les deux ordres du juge aveugle se contredisent ; `defauts` = max des deux ordres. */
 export interface Jugement { meca: Record<string, Meca>; remplaces?: string[]; defauts: Record<string, Defauts>; prefere: string; ui: string; raisons: string;
-  /** m2 : X et Y → bras, pour vérifier les preuves (captures-sorties-X/…). */ anonymat?: Record<'X' | 'Y', string>; aveugle_ordres?: Ordre[] }
+  /** m2 : X et Y → bras, pour vérifier les preuves (captures-sorties-X/…). */ anonymat?: Record<'X' | 'Y', string>; aveugle_ordres?: Ordre[];
+  /** L756 (issue #61) : identifiants exacts des modèles facturés par les sessions des juges (modelUsage de leur sortie), jamais l'alias de --juge. */
+  modeles_juge?: string[] }
 type Avis = { X: Defauts; Y: Defauts; prefere: string; ui: string; raisons: string };
 /** Un passage du juge aveugle, `prefere` et `ui` ramenés aux noms des bras. */ export type Ordre = Avis & { anonymat: Record<'X' | 'Y', string> };
 
@@ -79,26 +81,27 @@ export function validerAveugle(o: unknown): string[] {
 const remplir = (gabarit: string, v: Record<string, string>): string => Object.entries(v).reduce((t, [k, x]) => t.replaceAll(`{{${k}}}`, x), readFileSync(join(BRIEFS, gabarit), 'utf8'));
 
 /** Une session claude : { ok, session } ; jamais d'exception sur la sortie de claude (R7). */
-function appeler(exec: Executeur, args: string[], o: { cwd: string; env: NodeJS.ProcessEnv }): { ok: boolean; session: string } {
+function appeler(exec: Executeur, args: string[], o: { cwd: string; env: NodeJS.ProcessEnv }, modeles: string[] = []): { ok: boolean; session: string } {
   const e = exec(args, o);
   try {
-    const j = JSON.parse(e.stdout) as { session_id?: string; is_error?: boolean };
+    const j = JSON.parse(e.stdout) as { session_id?: string; is_error?: boolean; modelUsage?: Record<string, unknown> };
+    for (const m of Object.keys(j.modelUsage ?? {})) if (!modeles.includes(m)) modeles.push(m); // L756
     return { ok: !j.is_error && e.code === 0, session: j.session_id ?? '' };
   } catch { return { ok: false, session: '' }; }
 }
 
 /** Un juge : une session, une relance (--resume) avec les erreurs si le JSON est invalide ou la session en échec, puis null. */
-function demander(brief: string, sortie: string, valider: (o: unknown) => string[], cwd: string, modele: string, exec: Executeur): unknown {
+function demander(brief: string, sortie: string, valider: (o: unknown) => string[], cwd: string, modele: string, exec: Executeur, modeles: string[] = []): unknown {
   const commun = ['--output-format', 'json', '--model', modele, '--permission-mode', 'bypassPermissions', '--disallowedTools', OUTILS_INTERDITS.join(',')];
   const o = { cwd, env: environnementNeutre(process.env) };
-  let { ok, session } = appeler(exec, ['-p', brief, ...commun], o);
+  let { ok, session } = appeler(exec, ['-p', brief, ...commun], o, modeles);
   for (let essai = 0; essai < 2; essai++) {
     let res: unknown = null;
     if (ok) try { res = JSON.parse(readFileSync(sortie, 'utf8')); } catch { /* absent ou illisible */ }
     const erreurs = !ok ? ['session claude en échec'] : res === null ? ['fichier absent ou JSON illisible'] : valider(res);
     if (erreurs.length === 0) return res;
     if (essai === 1 || !session) return null;
-    ({ ok, session } = appeler(exec, ['-p', `Ton JSON dans ${sortie} est invalide : ${erreurs.join(' ; ')}. Réécris-le, rien d'autre.`, '--resume', session, ...commun], o));
+    ({ ok, session } = appeler(exec, ['-p', `Ton JSON dans ${sortie} est invalide : ${erreurs.join(' ; ')}. Réécris-le, rien d'autre.`, '--resume', session, ...commun], o, modeles));
   }
   return null;
 }
@@ -108,6 +111,7 @@ export function juger(b: Banc, clones: Record<string, string>, dirEval: string, 
   const noms = Object.keys(clones) as [string, string];
   const anon = anonymiser(noms, tirage);
   rmSync(dirEval, { recursive: true, force: true });
+  const modeles: string[] = []; // L756 : ce que les sessions des juges ont facturé
   const passes = ['meca', 'ordre-1', 'ordre-2'].map((n) => join(dirEval, n)); // R39, revue M1 : une passe = un dossier et un cwd, rien de visible d'une autre
   const copier = (p: string, a: Record<'X' | 'Y', string>): boolean => {
     mkdirSync(p, { recursive: true }); writeFileSync(join(p, 'demande.md'), lireDemande(b));
@@ -124,7 +128,7 @@ export function juger(b: Banc, clones: Record<string, string>, dirEval: string, 
     if (!copier(passes[0], anon)) return null;
     const v = (p: string) => ({ EVAL: p, SECRETS: b.secrets, MESURE: join(b.secrets, 'mesure.md'), TESTS: b.tests, DEMANDES: demandes }), sMeca = join(passes[0], 'meca.json');
     const so = sorties.length ? '\n' + remplir('juge-sorties.md', { ...v(passes[0]), LISTE: sorties.map((x, i) => `S${i + 1} (i=${i + 1}). étape ${x.k} : ${x.sortie}`).join('\n') }).trimEnd() : '';
-    const meca = demander(remplir('juge-mecanique.md', { ...v(passes[0]), SORTIE: sMeca, SORTIES: so }), sMeca, (x) => validerMeca(x, sorties), passes[0], modele, exec) as (Record<'X' | 'Y', Meca> & { remplaces: string[] }) | null;
+    const meca = demander(remplir('juge-mecanique.md', { ...v(passes[0]), SORTIE: sMeca, SORTIES: so }), sMeca, (x) => validerMeca(x, sorties), passes[0], modele, exec, modeles) as (Record<'X' | 'Y', Meca> & { remplaces: string[] }) | null;
     if (!meca) return null;
     for (const m of sorties.length ? [meca.X, meca.Y] : []) m.sorties = m.sorties!.map((x, j) => ({ ...sorties[j], i: x.i, verdict: x.verdict, preuve: x.preuve }));
     const ecran = (p: string) => (b.visible
@@ -133,10 +137,10 @@ export function juger(b: Banc, clones: Record<string, string>, dirEval: string, 
     const ordres: Ordre[] = [];
     for (const [a, p] of [[anon, passes[1]], [{ X: anon.Y, Y: anon.X }, passes[2]]] as const) { // R39 : second passage à ordre permuté (biais de position)
       if (!copier(p, a)) return null; // le juge à l'aveugle voit les livrables, pas les mutations
-      const f = join(p, 'aveugle.json'), av = demander(remplir('juge-aveugle.md', { ...v(p), ECRAN: ecran(p), SORTIE: f }), f, validerAveugle, p, modele, exec) as Avis | null;
+      const f = join(p, 'aveugle.json'), av = demander(remplir('juge-aveugle.md', { ...v(p), ECRAN: ecran(p), SORTIE: f }), f, validerAveugle, p, modele, exec, modeles) as Avis | null;
       if (!av) return null;
       ordres.push({ ...av, anonymat: a });
     }
-    return { meca: { [anon.X]: meca.X, [anon.Y]: meca.Y }, remplaces: meca.remplaces, ...combiner(ordres), anonymat: anon };
+    return { meca: { [anon.X]: meca.X, [anon.Y]: meca.Y }, remplaces: meca.remplaces, ...combiner(ordres), anonymat: anon, modeles_juge: modeles };
   } finally { for (const p of passes) for (const k of ['X', 'Y']) rmSync(join(p, k), { recursive: true, force: true }); } // copies effacées sur tous les chemins
 }

@@ -2,7 +2,7 @@ import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BARRE_SPEC, ligneHistorique, parisJour, type Critere, type Verdict } from '../bench/verdict.js';
 import { avisLu } from '../bench/juges.js';
-import { enteteEnvironnement, environnement, passagePrecedent, versionClaude } from '../bench/environnement.js';
+import { enteteEnvironnement, environnement, modelesExacts, passagePrecedent, versionClaude } from '../bench/environnement.js';
 import type { MesureEtape, ResultatSequence } from './passage.js';
 
 type Maint = NonNullable<MesureEtape['maintenabilite']>;
@@ -105,17 +105,17 @@ export function rapportSequence(r: ResultatSequence, ref: string, cand: string, 
 }
 
 /** Ligne `historique.jsonl` d'une séquence : `bancs` = [id de la séquence], jamais hebdo ni frais. */
-export const ligneSequence = (v: Verdict, e: { date: string; empreinte: string; candidat: string; reference: string; modele_candidat: string; sequence: string; run: string; repetition: number; repetitions: number }) =>
+export const ligneSequence = (v: Verdict, e: { date: string; empreinte: string; candidat: string; reference: string; modele_candidat: string; sequence: string; run: string; repetition: number; repetitions: number; modeles_exacts?: Record<string, string[]> }) =>
   ligneHistorique(v, { type: 'sequence', ...e, bancs: [e.sequence], hebdo: false, frais: 0 });
 
 /** Verdict, rapport (md et json) dans `rapports/` et ligne d'historique d'une séquence passée. */
-export function conclureSequence(racine: string, r: ResultatSequence, ref: string, cand: string, e: { maintenant: Date; empreinte: string; modele_candidat: string; repetition?: number; repetitions?: number; alias?: Record<string, string>; version?: string; out?: (l: string) => void }): Verdict {
+export function conclureSequence(racine: string, r: ResultatSequence, ref: string, cand: string, e: { maintenant: Date; empreinte: string; modele_candidat: string; repetition?: number; repetitions?: number; alias?: Record<string, string>; version?: string; juge?: string; out?: (l: string) => void }): Verdict {
   const v = verdictSequence(r, ref, cand), repetition = e.repetition ?? 1, repetitions = e.repetitions ?? 1, nom = `${r.run}-${r.sequence}-r${repetition}`, base = join(racine, 'rapports', nom);
-  const env = environnement(e.version ?? versionClaude(), e.alias ?? {}, [ref, cand].flatMap((b) => (r.etapes[b] ?? []).map((x) => ({ ...x.mesure, bras: b })))); // L742
+  const env = environnement(e.version ?? versionClaude(), e.alias ?? {}, [ref, cand].flatMap((b) => (r.etapes[b] ?? []).map((x) => ({ ...x.mesure, bras: b }))), { alias: e.juge ?? '?', jugements: [r.jugement] }); // L742 ; L756 : juges
   const entete = enteteEnvironnement(env, passagePrecedent(racine, nom)); mkdirSync(join(racine, 'rapports'), { recursive: true });
   writeFileSync(`${base}.md`, rapportSequence(r, ref, cand, v, { date: parisJour(e.maintenant).jour, empreinte: e.empreinte, repetition, repetitions, environnement: entete }));
   writeFileSync(`${base}.json`, JSON.stringify({ verdict: v, environnement: env, resultat: r }, null, 2)); if (entete[0].startsWith('⚠')) e.out?.(entete[0]); // ⚠ sur la sortie aussi (revue L742)
-  appendFileSync(join(racine, 'historique.jsonl'), `${ligneSequence(v, { date: e.maintenant.toISOString(), empreinte: e.empreinte, candidat: cand, reference: ref, modele_candidat: e.modele_candidat, sequence: r.sequence, run: r.run, repetition, repetitions })}\n`);
+  appendFileSync(join(racine, 'historique.jsonl'), `${ligneSequence(v, { date: e.maintenant.toISOString(), empreinte: e.empreinte, candidat: cand, reference: ref, modele_candidat: e.modele_candidat, sequence: r.sequence, run: r.run, repetition, repetitions, modeles_exacts: modelesExacts(env) })}\n`);
   return v;
 }
 

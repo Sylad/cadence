@@ -37,7 +37,7 @@ describe('cadence run : modèle de chaque passe (L726)', () => {
     const e = executerRun({ repo, demande: 'Crée fait.txt', exec: fauxClaude([commite('fait.txt')], appels), out });
     expect(relire(e)).toMatchObject({ etat: 'integre', modele: 'opus', modele_raison: 'par défaut', passes: [{ quoi: 'travail', modele: 'opus', raison: 'par défaut' }] });
     expect(l[0]).toContain('session Opus (par défaut) en mode leger');
-    expect(l).toContain('modèles : travail : Opus (par défaut)');
+    expect(l).toContain('modèles : travail : Opus (par défaut) → id non lu');
   });
 
   it('3e correction de porte rouge dans un même run : bascule sur fable, même session, et la fin le dit passe par passe', () => {
@@ -56,8 +56,8 @@ describe('cadence run : modèle de chaque passe (L726)', () => {
       { quoi: 'correction 2 (porte rouge)', modele: 'opus', raison: 'par défaut' },
       { quoi: 'correction 3 (porte rouge)', modele: 'fable', raison: '3e passe de correction' },
     ]);
-    expect(l).toContain('modèles : travail : Opus (par défaut) · correction 1 (porte rouge) : Opus (par défaut) · correction 2 (porte rouge) : Opus (par défaut)'
-      + ' · correction 3 (porte rouge) : Fable (3e passe de correction)');
+    expect(l).toContain('modèles : travail : Opus (par défaut) → id non lu · correction 1 (porte rouge) : Opus (par défaut) → id non lu · correction 2 (porte rouge) : Opus (par défaut) → id non lu'
+      + ' · correction 3 (porte rouge) : Fable (3e passe de correction) → id non lu');
   });
 
   it('deux revues non conformes du lot : le run suivant part en fable dès le lancement, avec les dates des revues', () => {
@@ -104,7 +104,7 @@ describe('cadence run : modèle de chaque passe (L726)', () => {
     minute(); const e = executerRun({ repo, demande: 'Crée fait.txt', exec: fauxClaude([() => OPUS, commite('fait.txt')], appels), out, ...horloge() });
     expect(relire(e)).toMatchObject({ etat: 'integre', modele: 'fable', modele_raison: 'limite Opus atteinte' });
     expect(relire(e).passes).toEqual([{ quoi: 'travail', modele: 'opus', raison: 'par défaut' }, { quoi: 'reprise', modele: 'fable', raison: 'limite Opus atteinte' }]);
-    expect(l).toContain('modèles : travail : Opus (par défaut) · reprise : Fable (limite Opus atteinte)');
+    expect(l).toContain('modèles : travail : Opus (par défaut) → id non lu · reprise : Fable (limite Opus atteinte) → id non lu');
   });
 
   it('lot absent du plan : opus, et la ligne de lancement dit que les revues ne sont pas comptées', () => {

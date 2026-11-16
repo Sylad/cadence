@@ -251,7 +251,7 @@ export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdi
 }
 
 export const ligneHistorique = (v: Verdict, e: { type?: 'sequence'; sequence?: string; run?: string; repetition?: number; repetitions?: number; date: string; empreinte: string; candidat: string; reference: string; modele_candidat: string; bancs: string[]; hebdo: boolean; frais: number; eclair_ok?: boolean;
-  niveau?: string; duree_s?: number }) =>
+  niveau?: string; duree_s?: number; modeles_exacts?: Record<string, string[]> }) => // L756 : modele_candidat est l'alias de bras.yaml (garde) ; modeles_exacts, ce que les sessions ont dit
   JSON.stringify({ ...e, vert: v.vert, rouges: v.criteres.filter((c) => c.bloquant && !c.ok).map((c) => c.nom), ...(v.non_mesurable && { non_mesurable: v.non_mesurable }) });
 
 const PARIS = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });

@@ -9,6 +9,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
 import { argsClaude, creerExecuteur, libererReglages, lire, OUTILS_INTERDITS, type Executeur } from '../bench/bras.js';
+import { ajouterSession, claudeVide } from '../bench/environnement.js';
 import { aiguiller, BRAS_COMPLET, BRAS_LEGER, chemin, modeleRun } from './aiguillage.js';
 import { lignePasses, modeleDeDepart, modeleDit, numeroCorrection, PASSE_FABLE, revueDuPlan, runsDuLot, type Passe, type Revue } from './escalade.js';
 import { heureLocale, reconnaitreQuota, type Quota } from './quota.js';
@@ -131,6 +132,8 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false, sujet?: string
   e.passes = [...(e.passes ?? []), { quoi: quoiPasse(e, neuve, sujet), modele: e.modele ?? 'opus', raison: e.modele_raison ?? (e.modele ? 'choisi au lancement' : 'par défaut') }]; // L726
   sauver(e);
   const brut = exec(['-p', prompt, ...(neuve ? ['--session-id', e.session] : e.session ? ['--resume', e.session] : []), ...argsClaude({ ...(e.mode === 'leger' ? BRAS_LEGER : BRAS_COMPLET), modele: e.modele ?? 'opus' }, e.worktree, interdits, reglagesRun(e.worktree))], { cwd: e.worktree, env }); // L705 : coupes du socle (../socle.ts)
+  const id = ajouterSession(claudeVide(), brut.stdout).modeles.join(', '); // L756 (issue #61) : l'id exact de la session, pas l'alias passé à --model
+  if (id) e.passes.at(-1)!.id_modele = id;
   const r = lire(brut), cause = causeSession(brut); if (cause) o.out(cause); // L711 : une session arrêtée par un signal le dit dans le journal, avant la suite habituelle
   e.session = r.session || e.session; e.cout_usd += r.cout;
   // D-15 : une fin de quota n'est pas un échec. La limite Opus seule bascule sur fable dans la même session ; la limite hebdo bloque tous les modèles : on attend.

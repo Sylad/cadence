@@ -7,7 +7,7 @@ import type { Io } from '../cli.js';
 import { ajouterBanc } from './ajouter.js';
 import { chargerBanc, listerBancs, piecesBanc, racineBanc, type Banc } from './banc.js';
 import { chargerBras, executeurClaude, lancerBras, libererReglages, type DefBras, type Executeur, type Mesure } from './bras.js';
-import { enteteEnvironnement, environnement, ligneComparaison, passagePrecedent, versionClaude, type Environnement } from './environnement.js';
+import { enteteEnvironnement, environnement, ligneComparaison, modelesExacts, passagePrecedent, versionClaude, type Environnement } from './environnement.js';
 import { fuitesDuBras } from './fuites.js';
 import { etatGit, juger, travailNonLivre, type Jugement } from './juges.js';
 import { preparer } from './preparer.js';
@@ -284,7 +284,7 @@ async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?:
   const duree_s = Math.round((Date.now() - debut.getTime()) / 1000);
   mkdirSync(join(o.racine, 'rapports'), { recursive: true });
   const base = join(o.racine, 'rapports', id);
-  const env = environnement(version, Object.fromEntries([o.ref, o.cand].map((n) => [n, bras[n].modele])), res.flatMap((r) => Object.values(r.mesures)));
+  const env = environnement(version, Object.fromEntries([o.ref, o.cand].map((n) => [n, bras[n].modele])), res.flatMap((r) => Object.values(r.mesures)), { alias: o.juge, jugements: res.map((r) => r.jugement) });
   const entete = enteteEnvironnement(env, passagePrecedent(o.racine, id));
   writeFileSync(`${base}.md`, rapport(res, o.ref, o.cand, v, { date, empreinte: o.empreinte, repetitions: N, eclair: e?.lignes, niveau: o.niveau, depot: o.depot, duree_s, environnement: entete }));
   writeFileSync(`${base}.json`, JSON.stringify({ verdict: v, environnement: env, resultats: res.map((r, i) => ({ ...r, clones: joues[i].clones })) }, null, 2));
@@ -297,7 +297,7 @@ async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?:
   }
   appendFileSync(join(o.racine, 'historique.jsonl'), `${ligneHistorique(v, { date: o.maintenant.toISOString(), empreinte: o.empreinte,
     candidat: o.cand, reference: o.ref, modele_candidat: bras[o.cand].modele, bancs: res.map((r) => r.banc), hebdo: o.hebdo, frais: new Set(res.filter((r) => r.frais).map((r) => banBase(r.banc))).size,
-    ...(e && { eclair_ok: e.ok }), ...(o.niveau && { niveau: o.niveau }), duree_s })}\n`);
+    ...(e && { eclair_ok: e.ok }), ...(o.niveau && { niveau: o.niveau }), duree_s, modeles_exacts: modelesExacts(env) })}\n`);
   o.out(`${titreVerdict(v)} — ${duree_s} s — rapport : ${base}.md`);
   return { ...v, eclair_ok: e?.ok };
 }

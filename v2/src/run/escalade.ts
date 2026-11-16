@@ -17,8 +17,9 @@ export const REVUES_FABLE = 2;
 export interface Revue { date: string; verdict: string; commit?: string | null; en_attente?: boolean }
 /** Ce que l'état d'un run garde pour l'aiguillage (sous-ensemble de Etat, run.ts). */
 export interface RunDuLot { id: string; repo: string; lot?: string; etat: string; debut?: string; corrections?: unknown[]; correction_revue?: boolean; revue?: Revue }
-/** Une session du run : ce qu'elle a fait, sur quel modèle, et pourquoi ce modèle. */
-export interface Passe { quoi: string; modele: string; raison: string }
+/** Une session du run : ce qu'elle a fait, sur quel modèle, et pourquoi ce modèle. L756 (issue #61) : `id_modele`, l'identifiant exact que la session
+ * a dit utiliser (system/init de sa sortie, ex. claude-fable-5-2), jamais l'alias demandé ; absent tant qu'elle n'a rien rendu, ou si sa sortie ne le dit pas. */
+export interface Passe { quoi: string; modele: string; raison: string; id_modele?: string }
 
 /** Même règle que isNonConformingVerdict (src/audit.ts, L660) : le verdict COMMENCE par « non conforme » / « not compliant ». */
 export const nonConforme = (verdict: string) => /^[^\p{L}\p{N}]*(?:non[\s-]*conforme|not\s+compliant|non[\s-]*compliant)/iu.test(verdict);
@@ -119,5 +120,5 @@ export const numeroCorrection = (e: { corrections_avant?: number; correction_rev
 const Nom = (m: string) => `${m[0].toUpperCase()}${m.slice(1)}`;
 /** « Fable (3e passe de correction du lot L12) » */
 export const modeleDit = (modele: string, raison: string) => `${Nom(modele)} (${raison})`;
-/** La ligne du rapport : chaque passe, son modèle et pourquoi. */
-export const lignePasses = (passes: Passe[]) => `modèles : ${passes.map((p) => `${p.quoi} : ${modeleDit(p.modele, p.raison)}`).join(' · ')}`;
+/** La ligne du rapport : chaque passe, son modèle et pourquoi, puis l'identifiant exact lu dans la sortie de la session (L756), « id non lu » sinon. */
+export const lignePasses = (passes: Passe[]) => `modèles : ${passes.map((p) => `${p.quoi} : ${modeleDit(p.modele, p.raison)} → ${p.id_modele ?? 'id non lu'}`).join(' · ')}`;

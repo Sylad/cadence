@@ -3715,6 +3715,11 @@ lots:
     estimate: 0.25
     created: 2026-11-16
     started: 2026-11-16
+  - id: L755
+    title: "Un lot qui modifie un skill, un agent ou leur doc rejoue les cas d'éval du plugin qui les concernent avant d'être clos (porte ou raf done), pas seulement à la publication — L744 a passé deux revues et n'a été vu rouge par l'éval qu'à la publication de 2.0.12, 7 h plus tard (D-26) ; coût visé ~0,40 $ et ~1 min par cas ; mesure : 0 éval rouge à la publication sur un défaut d'un lot déjà clos"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-16
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

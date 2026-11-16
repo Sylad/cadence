@@ -1,0 +1,16 @@
+{
+ "id": "D-26",
+ "texte": "ok, ouvre un lot pour ce mécanisme",
+ "date": "2026-11-16",
+ "etat": "ouverte",
+ "preuve": "",
+ "precisions": [
+  {
+   "date": "2026-11-16",
+   "texte": "Mécanisme proposé par le lead : un lot qui touche un skill, un agent ou leur doc rejoue les cas d'éval concernés avant d'être clos. Contexte : l'éval a arrêté la publication 2.0.12 sur une régression introduite par L744 le matin même."
+  }
+ ],
+ "lots": [
+  "L755"
+ ]
+}

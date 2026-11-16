@@ -3660,7 +3660,7 @@ lots:
     estimate: 0.25
     created: 2026-11-16
     started: 2026-11-16
-    review: { date: 2026-11-16, verdict: "non conforme : 1 bloquant — clore.ts:14,27-28 : git diff --name-only cite les noms accentués, les noms repartent vers git non échappés (un ':' initial ou un '\\' cassent aussi la comparaison) et le code de sortie est ignoré ; reproduit : décision.md, :deux-points.txt et a\\b.txt absents de main, --clore sort 0 et supprime la branche (perte de travail). M1 et M2 de la 1re revue corrigés.", commit: 43ac4746daee2d9c5efa8b006860915709944522 }
+    review: { date: 2026-11-16, verdict: "non conforme : 1 bloquant (bump de sous-module absent de main invisible avec diff.ignoreSubmodules=all → --clore supprime la branche, clore.ts:15) ; 3 majeurs (git status en échec laisse --clore retirer du travail non commité ; commits sur HEAD détaché du worktree perdus ; git cherry ignore les commits de fusion)", commit: 3ae5dbf22a5ea029f11d4f8a5eb4101e34eacb46 }
   - id: L746
     title: "Mise à jour mensuelle des technos et dépendances (D-1 du registre parent) : versions mineures et correctifs, majeures proposées à part ; noter chaque régression trouvée et sa correction"
     status: todo

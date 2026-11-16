@@ -3693,10 +3693,12 @@ lots:
     created: 2026-11-16
   - id: L751
     title: "Test instable v2/test/banc-niveaux-l689.test.ts (« les tests d'origine posés sont retirés du clone… », v.vert attendu true) : rouge sous charge machine, vert seul 3/3 — 2e occurrence le 16-11 (porte de L745, puis cadence release 2.0.12 arrêtée) ; le rendre indépendant de la charge SANS affaiblir ce qu'il vérifie"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-16
     started: 2026-11-16
+    review: { date: 2026-11-16, verdict: "conforme : horloge réelle par défaut partout, aucune assertion retirée ni seuil relevé, une mutation qui ne transmet pas l'horloge fait échouer le test visé ; 2 mineurs (horloge simulée partagée par tout le fichier, pas de fragment changelog.d) ; porte verte à b9bd42b3", commit: b9bd42b36e78d3f921e24fa54d65eaa1f8f582ba }
+    finished: 2026-11-16
   - id: L752
     title: "Même fragilité sous charge que L751 dans d'autres tests v2 : banc-niveaux-l689 « trois bancs joués en même temps » (vrais processus, durées réelles), bras-sans-livrable-l733:69/93, suite-rejouee-l734:49/81, bench-cli:46/92/98/220 (verdict vert avec horloge réelle), seuils absolus preparer:55 (<15 s) et lecture-obligatoire:157 (<1000 ms) — injecter l'horloge comme L751"
     status: todo

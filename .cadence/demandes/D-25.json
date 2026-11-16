@@ -1,0 +1,16 @@
+{
+ "id": "D-25",
+ "texte": "ok, ouvre un lot pour l'écart du banc 3",
+ "date": "2026-11-16",
+ "etat": "ouverte",
+ "preuve": "",
+ "lots": [
+  "L750"
+ ],
+ "precisions": [
+  {
+   "date": "2026-11-16",
+   "texte": "Écart mesuré : banc 3 (ol-companion-L241), cadence run 529 s / 6,1 M jetons contre A 276 s / 2,0 M (rapport 2026-11-16-1436), puis 577 s / 7,6 M contre 303 s / 2,6 M (rapport 2026-11-16-1458). Possible piste de la baisse de flux relevée au tour du matin (−65 %)."
+  }
+ ]
+}

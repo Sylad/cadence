@@ -3701,10 +3701,12 @@ lots:
     finished: 2026-11-16
   - id: L752
     title: "Même fragilité sous charge que L751 dans d'autres tests v2 : banc-niveaux-l689 « trois bancs joués en même temps » (vrais processus, durées réelles), bras-sans-livrable-l733:69/93, suite-rejouee-l734:49/81, bench-cli:46/92/98/220 (verdict vert avec horloge réelle), seuils absolus preparer:55 (<15 s) et lecture-obligatoire:157 (<1000 ms) — injecter l'horloge comme L751"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-16
     started: 2026-11-16
+    review: { date: 2026-11-16, verdict: "conforme : tests v2 visés indépendants de la charge, horloge injectée (réelle par défaut), aucune assertion affaiblie ; porte verte rejouée par le lead à 67f2a6a ; non vérifié : tsc hors porte par le relecteur (@types/node absent chez lui)", commit: 5108f4a8a76d44eb7b7a4128ff2869d4fe1df313 }
+    finished: 2026-11-16
   - id: L753
     title: "cadence release : écrire elle-même les deux formes de docs/whats-new.md (ligne « In two lines » et paragraphe « Version by version ») à partir des fragments changelog.d, au lieu de s'arrêter — vécu 2 fois le 16-11 (2.0.11 et 2.0.12), un agent chaque fois"
     status: todo

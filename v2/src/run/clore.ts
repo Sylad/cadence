@@ -11,7 +11,8 @@ import { etatVu, occupantRun, retirerRun, type Etat } from './run.js';
 const REPRENABLES = ['en-cours', 'interrompu', 'attente', 'quota'];
 const git = (cwd: string, ...a: string[]) => spawnSync('git', a, { cwd, encoding: 'utf8' });
 const sha = (repo: string, ref: string) => { const r = git(repo, 'rev-parse', '--verify', '-q', ref); return r.status === 0 ? r.stdout.trim() : ''; };
-const noms = (r: ReturnType<typeof git>) => r.stdout.split('\n').filter(Boolean);
+/** Revue r2 : les fichiers changés entre deux commits, lus avec -z (noms tels quels, ni cités ni échappés, jamais renvoyés à git) ; null si git échoue. */
+const changes = (repo: string, de: string, a: string) => { const r = git(repo, 'diff', '--name-only', '-z', '--no-renames', de, a); return r.status === 0 ? r.stdout.split('\0').filter(Boolean) : null; };
 
 /** `tete` sur un refus : les commits du run manquent à la cible, seul refus que --force passe. */
 export type Integration = { integre: true; tete: string; cible: string; preuve: string } | { integre: false; raison: string; tete?: string; cible?: string };
@@ -21,11 +22,12 @@ function teteDuRun(e: Etat): string {
   return sha(e.repo, `refs/heads/${e.branche}`) || (e.tete ? sha(e.repo, `${e.tete}^{commit}`) : '') || (existsSync(e.worktree) ? sha(e.worktree, 'HEAD') : '');
 }
 
-/** Revue L745 (M1) : les fichiers que le run change depuis son départ de la cible (merge-base), et ceux dont la cible n'a pas le contenu de la tête du run. */
-function contenuSurCible(e: Etat, tete: string, cible: string): { fichiers: string[]; differents: string[] } {
+/** Revue L745 (M1) : les fichiers que le run change depuis son départ de la cible (merge-base), et ceux dont la cible n'a pas le contenu de la tête du run.
+ * Revue r2 : l'intersection se fait ici, sans pathspec ; un git diff qui échoue rend null, jamais « rien de différent ». */
+function contenuSurCible(e: Etat, tete: string, cible: string): { fichiers: string[]; differents: string[] } | null {
   const depart = git(e.repo, 'merge-base', cible, tete).stdout.trim() || e.base;
-  const fichiers = noms(git(e.repo, 'diff', '--name-only', '--no-renames', depart, tete));
-  return { fichiers, differents: fichiers.length ? noms(git(e.repo, 'diff', '--name-only', '--no-renames', tete, cible, '--', ...fichiers)) : [] };
+  const fichiers = changes(e.repo, depart, tete), ecarts = changes(e.repo, tete, cible);
+  return fichiers && ecarts ? { fichiers, differents: fichiers.filter((f) => ecarts.includes(f)) } : null;
 }
 
 /** Tous les commits du run (base..tête) sont-ils sur la cible, ou leur contenu ? Sinon, la raison en une phrase. */
@@ -39,10 +41,10 @@ export function integrationManuelle(e: Etat): Integration {
   if (c.status !== 0) return { integre: false, raison: `git cherry a échoué : ${c.stderr.trim()}` };
   const absents = c.stdout.split('\n').filter((l) => l.startsWith('+ ')).map((l) => `${l.slice(2, 9)}${l.slice(42)}`);
   if (!absents.length) return { integre: true, tete, cible, preuve: `tous ses commits sont sur ${e.cible}` };
-  const { fichiers, differents } = contenuSurCible(e, tete, cible);
-  if (!differents.length) return { integre: true, tete, cible, preuve: `les fichiers du run (${fichiers.join(', ')}) ont sur ${e.cible} le contenu de sa tête (conflit résolu à la main)` };
+  const contenu = contenuSurCible(e, tete, cible);
+  if (contenu && !contenu.differents.length) return { integre: true, tete, cible, preuve: `les fichiers du run (${contenu.fichiers.join(', ')}) ont sur ${e.cible} le contenu de sa tête (conflit résolu à la main)` };
   return { integre: false, tete, cible, raison: `${absents.length} commit(s) du run absent(s) de ${e.cible} : ${absents.join(' ; ')} ; intègre-les d'abord (contenu différent sur ${e.cible} : `
-    + `${differents.join(', ')} ; si ta résolution les a changés exprès, clos sans preuve : cadence run --clore ${e.id} --force)` };
+    + `${contenu ? contenu.differents.join(', ') : 'invérifiable, git diff a échoué'} ; si ta résolution les a changés exprès, clos sans preuve : cadence run --clore ${e.id} --force)` };
 }
 
 /** L'état que --liste montre : « integre a la main » pour un run fini non intégré dont les commits ou leur contenu sont sur la cible, ou déjà clos. */

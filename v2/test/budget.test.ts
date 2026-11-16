@@ -50,6 +50,7 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // réglages suivis, et les compare au rapport précédent (environnement.ts, bench comparer), sans ligne tassée.
   // L745 (issue #62) : run 777 (+82), clore.ts (--liste « integre a la main », --clore) ; L745 (revue) : run 800 (+23), conflit résolu à la main reconnu par le contenu,
   // --clore --force, --reponse refuse un run clos, fichierRun et retirerRun partagés (une copie de moins dans cli.ts et clore.ts), sans ligne tassée.
+  // L745 (revue r2) : run 802 (+2), noms lus avec -z et comparés en JS (un nom accentué, « : » initial ou « \ » ne passe plus pour intégré), git diff en échec = non intégré.
   it('les totaux sont ceux de R29 : noyau 3000, mesure 2195 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
     expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2195]);

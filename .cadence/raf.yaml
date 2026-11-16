@@ -3660,7 +3660,7 @@ lots:
     estimate: 0.25
     created: 2026-11-16
     started: 2026-11-16
-    review: { date: 2026-11-16, verdict: "non conforme : 2 majeurs (un run conflit intégré à la main avec résolution n'est pas reconnu par --liste/--clore ; --reponse accepte un run clos par --clore) ; relèvement du budget de lignes à 777 justifié (mesuré)", commit: 57ebd32227471d1b0ec9e05f17343ccf436f71a3 }
+    review: { date: 2026-11-16, verdict: "non conforme : 1 bloquant — clore.ts:14,27-28 : git diff --name-only cite les noms accentués, les noms repartent vers git non échappés (un ':' initial ou un '\\' cassent aussi la comparaison) et le code de sortie est ignoré ; reproduit : décision.md, :deux-points.txt et a\\b.txt absents de main, --clore sort 0 et supprime la branche (perte de travail). M1 et M2 de la 1re revue corrigés.", commit: 43ac4746daee2d9c5efa8b006860915709944522 }
   - id: L746
     title: "Mise à jour mensuelle des technos et dépendances (D-1 du registre parent) : versions mineures et correctifs, majeures proposées à part ; noter chaque régression trouvée et sa correction"
     status: todo

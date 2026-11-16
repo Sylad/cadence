@@ -3508,6 +3508,8 @@ lots:
     started: 2026-11-15
     review: { date: 2026-11-15, verdict: "conforme : étude docs/etudes/retrait-vagues.md (36 % du code hors v2 ne sert qu'aux vagues, retrait en 3.0.0 en 7 lots après confirmation du compte pro) ; test mise-en-service passé de spawnSync à spawn, assertions inchangées", commit: 5aa4abd0b94835fd4f2304bae4a5433d0906c4ce }
     finished: 2026-11-15
+    notes:
+      - { date: 2026-11-16, text: "16-11, réponse du compte pro (boîte entre-claudes) : plus aucune vague depuis le 02-11, ~90 cadence run depuis le 10-11 ; rien ne casse chez lui. Écarts réels à trancher avant le retrait : run n'a ni testReplay, ni probe, ni acceptation scellée ; cadence-hud lit encore ~/.cadence/orchestrate/ (waves/, hud-context/)." }
   - id: L728
     title: "Issue #58 du compte pro : cadence run garde comme rapport le message du tour du prompt quand la session finit ce tour avec un travail encore en arrière-plan (« la recette tourne, je surveille ») et donne son vrai rapport dans un tour ouvert plus tard par une notification — l'inverse de #57 (L720). Le rapport est celui du dernier tour qui finit sans tâche de fond restante ; à défaut, le dernier message, et la fin de run dit de quel tour il vient"
     status: done

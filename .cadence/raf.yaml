@@ -3646,17 +3646,27 @@ lots:
     created: 2026-11-16
   - id: L744
     title: "livreur : prendre lead.ux par défaut (human) ou le lire lui-même, ne le réclamer que pour un lot visible ; vérifier la clé deliver dès le début (sans clé : rien à déployer, pousser le sha et le commit de plan, le dire en une ligne) — remarques du compte pro 16-11 (boîte entre-claudes)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-16
     started: 2026-11-16
-    review: { date: 2026-11-16, verdict: "non conforme : 1 majeur (la fiche livreur-delegue contredit le nouveau comportement : règles R14…R10 à aligner sur agents/livreur.md) ; 1 mineur (docs/skills.md:94 et skills/lead/SKILL.md à aligner sur le livreur sans clé deliver) ; 0 bloquant, push du commit de plan et grep de la clé vérifiés", commit: fbbcf459d99ba3e2a8ed0f83dce9e3d14a818ae1 }
+    review: { date: 2026-11-16, verdict: "conforme : seconde revue, le majeur (fiche livreur-delegue) et le mineur doc corrigés ; restent des mineurs non bloquants (titre de test R14 et description de l'agent périmés ; clé deliver vide prise pour présente : cas rare, l'agent s'arrête sur une question) ; porte verte à 469e160a", commit: 469e160aaccc0975500db018f889a2f259987743 }
+    notes:
+      - { date: 2026-11-16, text: "mineurs restants (16-11) : test/livreur-delegue.test.ts:242 titre R14 périmé ; agents/livreur.md:3 description périmée ; grep '^deliver:' prend une clé vide/null pour présente" }
+    finished: 2026-11-16
   - id: L745
     title: "cadence run --liste : un run « conflit » dont tous les commits sont sur main s'affiche intégré ; cadence run --clore <id> retire son worktree et sa branche (issue #62)"
     status: doing
     estimate: 0.25
     created: 2026-11-16
     started: 2026-11-16
+    review: { date: 2026-11-16, verdict: "non conforme : 2 majeurs (un run conflit intégré à la main avec résolution n'est pas reconnu par --liste/--clore ; --reponse accepte un run clos par --clore) ; relèvement du budget de lignes à 777 justifié (mesuré)", commit: 57ebd32227471d1b0ec9e05f17343ccf436f71a3 }
+  - id: L746
+    title: "Mise à jour mensuelle des technos et dépendances (D-1 du registre parent) : versions mineures et correctifs, majeures proposées à part ; noter chaque régression trouvée et sa correction"
+    status: todo
+    estimate: 0.5
+    every: 30
+    created: 2026-11-16
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

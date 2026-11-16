@@ -3678,9 +3678,10 @@ lots:
     created: 2026-11-16
   - id: L748
     title: "escalade Fable (L726) manquée : une revue non conforme écrite en attente (plan-en-attente.yaml, main tenue par un autre run) n'est pas vue au lancement du run de correction, donc deux revues non conformes ne comptent que pour une — vécu 16-11 sur L745 (3e passe jouée par Opus)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-16
+    started: 2026-11-16
   - id: L749
     title: "cadence run : l'intégration normale retire son worktree avec --force ; un commit fait dans un sous-module du worktree et non poussé y est perdu (limite relevée par L745, 16-11)"
     status: todo
@@ -3709,10 +3710,12 @@ lots:
     finished: 2026-11-16
   - id: L753
     title: "cadence release : écrire elle-même les deux formes de docs/whats-new.md (ligne « In two lines » et paragraphe « Version by version ») à partir des fragments changelog.d, au lieu de s'arrêter — vécu 2 fois le 16-11 (2.0.11 et 2.0.12), un agent chaque fois"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-16
     started: 2026-11-16
+    review: { date: 2026-11-16, verdict: "conforme : whats-new écrit fidèlement depuis changelog.d, forme manuelle jamais écrasée, idempotent, aucun cas d'éval concerné ; porte verte rejouée par le lead à 3861ca9d ; suite : L761 (paragraphe de version en tête pris pour l'introduction)", commit: 3861ca9dbbea8056d711832efdc65d7cdf24b76d }
+    finished: 2026-11-16
   - id: L754
     title: "Régression d'éval livrer-sh-sans-bloc (0,83 puis 0,67, publication 2.0.12 arrêtée le 16-11) : depuis L744, la doc dit « sans clé deliver : rien à déployer », ce qui pousse le modèle à dire que cadence deliver se passe de clé ; rétablir : cadence deliver sans bloc deliver refuse et ne devine pas ./livrer.sh, il faut déclarer script: ; seul le livreur, faute de tout script de livraison, conclut à « rien à déployer »"
     status: done
@@ -3753,6 +3756,11 @@ lots:
     title: "La clé references: de cadence.yaml a deux lecteurs incompatibles : cadence run (aiguiller) attend une liste de { mots, docs }, cadence ref (readReferencesConfig, src/config.ts) attend { dir } — un même cadence.yaml ne peut servir les deux ; vu 16-11 par expertise-gis L5"
     status: todo
     estimate: 0.5
+    created: 2026-11-16
+  - id: L761
+    title: "release : un paragraphe **x.y.z**: en tête de « Version by version » n'est pas pris pour l'introduction — sans introduction, la commande écrit la nouvelle version sous l'ancienne et sort quand même en 0 (revue de L753, 16-11)"
+    status: todo
+    estimate: 0.25
     created: 2026-11-16
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

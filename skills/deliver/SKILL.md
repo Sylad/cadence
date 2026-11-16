@@ -18,25 +18,27 @@ deliver:
       contains: "${SHORT}"   # the new version is the one being served
 ```
 
-A project that already has its own delivery script declares it instead — cadence then keeps the
-preconditions, the lock, the log and the delivered lots, and the script keeps the CI wait, the deploy
-and its business checks:
+A project that already has its own delivery script (a `./livrer.sh`, a `scripts/ship.sh`) declares it instead — cadence then keeps the
+preconditions (clean tree, sha on a remote branch), the lock, the log and the delivered lots, and the script keeps the CI wait, the deploy
+and its business checks (no `ci:` or `deploy:` beside it):
 
 ```yaml
 deliver:
-  script: ./scripts/ship.sh "$CADENCE_SHORT"
+  script: ./livrer.sh "$CADENCE_SHORT"
 ```
 
-Without a `deliver:` key in `cadence.yaml` (or without the file), `cadence deliver` refuses (« clé deliver absente »; « pas de configuration de livraison » when the file is missing) before any step: it never looks for or runs a `./livrer.sh` on its own, so declare it with `deliver: { script: … }` first.
+The arguments given after `--` go to that script, appended to this line: `cadence deliver -- api frontend` runs
+`./livrer.sh "$CADENCE_SHORT" api frontend` (without `script:`, cadence refuses them).
+
+Without a `deliver:` key in `cadence.yaml` (or without the file), `cadence deliver` refuses with code 2 (« clé deliver absente »; « pas de configuration de livraison » when the file is missing) before any step: it never looks for or runs a `./livrer.sh` on its own, so declare it with `deliver: { script: … }` first. A missing key never means « nothing to deliver » when the project has such a script: it means the script is not declared yet.
 
 A script that deploys a commit other than `$CADENCE_SHA` (it committed a Nouveautés timestamp itself)
 writes that sha into the file named by `$CADENCE_DEPLOYED_FILE`: cadence logs it as delivered and never guesses
 (a content that is not a hexadecimal commit sha — `HEAD` or a branch name included — fails the delivery; empty during a wave, the log keeps `$CADENCE_SHA` and a warning
 says the head moved).
 
-Its arguments go after `--`: `cadence deliver -- api frontend` (`--sha <rev>` to deliver a commit
-other than HEAD, see « Delivering a commit that is not HEAD »). Ask the human (or the project's own
-delivery skill) which arguments this delivery needs; never guess them.
+`--sha <rev>` delivers a commit other than HEAD (see « Delivering a commit that is not HEAD »). Ask the human (or the project's own
+delivery skill) which arguments after `--` this delivery needs; never guess them.
 
 ## Delivering a commit that is not HEAD
 

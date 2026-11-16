@@ -422,6 +422,29 @@ describe('fiche livreur-delegue et docs alignées sur le livreur (revue L744)', 
     )
   })
 
+  it('R14 — sans clé deliver mais avec un script de livraison non déclaré, le livreur pose une question et ne conclut pas « rien à déployer »', () => {
+    // L754 : « sans clé deliver : rien à déployer » laissait croire qu'un ./livrer.sh non déclaré se passait de clé ;
+    // cadence deliver refuse sans elle (code 2) et ne devine jamais un script.
+    const question = 'Question : pas de clé deliver mais un script de livraison <chemin> : le déclarer (deliver: script: <chemin> "$CADENCE_SHORT") ou confirmer qu\'il n\'y a rien à déployer'
+    const c = section('Before any command')
+    before(c, "grep -n '^deliver:' cadence.yaml", 'ls livrer.sh')
+    before(c, 'ls livrer.sh', 'Only without the key AND without such a script is there nothing to deploy')
+    expect(c).toContain(question)
+    expect(c).toMatch(/refuses \(code 2\) and never guesses a script/)
+    expect(regle('R14')).toMatch(/« rien à déployer » ne vaut que sans clé deliver ET sans script de livraison/)
+    expect(fiche.contrats[0].erreurs.map((e) => e.message)).toContain(question)
+    for (const doc of [lead, flat(readFileSync(join(root, 'docs/skills.md'), 'utf8')), flat(readFileSync(join(root, 'docs/lead.md'), 'utf8'))]) {
+      expect(doc).toMatch(/without a `deliver` key[^.]*and without a delivery script/)
+      expect(doc).toMatch(/never guess(es)? (it|a script)/)
+    }
+    // le skill deliver dit la même chose : refus code 2, jamais de script deviné, le script se déclare
+    const deliver = flat(readFileSync(join(root, 'skills/deliver/SKILL.md'), 'utf8'))
+    expect(deliver).toMatch(/refuses with code 2 \(« clé deliver absente »/)
+    expect(deliver).toMatch(/never looks for or runs a `\.\/livrer\.sh` on its own/)
+    expect(deliver).toContain('script: ./livrer.sh "$CADENCE_SHORT"')
+    expect(deliver).toMatch(/arguments given after `--` go to that script/)
+  })
+
   it('R10 — sans clé deliver, le commit du plan est poussé par son sha et cadence deliver ne tourne pas (R3 aussi)', () => {
     const r10 = regle('R10')
     expect(r10).toMatch(/Avec la clé deliver, le livreur ne pousse pas le commit du plan/)

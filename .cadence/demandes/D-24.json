@@ -3,7 +3,7 @@
  "texte": "au fait je crois que tu avais des questions à poser à mon claude pro, il n'y aurais pas moyen de vous faire communiquer tout les 2 directement? car faire le téléphone arabe entre vous 2 n'est pas super passionant?",
  "date": "2026-11-16",
  "etat": "livrée",
- "preuve": "Boîte aux lettres ~/entre-claudes/ sur Big-Blue (LISEZMOI.md + première question 2026-11-16-retrait-des-vagues.md) ; règle de lecture à chaque tour dans ~/projects/developpeur/CLAUDE.md. Vérifiée quand le Claude pro aura répondu dans la boîte sans recopie de Sylvain.",
+ "preuve": "Boîte aux lettres sur mini-blue C:\\Users\\sylva\\entre-claudes (LISEZMOI.md + 2026-11-16-retrait-des-vagues.md, déposés par scp) ; règle de lecture à chaque tour dans ~/projects/developpeur/CLAUDE.md. Vérifiée quand le Claude pro aura répondu dans la boîte sans recopie de Sylvain.",
  "precisions": [
   {
    "date": "2026-11-16",
@@ -12,6 +12,10 @@
   {
    "date": "2026-11-16",
    "texte": "Le compte pro tourne sur mobi-blue (PC perso de Sylvain), qui a un accès SSH à Big-Blue et à mini-blue : la boîte vit donc sur Big-Blue."
+  },
+  {
+   "date": "2026-11-16",
+   "texte": "Big-Blue n'a pas de sshd (WSL en NAT) : la boîte est déplacée sur mini-blue, joignable en SSH depuis Big-Blue et depuis mobi-blue."
   }
  ]
 }

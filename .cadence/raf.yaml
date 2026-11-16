@@ -3650,6 +3650,7 @@ lots:
     estimate: 0.25
     created: 2026-11-16
     started: 2026-11-16
+    review: { date: 2026-11-16, verdict: "non conforme : 1 majeur (la fiche livreur-delegue contredit le nouveau comportement : règles R14…R10 à aligner sur agents/livreur.md) ; 1 mineur (docs/skills.md:94 et skills/lead/SKILL.md à aligner sur le livreur sans clé deliver) ; 0 bloquant, push du commit de plan et grep de la clé vérifiés", commit: fbbcf459d99ba3e2a8ed0f83dce9e3d14a818ae1 }
   - id: L745
     title: "cadence run --liste : un run « conflit » dont tous les commits sont sur main s'affiche intégré ; cadence run --clore <id> retire son worktree et sa branche (issue #62)"
     status: doing

@@ -113,7 +113,7 @@ describe('agent livreur (L439)', () => {
 
   it('R7 — agents/livreur.md interdit raf ux quand lead.ux n\'est pas lead', () => {
     const ux = section('The UX verdict')
-    expect(ux).toMatch(/`lead\.ux: human` \(or no key\): never form the verdict/)
+    expect(ux).toMatch(/`lead\.ux: human` \(or no value in the brief, the default\): never form the verdict/)
     expect(ux).toContain('Question : verdict UX absent pour <lot> (lead.ux: human)')
   })
 
@@ -243,7 +243,7 @@ describe('agent livreur (L439)', () => {
     const c = section('Before any command')
     expect(c).toMatch(/launch neither verify, nor `raf done`, nor a push, nor deliver/)
     // la phrase exacte de la liste des champs : « sha » seul revient dix fois dans la section et ne peut pas faire échouer le test
-    expect(c).toContain('1. Complete brief: project folder, lot id, sha, `lead.ux` value. Otherwise `Question : brief incomplet : <champ> absent`.')
+    expect(c).toContain('1. Complete brief: project folder, lot id, sha. Otherwise `Question : brief incomplet : <champ> absent`.')
   })
 
   it('R14 — l\'URL de base est exigée au contrôle 4 (après git fetch origin main, quand le diff touche une page ou une API), pas au contrôle 1, par « Question : brief incomplet : URL de base absente »', () => {
@@ -351,5 +351,44 @@ describe('skills/lead/SKILL.md et documentation — livreur délégué (L439)', 
       expect(readFileSync(join(root, f), 'utf8'), f).toContain('livreur')
     }
     expect(readFileSync(join(root, 'README.md'), 'utf8')).toMatch(/livreur/)
+  })
+})
+
+describe('agent livreur — remarques du compte pro (L744)', () => {
+  it('lead.ux absent du brief : le défaut human, jamais « brief incomplet »', () => {
+    const c = section('Before any command')
+    const check1 = c.slice(c.indexOf('1. Complete brief'), c.indexOf('2. The lot'))
+    expect(check1).not.toMatch(/Complete brief:[^.]*lead\.ux/)
+    expect(check1).toMatch(/absent from the brief, it is `human`, the default documented in `docs\/lead\.md`/)
+    expect(check1).toMatch(/only matters for a visible lot/)
+    expect(check1).toMatch(/never « brief incomplet » for it/)
+    // le défaut écrit dans le livreur est celui que documente docs/lead.md
+    expect(flat(readFileSync(join(root, 'docs/lead.md'), 'utf8'))).toMatch(/`lead\.ux: lead` \(parent `cadence\.yaml`, default `human`\)/)
+  })
+
+  it('la clé deliver est lue avant toute commande, et sans elle cadence deliver ne tourne jamais', () => {
+    const c = section('Before any command')
+    before(c, "grep -n '^deliver:' cadence.yaml", '1. Complete brief')
+    expect(c).toMatch(/`cadence deliver` is never run/)
+    expect(c).toMatch(/Without the `deliver` key nothing is deployed, so no QA is due/)
+    expect(c).toContain('Question : <lot> déjà clos et sha <sha> déjà dans origin/main (pas de clé deliver)')
+    const chain = section('The chain')
+    expect(chain).toMatch(/5\. With the `deliver` key only: `cadence deliver --dry-run --sha <sha>`/)
+  })
+
+  it('sans clé deliver : le sha puis le commit du plan sont poussés, par leur sha, jamais HEAD, et la ligne le dit', () => {
+    const chain = section('The chain')
+    before(chain, 'git push origin <sha>:main', 'git push origin <plan>:main')
+    expect(chain).toMatch(/never the word `HEAD`/)
+    expect(chain).toMatch(/only when `git rev-parse <plan>\^` is the sha/)
+    expect(chain).toMatch(/With the `deliver` key, do not push the commit of the plan/)
+    const line = section('The line')
+    expect(line).toContain('<lot> poussé <sha court> avec le commit du plan <plan court>, rien à déployer (pas de clé deliver)')
+    expect(line).toContain('commit du plan <plan court> non poussé : commits entre le sha et lui')
+  })
+
+  it('le message de la clé absente est celui que rend parseDeliverConfig', () => {
+    expect(readFileSync(join(root, 'src/deliver.ts'), 'utf8')).toContain('clé deliver absente')
+    expect(section('Before any command')).toContain('`clé deliver absente`')
   })
 })

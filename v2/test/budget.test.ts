@@ -55,6 +55,8 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // sans git cherry), la reconnaissance par contenu retirée, sans ligne tassée.
   // L745 (5e passe, changement de conception) : run 845 (-1), --clore archive avant de retirer (refs/cadence/archive/), --liste ne fait qu'afficher, cadence run
   // --archives ; patch-id, tableau de reconnaissance et --force retirés, sans ligne tassée.
+  // L748 : run 881 (+36), escalade.ts lit aussi les revues du lot mises en attente (.cadence/plan-en-attente.yaml, parse des argv de raf review) et
+  // reconnaît une revue à son commit seul quand il est connu, sans ligne tassée.
   // L752 : bench 1500 (+7), mesure 2202 : horlogeAPas exportée (tests en ligne et enfants) et Enfants.pas_horloge_ms passée aux bras des enfants, sans ligne tassée.
   it('les totaux sont ceux de R29 : noyau 3000, mesure 2202 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742, L752)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);

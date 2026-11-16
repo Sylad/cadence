@@ -39,6 +39,8 @@
     "cadence2 env HOME": "docs/v2/banc.md",
     "cadence2 env CADENCE_HOME": "docs/v2/2026-11-09-cadence-run.md",
     "cadence2 env CLAUDE_CONFIG_DIR": "docs/v2/2026-11-09-cadence-run.md",
-    "cadence2 --git-common-dir": "docs/raf.md"
+    "cadence2 --git-common-dir": "docs/raf.md",
+    "cadence2 --vu": "docs/raf.md",
+    "cadence2 --vu-depot": "docs/raf.md"
   }
 }

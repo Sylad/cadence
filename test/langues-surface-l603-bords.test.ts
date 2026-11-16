@@ -45,7 +45,8 @@ describe('langues-surface L603 — bords', () => {
   });
 
   it('B4 — les options françaises listées sont déclarées comme options du CLI, pas seulement citées', () => {
-    const context = read('src/cli/context.ts');
+    // revue L748 : la table des options de src/cli/context.ts vit dans scripts/options-raf.mjs (partagée avec cadence run)
+    const context = read('scripts/options-raf.mjs');
     for (const o of ['quoi', 'largeur', 'seuil', 'porteur', 'sans-rendu', 'cache-sous-causes']) {
       expect(context, o).toMatch(new RegExp(`(^|\\s)'?${o}'?: *\\{ *type`, 'm'));
     }

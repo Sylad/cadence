@@ -1,5 +1,6 @@
 // Le contexte commun des commandes de raf et de cadence (L488, sorti de cli.ts) : les options, ce que dispatch construit, les assistants partagés.
 import { parseArgs } from 'node:util';
+import { OPTIONS_RAF } from '../../scripts/options-raf.mjs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { defaultPlan, PLAN_DEFAULT, PLAN_LEGACY, readNewsConfig, readPlanConfig } from '../config.js';
 import type { Day } from '../dates.js';
@@ -20,86 +21,8 @@ export interface Io {
   stdin?: () => string;
 }
 
-/** Les options de la ligne de commande, toutes commandes confondues : une option n'a de sens que pour certaines, chaque commande lit les siennes. */
-const OPTIONS = {
-    file: { type: 'string' },
-    project: { type: 'string' },
-    prefix: { type: 'string' },
-    'no-hook': { type: 'boolean' },
-    estimate: { type: 'string' },
-    quickwin: { type: 'boolean' },
-    by: { type: 'string' },
-    max: { type: 'string' },
-    visible: { type: 'boolean' },
-    screen: { type: 'string' },
-    spec: { type: 'boolean' },
-    local: { type: 'boolean' },
-    public: { type: 'string' },
-    every: { type: 'string' },
-    dir: { type: 'string' },
-    title: { type: 'string' },
-    after: { type: 'string' },
-    uses: { type: 'string' },
-    planned: { type: 'string' },
-    propose: { type: 'boolean' },
-    apply: { type: 'boolean' },
-    'per-day': { type: 'string' },
-    from: { type: 'string' },
-    set: { type: 'string', multiple: true },
-    parent: { type: 'string' },
-    id: { type: 'string' },
-    under: { type: 'string' },
-    force: { type: 'boolean' },
-    now: { type: 'boolean' },
-    back: { type: 'boolean' },
-    reason: { type: 'string' },
-    porteur: { type: 'string' },
-    status: { type: 'string' },
-    since: { type: 'string' },
-    before: { type: 'string' },
-    idle: { type: 'string' },
-    ttl: { type: 'string' },
-    session: { type: 'string' },
-    all: { type: 'boolean' },
-    depth: { type: 'string' },
-    output: { type: 'string', short: 'o' },
-    config: { type: 'string' },
-    'dry-run': { type: 'boolean' },
-    sha: { type: 'string' },
-    block: { type: 'string' },
-    constat: { type: 'boolean' },
-    retry: { type: 'string' },
-    gate: { type: 'boolean' },
-    clear: { type: 'boolean' },
-    'from-config': { type: 'boolean' },
-    'to-config': { type: 'boolean' },
-    verify: { type: 'boolean' },
-    rename: { type: 'string', multiple: true },
-    ignored: { type: 'boolean' },
-    notes: { type: 'boolean' },
-    json: { type: 'boolean' },
-    verbose: { type: 'boolean' },
-    classify: { type: 'boolean' },
-    wave: { type: 'string' },
-    model: { type: 'string' },
-    cache: { type: 'string' },
-    'cache-sous-causes': { type: 'string' },
-    sample: { type: 'string' },
-    sections: { type: 'string' },
-    slug: { type: 'string' },
-    quoi: { type: 'string' },
-    'sans-rendu': { type: 'boolean' },
-    out: { type: 'string' },
-    seuil: { type: 'string' },
-    'model-b': { type: 'string' },
-    double: { type: 'boolean' },
-    largeur: { type: 'string' },
-    until: { type: 'string' },
-    // Internes (L722) : ce qu'une revue mise en attente a relu, écrit par la mise en attente, refusé ailleurs (attente-commands.ts).
-    vu: { type: 'string' },
-    'vu-depot': { type: 'string', multiple: true },
-    help: { type: 'boolean', short: 'h' },
-} as const;
+/** Les options de la ligne de commande, toutes commandes confondues : la table partagée avec cadence run (scripts/options-raf.mjs, revue L748). */
+const OPTIONS = OPTIONS_RAF;
 
 export function parseCli(argv: string[]) {
   return parseArgs({ args: argv, allowPositionals: true, options: OPTIONS });

@@ -62,3 +62,9 @@
 - L'introduction de « Version by version » est ce qui précède le premier paragraphe `**x.y.z**:` (zéro, un ou plusieurs paragraphes) ; le paragraphe long de la nouvelle version s'écrit juste avant ce premier paragraphe (src/whats-new-forms.ts `insertLong`), sous le titre quand il n'y a pas d'introduction, à la fin de la section quand elle n'a aucune version.
 - La vérification (src/release.ts `whatsNewIssues`) ne saute plus « la première ligne » : un paragraphe de version en tête compte dans l'ordre ; un paragraphe d'un autre genre sous celui de la version qui sort = « mal placé » (garde le cas R10 « avant l'introduction »).
 - Structure reconnue = `## In two lines` puis `## Version by version`, une fois chacun (`whatsNewStructureIssue`). Sinon `cadence release` refuse juste après `plan()`, avant fumée, CI rejouée et écrits : RafError, code 2, « structure non reconnue, … ». Fichier absent : rien à vérifier, comme avant. Les deux tests L418 (fichier vide, sans « Version by version ») passent de « code 1 + écarts » à « code 2 + refus ».
+
+## cadence run : escalade Fable et plan en attente (L748, revue r1)
+
+- Workflow : au lancement, `revueDuPlan` (v2/src/run/escalade.ts) lit la revue du plan (`raf list --json`) puis les `raf review <lot>` de `.cadence/plan-en-attente.yaml` ; la dernière est la revue courante.
+- Décision (revue r1) : l'argv en attente se lit avec la table d'options de raf, déplacée de src/cli/context.ts vers `scripts/options-raf.mjs` (+ `.d.mts` aux types littéraux, comparée par test/options-raf-l748.test.ts ; publiée dans `files` et copiée par l'instantané). Option inconnue = plan en attente illisible, nommé.
+- Décision (revue r1) : une revue conforme, au plan ou en attente, remplace les précédentes comme au plan sous L726 ; seules les non conformes écrites après elle (et celles vues par des runs) comptent. Tests : v2/test/run-modele-attente-l748.test.ts.

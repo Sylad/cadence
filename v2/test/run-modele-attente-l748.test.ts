@@ -53,6 +53,19 @@ describe('cadence run : revues mises en attente comptées pour l\'escalade (L748
     expect(revuesNonConformes([relire(b)], NC1)).toHaveLength(1);
   });
 
+  it('revue conforme en attente après NC1 (vue par un run) et NC2 (en attente) : opus, pas de correction après revue, NC1 seule comptée', () => {
+    const repo = depot('exit 0');
+    const run = (raf: string, out = (_: string) => {}) => { minute(); return executerRun({ repo, demande: 'x', lot: 'L1', raf, exec: fauxClaude([commite(`g${Date.now()}.txt`)]), out }); };
+    run(fauxRaf());
+    expect(relire(run(fauxRaf(NC1)))).toMatchObject({ modele: 'opus', revue: NC1 });
+    attente(repo, [{ date: '2026-11-14T12:00:00.000Z', argv: NC2_ARGV }, { date: '2026-11-14T12:00:00.000Z', argv: ['review', 'L1', 'conforme', '--vu', 'ccc'] }]);
+    const { l, out } = io(), c = relire(run(fauxRaf(NC1), out));
+    expect(c).toMatchObject({ modele: 'opus', modele_raison: 'par défaut' });
+    expect(c.correction_revue).toBeUndefined();
+    expect(c.revue).toBeUndefined();
+    expect(l[0]).toContain('session Opus (par défaut) en mode leger');
+  });
+
   it('sans le plan en attente, le même lot reste sur opus (une seule revue non conforme vue)', () => {
     const repo = depot('exit 0');
     minute(); executerRun({ repo, demande: 'x', lot: 'L1', raf: fauxRaf(), exec: fauxClaude([commite('a.txt')]), out: () => {} });
@@ -94,6 +107,41 @@ describe('revueDuPlan lit le plan en attente (L748)', () => {
     const r = revueDuPlan(b, 'L1', fauxRaf(NC1));
     expect(r.revue).toEqual(NC1);
     expect(r.erreur).toMatch(/^plan en attente illisible \(\.cadence\/plan-en-attente\.yaml : [^\n]+\)$/);
+  });
+
+  // Revue L748, note 1 : l'argv en attente est celui que raf a reçu ; une option à valeur se lit avec la table de raf, pas comme un mot du verdict ou le lot.
+  it('une option à valeur de raf (--file, --config) dans l\'argv en attente : la revue du lot est lue, son verdict sans la valeur', () => {
+    const ici = dossierTemp('plan-');
+    attente(ici, [
+      { date: '2026-11-14T12:00:00.000Z', argv: ['--file', 'autre/plan.yaml', 'review', 'L1', 'non conforme : doc muette', '--vu', 'bbb'] },
+      { date: '2026-11-15T12:00:00.000Z', argv: ['review', 'L1', '--config', 'c.yaml', 'non conforme : encore', '--vu=ccc', '--project', 'p'] },
+    ]);
+    const nc3: Revue = { date: '2026-11-15', verdict: 'non conforme : encore', commit: 'ccc', en_attente: true };
+    expect(revuesEnAttente(ici, 'L1')).toEqual({ revues: [NC2_ATTENTE, nc3] });
+    expect(revueDuPlan(ici, 'L1', fauxRaf(NC1))).toEqual({ revue: nc3, precedentes: [NC1, NC2_ATTENTE] });
+  });
+
+  it('une option inconnue de raf dans l\'argv en attente : erreur nommée (raf la refuserait aussi), la revue du plan compte', () => {
+    const ici = dossierTemp('plan-');
+    attente(ici, [{ date: '2026-11-14T12:00:00.000Z', argv: ['review', 'L1', 'non conforme : x', '--inconnue'] }]);
+    const r = revueDuPlan(ici, 'L1', fauxRaf(NC1));
+    expect(r.revue).toEqual(NC1);
+    expect(r.erreur).toMatch(/^plan en attente illisible \(\.cadence\/plan-en-attente\.yaml : [^\n]*--inconnue[^\n]*\)$/);
+  });
+
+  // Revue L748, note 2 : une revue conforme remplace celles d'avant comme au plan (L726, où elle les écrasait) ; les revues vues par des runs comptent encore.
+  it('revue conforme en attente : les non conformes qu\'elle remplace ne se comptent plus, celles écrites après elle si', () => {
+    const ici = dossierTemp('plan-'), OK_ARGV = ['review', 'L1', 'conforme (1 mineur)', '--vu', 'ddd'];
+    const ok: Revue = { date: '2026-11-15', verdict: 'conforme (1 mineur)', commit: 'ddd', en_attente: true };
+    attente(ici, [{ date: '2026-11-14T12:00:00.000Z', argv: NC2_ARGV }, { date: '2026-11-15T12:00:00.000Z', argv: OK_ARGV }]);
+    expect(revueDuPlan(ici, 'L1', fauxRaf(NC1))).toEqual({ revue: ok });
+    const nc4: Revue = { date: '2026-11-16', verdict: 'non conforme : rechute', commit: 'eee', en_attente: true };
+    attente(ici, [{ date: '2026-11-14T12:00:00.000Z', argv: NC2_ARGV }, { date: '2026-11-15T12:00:00.000Z', argv: OK_ARGV },
+      { date: '2026-11-16T12:00:00.000Z', argv: ['review', 'L1', 'non conforme : rechute', '--vu', 'eee'] }]);
+    expect(revueDuPlan(ici, 'L1', fauxRaf(NC1))).toEqual({ revue: nc4 });
+    // conforme au plan, non conformes en attente après elle : elles se comptent
+    attente(ici, [{ date: '2026-11-14T12:00:00.000Z', argv: NC2_ARGV }, { date: '2026-11-16T12:00:00.000Z', argv: ['review', 'L1', 'non conforme : rechute', '--vu', 'eee'] }]);
+    expect(revueDuPlan(ici, 'L1', fauxRaf({ date: '2026-11-13', verdict: 'conforme', commit: 'aaa' }))).toEqual({ revue: nc4, precedentes: [NC2_ATTENTE] });
   });
 
   it('une revue en attente puis appliquée le lendemain (même commit) reste une seule revue', () => {

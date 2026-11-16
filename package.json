@@ -25,6 +25,8 @@
     "scripts/qualite.d.mts",
     "scripts/arbre-non-commite.mjs",
     "scripts/arbre-non-commite.d.mts",
+    "scripts/options-raf.mjs",
+    "scripts/options-raf.d.mts",
     ".claude-plugin",
     "README.md",
     "NOTICE",

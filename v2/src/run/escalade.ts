@@ -6,8 +6,10 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { parseArgs } from 'node:util';
 import { parse } from 'yaml';
 import { PLAN_EN_ATTENTE } from '../../../scripts/arbre-non-commite.mjs';
+import { OPTIONS_RAF } from '../../../scripts/options-raf.mjs';
 
 export const PASSE_FABLE = 3;
 export const REVUES_FABLE = 2;
@@ -24,17 +26,12 @@ export const nonConforme = (verdict: string) => /^[^\p{L}\p{N}]*(?:non[\s-]*conf
  * car une revue en attente, datée de sa mise en attente, peut être appliquée au plan le lendemain ; son commit, figé à la mise en attente, ne change pas. */
 const cle = (r: Revue) => (r.commit ? `@${r.commit}` : `${r.date}|`);
 
-/** L748 : la revue qu'écrira un `raf review <lot> <verdict…> --vu <sha|aucun>` mis en attente (format de src/repo-held.ts), ou null. */
+/** L748 : la revue qu'écrira un `raf review <lot> <verdict…> --vu <sha|aucun>` mis en attente (format de src/repo-held.ts), ou null. L'argv est celui
+ * que raf a reçu : il se lit avec la table d'options de raf (revue L748), sans quoi la valeur d'une option (--file x.yaml) se prendrait pour le lot. */
 function revueEnAttente(w: { date: string; argv: string[] }, lot: string): Revue | null {
-  const pos: string[] = [], d = new Date(w.date), jour = `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, '0')}-${`${d.getDate()}`.padStart(2, '0')}`;
-  let vu: string | undefined; // --vu et --vu-depot, seules options de valeur d'une revue en attente (src/cli/attente-commands.ts)
-  for (let i = 0; i < w.argv.length; i++) {
-    const a = w.argv[i]!;
-    if (a === '--vu') vu = w.argv[++i];
-    else if (a === '--vu-depot') i++;
-    else if (!a.startsWith('-')) pos.push(a);
-  }
-  const [cmd, id, ...mots] = pos;
+  const d = new Date(w.date), jour = `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, '0')}-${`${d.getDate()}`.padStart(2, '0')}`;
+  const { values, positionals } = parseArgs({ args: w.argv, allowPositionals: true, options: OPTIONS_RAF });
+  const [cmd, id, ...mots] = positionals, vu = values.vu;
   return cmd === 'review' && id === lot && mots.length ? { date: jour, verdict: mots.join(' '), commit: !vu || vu === 'aucun' ? null : vu, en_attente: true } : null;
 }
 
@@ -48,14 +45,17 @@ export function revuesEnAttente(repo: string, lot: string): { revues: Revue[]; e
   } catch (x) { return { revues: [], erreur: `plan en attente illisible (${PLAN_EN_ATTENTE} : ${(x as Error).message.replace(/\s+/g, ' ').trim()})` }; }
 }
 
-/** Les revues du lot au lancement : `revue`, celle qui vaudra une fois l'attente appliquée ; `precedentes`, celles qu'elle remplacera (L748). */
+/** Les revues du lot au lancement : `revue`, celle qui vaudra une fois l'attente appliquée ; `precedentes`, les non conformes qu'elle remplacera, écrites
+ * après la dernière revue conforme (L748). */
 export interface RevuesDuPlan { revue?: Revue; precedentes?: Revue[]; erreur?: string }
 
 /** La revue du lot dans le plan, lue par raf, puis celles du plan en attente ; `erreur` si l'un ne se lit pas (le run part quand même, sans le compter). */
 export function revueDuPlan(repo: string, lot: string, raf: string): RevuesDuPlan {
   const attente = revuesEnAttente(repo, lot), avec = (p: { revue?: Revue; erreur?: string }): RevuesDuPlan => {
     const toutes = [...(p.revue ? [p.revue] : []), ...attente.revues], erreur = [p.erreur, attente.erreur].filter(Boolean).join(' ; ');
-    return { ...(toutes.length ? { revue: toutes.at(-1) } : {}), ...(toutes.length > 1 ? { precedentes: toutes.slice(0, -1) } : {}), ...(erreur ? { erreur } : {}) };
+    // Revue L748 : une revue conforme remplace celles d'avant comme au plan (L726) ; seules les non conformes écrites après elle se comptent ici.
+    const precedentes = toutes.slice(toutes.reduce((k, r, i) => (nonConforme(r.verdict) ? k : i), -1) + 1, -1);
+    return { ...(toutes.length ? { revue: toutes.at(-1) } : {}), ...(precedentes.length ? { precedentes } : {}), ...(erreur ? { erreur } : {}) };
   };
   const r = spawnSync(process.execPath, [raf, 'list', '--json'], { cwd: repo, encoding: 'utf8', timeout: 60_000, maxBuffer: 64 << 20 });
   if (r.status !== 0) return avec({ erreur: `plan illisible (raf list : ${`${r.stderr ?? ''}`.trim().split('\n')[0] || r.error?.message || `code ${r.status}`})` });

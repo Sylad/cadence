@@ -35,8 +35,8 @@ describe('la surface du compte pro : langues et comptes (L603)', () => {
     expect(langues).toMatch(/no alias/i);
   });
 
-  it('R4 — chaque option française de la section existe dans src/cli/context.ts, chaque clé dans src/config.ts', () => {
-    const context = read('src/cli/context.ts');
+  it('R4 — chaque option française de la section existe dans la table des options du CLI, chaque clé dans src/config.ts', () => {
+    const context = read('scripts/options-raf.mjs'); // revue L748 : la table de src/cli/context.ts, partagée avec cadence run
     for (const o of ['quoi', 'largeur', 'seuil', 'porteur', 'sans-rendu', 'cache-sous-causes']) expect(context, o).toMatch(new RegExp(`'${o}'|\\b${o}:`));
     const config = read('src/config.ts');
     for (const k of ['maquette', 'maquetteReviews', 'fiche']) expect(config, k).toContain(k);

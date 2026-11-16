@@ -3701,9 +3701,10 @@ lots:
     finished: 2026-11-16
   - id: L752
     title: "Même fragilité sous charge que L751 dans d'autres tests v2 : banc-niveaux-l689 « trois bancs joués en même temps » (vrais processus, durées réelles), bras-sans-livrable-l733:69/93, suite-rejouee-l734:49/81, bench-cli:46/92/98/220 (verdict vert avec horloge réelle), seuils absolus preparer:55 (<15 s) et lecture-obligatoire:157 (<1000 ms) — injecter l'horloge comme L751"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-16
+    started: 2026-11-16
   - id: L753
     title: "cadence release : écrire elle-même les deux formes de docs/whats-new.md (ligne « In two lines » et paragraphe « Version by version ») à partir des fragments changelog.d, au lieu de s'arrêter — vécu 2 fois le 16-11 (2.0.11 et 2.0.12), un agent chaque fois"
     status: todo
@@ -3719,6 +3720,26 @@ lots:
     finished: 2026-11-16
   - id: L755
     title: "Un lot qui modifie un skill, un agent ou leur doc rejoue les cas d'éval du plugin qui les concernent avant d'être clos (porte ou raf done), pas seulement à la publication — L744 a passé deux revues et n'a été vu rouge par l'éval qu'à la publication de 2.0.12, 7 h plus tard (D-26) ; coût visé ~0,40 $ et ~1 min par cas ; mesure : 0 éval rouge à la publication sur un défaut d'un lot déjà clos"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-16
+  - id: L756
+    title: "Veille #61 : chaque mesure du banc et chaque run notent l'identifiant exact du modèle (claude-fable-5-2, pas « fable ») — depuis 2.1.321 (09-11) l'alias fable a changé sous nos pieds ; mesure : 100 % des rapports de banc portent l'id exact"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-16
+  - id: L757
+    title: "D-4 (article sous-agents et quota, 15-11) : aucun des 11 agents du plugin ne déclare de model, tous héritent du modèle de la session (Opus) — donner un model explicite aux agents mécaniques (livreur, precheck-reader) et mesurer avant de toucher aux juges (code-reviewer reste Opus) ; mesure : jetons Opus par livraison avant/après sur 5 livraisons, 0 livraison ratée de plus"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-16
+  - id: L758
+    title: "D-27 (1/2) : ablation au banc à chaque nouveau modèle (Fable 5.2, Opus 5.5…) — retirer UN composant de cadence run à la fois (lecture obligatoire des pièces, registre, correction après porte, escalade…) sur le banc figé et mesurer réussite, coût par lot réussi et durée ; un composant sans gain mesuré est retiré (idée de l'article « harness agentique », 12-11)"
+    status: todo
+    estimate: 1
+    created: 2026-11-16
+  - id: L759
+    title: "D-27 (2/2) : chaque fiche (spec: true) et chaque jeu de tests d'acceptation porte au moins un critère négatif (ce qui ne doit PAS arriver), refus de la fiche sinon ; mesure : part des lots dont un défaut échappé aurait été pris par un critère négatif (idée de l'article « harness agentique », 12-11)"
     status: todo
     estimate: 0.5
     created: 2026-11-16

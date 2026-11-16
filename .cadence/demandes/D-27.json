@@ -1,0 +1,12 @@
+{
+  "id": "D-27",
+  "texte": "Mets les deux idées de l'article 2 au plan",
+  "date": "2026-11-16",
+  "etat": "livrée",
+  "preuve": "Lots L758 (ablation au banc) et L759 (critère négatif) ajoutés au plan le 16-11",
+  "precision": "2026-11-16 : article 2 = https://the-bearded-bear.com/blog/harness-agentique-claude-code-planner-generateur-evaluateur ; idées : (1) ablation d'un composant à la fois au banc à chaque nouveau modèle, (2) au moins un critère négatif par contrat",
+  "lots": [
+    "L758",
+    "L759"
+  ]
+}

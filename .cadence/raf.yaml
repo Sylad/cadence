@@ -3646,9 +3646,10 @@ lots:
     created: 2026-11-16
   - id: L744
     title: "livreur : prendre lead.ux par défaut (human) ou le lire lui-même, ne le réclamer que pour un lot visible ; vérifier la clé deliver dès le début (sans clé : rien à déployer, pousser le sha et le commit de plan, le dire en une ligne) — remarques du compte pro 16-11 (boîte entre-claudes)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-16
+    started: 2026-11-16
   - id: L745
     title: "cadence run --liste : un run « conflit » dont tous les commits sont sur main s'affiche intégré ; cadence run --clore <id> retire son worktree et sa branche (issue #62)"
     status: todo

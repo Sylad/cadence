@@ -14,10 +14,12 @@ function depot(yaml?: string): string {
   return d;
 }
 const REFS = `references:
-  - mots: [sigwx, jet, "centre de pression"]
-    docs: [docs/normes/sigwx.md, docs/normes/absent.md]
-  - mots: [dépression, anticyclone]
-    docs: [docs/normes/centres.md]
+  dir: ~/kb/references
+  run:
+    - mots: [sigwx, jet, "centre de pression"]
+      docs: [docs/normes/sigwx.md, docs/normes/absent.md]
+    - mots: [dépression, anticyclone]
+      docs: [docs/normes/centres.md]
 `;
 
 describe('aiguillage de cadence run', () => {
@@ -45,7 +47,7 @@ describe('aiguillage de cadence run', () => {
   });
   it('références et pièces hors du dépôt (chemin absolu ou ~) : gardées telles quelles, comme une base de connaissance', () => {
     const kb = dossierTemp('kb-'); writeFileSync(join(kb, 'lot.md'), 'dossier du lot');
-    const d = depot(`references:\n  - mots: [canopy]\n    docs: [${join(kb, 'lot.md')}]\n`);
+    const d = depot(`references:\n  run:\n    - mots: [canopy]\n      docs: [${join(kb, 'lot.md')}]\n`);
     expect(aiguiller('Le style canopy', d, [])).toMatchObject({ mode: 'complet', pieces: [join(kb, 'lot.md')] });
     expect(chemin(d, '~/x.md')).toBe(join(homedir(), 'x.md'));
     expect(chemin(d, '/abs/y.md')).toBe('/abs/y.md');
@@ -56,6 +58,13 @@ describe('aiguillage de cadence run', () => {
   });
   it('references mal formée : refus clair plutôt qu un aiguillage faux', () => {
     expect(() => aiguiller('x', depot('references: oui\n'), [])).toThrow(/references/);
+    expect(() => aiguiller('x', depot('references:\n  run:\n    - { mots: [sigwx] }\n'), [])).toThrow('cadence.yaml : references.run[0].docs : liste non vide de textes attendue');
+  });
+  it('L760 : l ancienne forme (une liste sous references) est lue comme references.run, avec le message de migration', () => {
+    const a = aiguiller('Dessine les SIGWX', depot('references:\n  - mots: [sigwx]\n    docs: [docs/normes/sigwx.md]\n'), []);
+    expect(a).toMatchObject({ mode: 'complet', pieces: ['docs/normes/sigwx.md'] });
+    expect(a.migration).toMatch(/ancienne forme de cadence run.*references\.run/);
+    expect(aiguiller('Dessine les SIGWX', depot(REFS), []).migration).toBeUndefined();
   });
 });
 

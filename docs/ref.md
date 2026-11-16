@@ -179,7 +179,8 @@ deviation (R6/R9) is listed, none masks another; elsewhere a deviation can hide 
 
 ### Where the files go
 
-Outside the repository: `references.dir` of `cadence.yaml` (relative to that file), by default
+Outside the repository: `references.dir` of `cadence.yaml` (relative to that file; the key `references` also holds `run` for `cadence run`,
+see [config](config.md#references-cadence-ref-and-cadence-run)), by default
 `$XDG_DATA_HOME/cadence/references` (`~/.local/share/cadence/references`). A `references.dir`
 inside a Git repository is refused: the documents may be private. One folder per document:
 

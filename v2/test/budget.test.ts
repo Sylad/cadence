@@ -62,6 +62,8 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // passage, pour les juges (modelUsage) et pour chaque passe de cadence run, sans ligne tassée.
   // L756 (revue) : bench 1526 (+9), sequence 715 (+13), mesure 2241 : juges lus en stream-json (le juge à part des modèles auxiliaires facturés), une répétition
   // de séquence interrompue emporte ses étapes jouées et écrit modeles_exacts, sans ligne tassée.
+  // L760 : run 888 (+3) : la clé references: lue par scripts/references.mjs comme cadence ref (forme { dir, run }, ancienne liste avec migration dite au lancement,
+  // forme mal formée refusée avant le worktree), sans ligne tassée.
   it('les totaux sont ceux de R29 : noyau 3000, mesure 2241 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742, L752, L756)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
     expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2241]);

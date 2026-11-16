@@ -28,7 +28,11 @@ const USAGE_MEASURE = 'usage : cadence ref measure <slug> <page> <page | x,y | x
 export function refCommand(rest: string[], values: { sections?: string; slug?: string; model?: string; config?: string; 'sans-rendu'?: boolean; out?: string; seuil?: string; 'model-b'?: string; double?: boolean; quoi?: string; largeur?: string; json?: boolean }, root: string, io: Io): number | Promise<number> {
   const [verb, ...args] = rest;
   const configPath = resolve(io.cwd, values.config ?? join(root, 'cadence.yaml'));
-  const refsDir = (): string => referencesDir(root, configPath, io.env);
+  let migrationDite = false; // L760 : l'ancienne forme de references: est dite une fois par commande, sur la sortie d'erreur
+  const refsDir = (): string => referencesDir(root, configPath, io.env, (m) => {
+    if (!migrationDite) io.err(`cadence ref : ${m}`);
+    migrationDite = true;
+  });
   if (verb === 'add' && args.length === 1) {
     add({ document: args[0]!, slug: values.slug, sections: values.sections, env: io.env, cwd: io.cwd, refsDir, now: io.now(), out: io.out });
     return 0;

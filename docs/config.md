@@ -11,7 +11,7 @@ Four folders, on two user-level roots.
 | `.cadence/` in the repository | the plan (`raf.yaml`, its notes), `archive/` | yes (the plan is the project's history) | `plan:` in `cadence.yaml` ([raf](raf.md)) |
 | `.cadence/runs/<wave>/` in the launch folder | one folder per wave: `wave.json` (the state of the wave and its lots), `journal.log` and, for a wave launched from a folder other than the repository root, the lots' worktrees (`worktrees/`); also `.cadence/corrections.json`, the cache of `cadence corrections` | no: cadence adds both to `.git/info/exclude` of the launch folder's repository, so state never dirties a tree | the folder the wave is launched from |
 | `~/.cadence/orchestrate/` | what every live wave of the user shares: `waves/`, `slots/` (session slots), `holds/` (sessions started by hand), `waiters/`, `hud-context/`, `hud-quota.json` (the weekly quota the band publishes, L700), and `worktrees/` for the waves launched from a repository root only | no, outside any repository | `CADENCE_HOME` (replaces the whole folder) |
-| `~/.local/share/cadence/` | the copies of cadence in service (`npm run service`, [how it works](fonctionnement.md#4-putting-cadence-itself-in-service)) and, under `$XDG_DATA_HOME/cadence/references/`, the reference documents of `cadence ref add` | no | `XDG_DATA_HOME` for the reference documents; `references.dir` in `cadence.yaml` for their folder ([ref](ref.md)) |
+| `~/.local/share/cadence/` | the copies of cadence in service (`npm run service`, [how it works](fonctionnement.md#4-putting-cadence-itself-in-service)) and, under `$XDG_DATA_HOME/cadence/references/`, the reference documents of `cadence ref add` | no | `XDG_DATA_HOME` for the reference documents; `references.dir` in `cadence.yaml` for their folder ([below](#references-cadence-ref-and-cadence-run), [ref](ref.md)) |
 
 `CADENCE_HOME` does not move `~/.local/share/cadence`: the two roots are independent. The copies in service are cleaned by `npm run service` itself (it keeps the copy in service and the 3 before it, [orchestrate](orchestrate-cycle.md)); a lot's worktree is removed with `cadence orchestrate --remove-worktree`. `session.clean` ([session](session.md)) lists working files of *your* project; it is not a list of cadence's state.
 
@@ -59,3 +59,26 @@ bounds:
 6. **A usage page goes stale on a sentence of behaviour (L672).** The identifiers of L648 do not cover a phrase: L662 and L666 came back from two reviews with a major on a line of `docs/` that still said the old behaviour. The implementation and fix briefs list, for each page of `docs/` (subfolders included) with a line that contains a phrase the lot's title or goal quotes (between `« »`, `“ ”`, `""` or backticks, 5 characters or more, case and spacing ignored), the page and its line numbers (3 per page, 12 pages): read each one and update it in the same commit. Only the quoted phrases are searched, not the other words of the title; the check stops at the brief (no write-time hook).
 
 `bounds` is a list; an unknown key, a limit that is not a positive integer or a test path with `..` is refused, like any key of `cadence.yaml` (the gate validates `cadence.yaml` after a lot that changed it).
+
+## References: `cadence ref` and `cadence run`
+
+One key of `cadence.yaml`, `references`, serves both commands that read reference documents, in one form (L760):
+
+```yaml
+references:
+  dir: ~/kb/references            # cadence ref: where its documents go (outside any Git repository)
+  run:                            # cadence run: a word of the request turns on the complete mode
+    - mots: [sigwx, jet, cb]      #   words, compared without accents or case, as whole words
+      docs: [docs/normes/sigwx.md] #   documents read in full (relative to the repository, absolute or under ~)
+```
+
+Both parts are optional. Without `dir`, `cadence ref` stores under `$XDG_DATA_HOME/cadence/references` ([ref](ref.md)); without `run`,
+`cadence run` takes the light mode unless a `--piece` or `--complet` is given ([cadence run](v2/2026-11-09-cadence-run.md)).
+The two commands and the gate that validates `cadence.yaml` read the key with the same code (`scripts/references.mjs`): a file one accepts, the
+others accept too. A malformed key is refused by all three with the key at fault (`references.run[0].docs : liste non vide de textes attendue`),
+never read as « no reference »: an unknown key under `references` or in an entry, a `mots` or `docs` that is not a non-empty list of texts, an empty `dir`.
+
+**The former form of `cadence run`** — a list directly under `references:` (`references:` then `- mots: …`) — is still read, as `references.run`,
+and each command says so: `cadence run` in its launch lines, `cadence ref` on its error output, once per command
+(« references en liste (ancienne forme de cadence run) : lue comme references.run ; écrire … »). Move the list under `run:` to silence it; such a
+file has no `dir`, so `cadence ref` uses its default folder.

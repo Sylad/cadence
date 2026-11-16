@@ -23,7 +23,7 @@ describe('L487 — bords des appelants de readYamlKey / readYamlFile', () => {
     ['perf', readPerfConfig, null],
     ['session', readSessionConfig, {}],
     ['verify', readVerifyConfig, {}],
-    ['references', readReferencesConfig, {}],
+    ['references', readReferencesConfig, { run: [] }],
     ['migrate', readMigrateConfig, { keep: [] }],
     ['plan', (f) => readPlanConfig(f), null],
     ['priority', (f) => readPriority(join(f, '..')), []],

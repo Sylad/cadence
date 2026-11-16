@@ -13,6 +13,7 @@ import { readOnWrite } from './config-onwrite.js';
 import { parseStates } from './plan-states.js';
 import { checkTestRelated, checkTestReplay, readGateTest, type GateTest } from './orchestrate/gate-parts.js';
 import { booleanKey, isObject, list, readYamlFile, readYamlKey } from './yaml-keys.js';
+import { lireReferences, type References } from '../scripts/references.mjs';
 import { FIELDS, Plan, RafError, readIdPattern, STATUSES, type Field, type PlanFormat, type PlanSettings, type Status } from './plan.js';
 
 interface PlanConfig {
@@ -569,20 +570,17 @@ export function readDocsConfig(file: string): DocsConfig {
   return config;
 }
 
-interface ReferencesConfig {
-  /** Dossier des documents de référence (cadence ref), relatif au dossier du cadence.yaml. */
-  dir?: string;
-}
-
-/** Clé `references:` de cadence.yaml. */
-export function readReferencesConfig(file: string): ReferencesConfig {
-  const r = readYamlKey(file, 'references');
-  if (r == null) return {};
-  if (!isObject(r)) throw new RafError(`${file} : references doit être un objet { dir }`);
-  for (const k of Object.keys(r)) if (k !== 'dir') throw new RafError(`${file} : references.${k} inconnu (attendu : dir)`);
-  if (r.dir == null) return {};
-  if (typeof r.dir !== 'string' || r.dir.trim() === '') throw new RafError(`${file} : references.dir : chemin attendu`);
-  return { dir: r.dir.trim() };
+/**
+ * Clé `references:` de cadence.yaml (L760) : `dir` pour cadence ref, `run` (liste de { mots, docs }) pour l'aiguillage de cadence run.
+ * Le même code que cadence run (scripts/references.mjs) : un cadence.yaml que l'une accepte, l'autre l'accepte aussi.
+ * L'ancienne forme de cadence run (une liste) est acceptée et rend `migration`, le message que la commande affiche.
+ */
+export function readReferencesConfig(file: string): References {
+  try {
+    return lireReferences(readYamlKey(file, 'references'), file);
+  } catch (e) {
+    throw new RafError((e as Error).message);
+  }
 }
 
 interface MigrateConfig {

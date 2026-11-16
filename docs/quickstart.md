@@ -111,7 +111,7 @@ When you pick `alpha:L1`, the lead runs it with `cadence run`. You can do it you
 cd alpha && raf start L1 && cadence run "what L1 must do, in your words" --lot L1 --fond
 ```
 
-One Opus session does the lot in a worktree next to the project (`../.cadence-run/`), then the gate of `cadence.yaml` runs once and the work lands on your branch by fast-forward; nothing is pushed. `cadence run --liste` shows where it is; a question stops it until `cadence run --reponse <id> "…"`. When the request names references (a `--piece`, a word of `references:` in `cadence.yaml`), the session reads them in full before writing ([cadence run](v2/2026-11-09-cadence-run.md)).
+One Opus session does the lot in a worktree next to the project (`../.cadence-run/`), then the gate of `cadence.yaml` runs once and the work lands on your branch by fast-forward; nothing is pushed. `cadence run --liste` shows where it is; a question stops it until `cadence run --reponse <id> "…"`. When the request names references (a `--piece`, a word of `references.run` in `cadence.yaml`), the session reads them in full before writing ([cadence run](v2/2026-11-09-cadence-run.md)).
 
 ## A wave, on request
 

@@ -15,14 +15,17 @@ cadence run --help        # ou -h
 
 Le brief complet (v2d, hook de lecture) ne gagne au banc que quand la demande a des références à lire : normes, captures. Sans elles, au banc court du 10-11, Claude seul faisait aussi bien, et plus vite. `cadence run` choisit donc son mode par une règle mécanique :
 
-- **complet** (brief v2d + hook) : une `--piece` est donnée, ou la demande contient un mot de la section `references` de `cadence.yaml`, ou `--complet` est passé. Les documents de la référence trouvée deviennent des pièces à lire en entier ;
+- **complet** (brief v2d + hook) : une `--piece` est donnée, ou la demande contient un mot de `references.run` dans `cadence.yaml`, ou `--complet` est passé. Les documents de la référence trouvée deviennent des pièces à lire en entier ;
 - **léger** (brief de Claude seul, `v2/briefs/bras-A.md`) : sinon. Le worktree, la porte et l'intégration ne changent pas.
 
 ```yaml
 references:
-  - mots: [sigwx, jet, cb]
-    docs: [docs/normes/sigwx.md]
+  run:
+    - mots: [sigwx, jet, cb]
+      docs: [docs/normes/sigwx.md]
 ```
+
+La clé `references:` sert aussi `cadence ref` (`references.dir`) : une seule forme, lue par le même code dans les deux commandes (L760, [config](../config.md#references-cadence-ref-and-cadence-run)). L'ancienne forme, une liste directement sous `references:`, est encore lue comme `references.run`, avec une ligne de migration au lancement ; une forme mal formée est refusée avant la création du worktree.
 
 Le modèle, le mode et sa raison s'affichent au lancement (« session Fable en mode leger (…) »). Dans un vrai dépôt, la ligne « Taille » du brief complet, qui ne sert qu'au banc, est retirée : elle casserait un commitlint. Les mots se comparent sans accents ni casse, en mot entier. Un document ou une `--piece` peut être relatif au dépôt, absolu ou sous `~` : une base de connaissance hors du dépôt (par exemple `~/kb/dossiers/<dépôt>-<lot>.md`) se lit comme une pièce.
 

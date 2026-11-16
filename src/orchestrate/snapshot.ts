@@ -34,8 +34,8 @@ export const isSnapshotChild = (env: NodeJS.ProcessEnv, root = PACKAGE_ROOT): bo
 const BIN_ENTRIES = { raf: 'raf.js', cadence: 'cadence.js' };
 
 /** Ce du paquet qui sert à l'exécution d'une vague ; node_modules est lié, jamais copié. */
-// L722 : dist/repo-held.js importe scripts/arbre-non-commite.mjs ; revue L748 : dist/cli/context.js, scripts/options-raf.mjs.
-const COPIED = ['bin', 'dist', 'templates', 'agents', 'skills', 'scripts/qualite.mjs', 'scripts/qualite.d.mts', 'scripts/arbre-non-commite.mjs', 'scripts/arbre-non-commite.d.mts', 'scripts/options-raf.mjs', 'scripts/options-raf.d.mts', 'package.json'];
+// L722 : dist/repo-held.js importe scripts/arbre-non-commite.mjs ; revue L748 : dist/cli/context.js, scripts/options-raf.mjs ; L760 : dist/config.js, scripts/references.mjs.
+const COPIED = ['bin', 'dist', 'templates', 'agents', 'skills', 'scripts/qualite.mjs', 'scripts/qualite.d.mts', 'scripts/arbre-non-commite.mjs', 'scripts/arbre-non-commite.d.mts', 'scripts/options-raf.mjs', 'scripts/options-raf.d.mts', 'scripts/references.mjs', 'scripts/references.d.mts', 'package.json'];
 
 /** Dossier et sorties du processus relancé : ceux du `io` de l'appelant. */
 export interface LineSink {

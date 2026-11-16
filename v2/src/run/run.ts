@@ -38,7 +38,9 @@ export interface Etat extends EtatRapport { id: string; repo: string; branche: s
   etat: EtatRun; detail: string; debut: string; integre?: string; quota?: Quota; journal?: string; conflits?: Conflit[]; corrections?: Correction[];
   /** L726 (escalade.ts) : pourquoi `modele` ; le run est une correction après revue (un run du lot déjà intégré) ; passes de correction du lot avant ce run ;
    * revue non conforme du plan au lancement ; chaque session jouée, son modèle et pourquoi. */
-  modele_raison?: string; correction_revue?: boolean; corrections_avant?: number; revue?: Revue; passes?: Passe[] }
+  modele_raison?: string; correction_revue?: boolean; corrections_avant?: number; revue?: Revue; passes?: Passe[];
+  /** L745 (clore.ts) : la tête du worktree à la fin d'un run non intégré (l'intégration à la main se vérifie même branche retirée) ; `clos` : posé par --clore. */
+  tete?: string; clos?: { date: string; cible: string; tete: string } }
 /** `maintenant` et `attendre` : l'horloge et l'attente du quota (D-15), simulées par les tests ; `attendre: null` rend la main sans attendre la remise à zéro. */
 interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null }
 
@@ -289,6 +291,7 @@ function suite(e: Etat, o: Opts): Etat {
 }
 
 function fin(e: Etat, o: Opts, registre = registreOuvert(e.worktree)): Etat {
+  if (e.etat !== 'integre' && existsSync(e.worktree)) e.tete = essaiGit(e.worktree, 'rev-parse', 'HEAD').stdout.trim() || e.tete;
   sauver(e);
   rendre(e, o);
   const duree = Math.round((Date.now() - Date.parse(e.debut)) / 1000);

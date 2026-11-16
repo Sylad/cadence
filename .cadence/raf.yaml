@@ -3630,11 +3630,12 @@ lots:
     finished: 2026-11-16
   - id: L742
     title: "Fiche de version par mesure : chaque rapport de banc note la version de Claude Code, l'identifiant exact du modèle de chaque bras et les réglages d'environnement (D-23, veille #61)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-16
     started: 2026-11-16
-    review: { date: 2026-11-16, verdict: "non conforme : 1 majeur (branches de environnement.ts sans test : version de session ≠ claude --version, bras aux réglages différents, CLAUDE_CONFIG_DIR, fichier de réglages illisible) ; 2 mineurs (ligne ⚠ non imprimée en séquence alors que docs/v2/banc.md:138 le dit ; ⚠ déclenchée quand un bras utilise un sous-agent sans changement d'environnement)", commit: 6e329ed68a9193987d43d58922d73f151a49af92 }
+    review: { date: 2026-11-16, verdict: "conforme : seconde revue, les 3 constats de la première (branches de environnement.ts testées, ⚠ en séquence, sous-agents hors comparaison) sont corrigés sans nouveau défaut ; porte verte à a719b7b1", commit: a719b7b1402ebdfbdd56fcb78e9982bcb5900071 }
+    finished: 2026-11-16
   - id: L743
     title: "Banc : bras Fable 5.2 (effort medium puis high) contre Opus 5.5, après le banc complet du 21-11 (D-23, veille #61)"
     status: todo

@@ -2,6 +2,7 @@
 // { mots, docs }, cadence ref (readReferencesConfig) un objet { dir } — et un même cadence.yaml ne pouvait servir les deux (vu le 16-11, expertise-gis L5).
 // Une seule forme, `references: { dir, run: [{ mots, docs }] }`, lue par scripts/references.mjs dans les deux commandes ; l'ancienne liste est acceptée
 // avec un message de migration, jamais ignorée en silence ; validateConfig refuse une forme mal formée.
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -101,6 +102,31 @@ describe('L760 : un même cadence.yaml sert cadence ref et cadence run', () => {
       expect(r.err, yaml).toContain(raison);
       expect(() => aiguiller('Dessine les SIGWX', p.cwd, []), yaml).toThrow(raison);
     }
+  });
+
+  it('references.dir sous ~ (l\'exemple de docs/config.md) : cadence ref range sous $HOME, jamais dans un dossier « ~ » à côté du cadence.yaml (revue r1, M1)', () => {
+    const doc = readFileSync(join(import.meta.dirname, '..', 'docs', 'config.md'), 'utf8');
+    const bloc = /```yaml\n([\s\S]*?)```/.exec(doc.slice(doc.indexOf('## References: `cadence ref` and `cadence run`')))?.[1] ?? '';
+    const dir = (parse(bloc) as { references: { dir: string } }).references.dir;
+    expect(dir.startsWith('~/')).toBe(true);
+    const p = projet(() => `references:\n  dir: ${dir}\n`);
+    p.env.HOME = join(p.base, 'maison');
+    const r = refAdd(p);
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    expect(existsSync(join(p.base, 'maison', dir.slice(2), 'norme', 'document.json'))).toBe(true);
+    expect(existsSync(join(p.cwd, '~'))).toBe(false);
+    // ~ seul, et ~ dans un dépôt Git : refusé comme tout dossier de dépôt, avec le chemin développé
+    const seul = projet(() => 'references:\n  dir: "~"\n');
+    seul.env.HOME = join(seul.base, 'maison');
+    expect(refAdd(seul).code).toBe(0);
+    expect(existsSync(join(seul.base, 'maison', 'norme', 'document.json'))).toBe(true);
+    const depot = projet(() => 'references:\n  dir: ~/kb\n');
+    depot.env.HOME = depot.cwd;
+    execFileSync('git', ['init', '-q', depot.cwd]);
+    const refus = refAdd(depot);
+    expect(refus.code).toBe(2);
+    expect(refus.err).toContain(`references.dir (${join(depot.cwd, 'kb')}) est dans un dépôt Git`);
   });
 
   it('docs/config.md documente la forme unique, et docs/v2 ne montre plus l\'ancienne', () => {

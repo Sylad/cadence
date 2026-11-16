@@ -80,3 +80,8 @@
 - Décision : les juges tournent en `stream-json --verbose` comme les bras ; le juge = modèle principal (`system/init`, `modeles_juge`), les auxiliaires facturés (`modelUsage` sans lui) à part (`autres_modeles_juge`). Le dernier `result` du flux fait foi (une sortie JSON d'un seul objet reste lue).
 - Écran (en-tête de rapport) : `Juges : alias opus → claude-opus-5-5 ; autres modèles facturés : claude-haiku-5-5` ; « non lu (aucune session de juge n'a rendu son system/init) » sans init. La comparaison au passage précédent ne regarde que le juge.
 - `modeles_exacts` de l'historique : `"id non lu"` (chaîne) pour un bras ou des juges sans id lu, jamais `[]`. Une répétition de séquence interrompue (`echecRepetition`) l'écrit aussi : `passer` lève `RepetitionInterrompue` qui emporte les étapes jouées. Tests : v2/test/revue-l756.test.ts.
+
+## references: lue par cadence ref et cadence run (L760, revue r1)
+
+- `references.dir` sous `~` (`~` seul ou `~/…`) vaut `$HOME` de l'environnement de la commande (src/ref/store.ts, `referencesDir`), comme les `docs` de `references.run` ; `~user` n'est pas développé. L'exemple de docs/config.md (`dir: ~/kb/references`) est joué par `cadence ref add` dans test/references-l760.test.ts.
+- `cadence run` refuse un `references:` mal formé avant le worktree (ni worktree, ni branche, ni état, ni session) et dit la migration de l'ancienne forme à la fin de sa ligne de lancement (`; cadence.yaml : <migration>`). Test : v2/test/run-references-l760.test.ts.

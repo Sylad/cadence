@@ -72,6 +72,7 @@ references:
       docs: [docs/normes/sigwx.md] #   documents read in full (relative to the repository, absolute or under ~)
 ```
 
+`dir` is relative to the folder of `cadence.yaml`, absolute, or under `~` (`~` alone or `~/…`, replaced by `$HOME`; `~user` is not expanded).
 Both parts are optional. Without `dir`, `cadence ref` stores under `$XDG_DATA_HOME/cadence/references` ([ref](ref.md)); without `run`,
 `cadence run` takes the light mode unless a `--piece` or `--complet` is given ([cadence run](v2/2026-11-09-cadence-run.md)).
 The two commands and the gate that validates `cadence.yaml` read the key with the same code (`scripts/references.mjs`): a file one accepts, the

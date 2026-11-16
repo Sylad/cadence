@@ -37,7 +37,8 @@ export interface StoredDocument {
 }
 
 /**
- * Dossier des documents : `references.dir` de cadence.yaml (relatif à son dossier), sinon `$XDG_DATA_HOME/cadence/references`.
+ * Dossier des documents : `references.dir` de cadence.yaml (relatif à son dossier, absolu, ou sous `~` : `$HOME`, revue r1 de L760), sinon
+ * `$XDG_DATA_HOME/cadence/references`.
  * Un `references.dir` dans un dépôt Git est refusé : les documents de référence peuvent être privés, ils ne se commitent pas.
  * `avis` reçoit le message de migration quand `references:` a l'ancienne forme de cadence run (une liste, L760) : jamais lue en silence.
  */
@@ -46,7 +47,8 @@ export function referencesDir(root: string, configPath: string, env: NodeJS.Proc
   if (config.migration) avis?.(config.migration);
   const dir = config.dir;
   if (dir === undefined) return join(env.XDG_DATA_HOME || join(env.HOME || homedir(), '.local', 'share'), 'cadence', 'references');
-  const abs = resolve(dirname(configPath), dir);
+  const home = env.HOME || homedir();
+  const abs = resolve(dirname(configPath), dir.replace(/^~(?=\/|$)/, () => home)); // comme `chemin` de cadence run : ~ seul ou ~/…, jamais ~user
   let probe = abs;
   while (!existsSync(probe) && dirname(probe) !== probe) probe = dirname(probe);
   if (gitRoot(probe)) throw new RafError(`ref : references.dir (${abs}) est dans un dépôt Git : les documents de référence restent hors du dépôt (choisir un dossier ailleurs, ou retirer la clé pour $XDG_DATA_HOME/cadence/references)`);

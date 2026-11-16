@@ -3711,10 +3711,12 @@ lots:
     created: 2026-11-16
   - id: L754
     title: "Régression d'éval livrer-sh-sans-bloc (0,83 puis 0,67, publication 2.0.12 arrêtée le 16-11) : depuis L744, la doc dit « sans clé deliver : rien à déployer », ce qui pousse le modèle à dire que cadence deliver se passe de clé ; rétablir : cadence deliver sans bloc deliver refuse et ne devine pas ./livrer.sh, il faut déclarer script: ; seul le livreur, faute de tout script de livraison, conclut à « rien à déployer »"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-16
     started: 2026-11-16
+    review: { date: 2026-11-16, verdict: "conforme : skill deliver, livreur, skill lead et docs cohérents avec src/deliver.ts (cadence deliver sans bloc deliver refuse, ne devine aucun script) ; cas d'éval livrer-sh-sans-bloc à 1,00 sur 6 runs ; 2 mineurs (le livreur ne cherche un script qu'à la racine et sous scripts/ ; docs/deliver.md ne dit pas le refus en code 2)", commit: 26bd26f0973fba40ae0f2aa1dce0cf7093bf2578 }
+    finished: 2026-11-16
   - id: L755
     title: "Un lot qui modifie un skill, un agent ou leur doc rejoue les cas d'éval du plugin qui les concernent avant d'être clos (porte ou raf done), pas seulement à la publication — L744 a passé deux revues et n'a été vu rouge par l'éval qu'à la publication de 2.0.12, 7 h plus tard (D-26) ; coût visé ~0,40 $ et ~1 min par cas ; mesure : 0 éval rouge à la publication sur un défaut d'un lot déjà clos"
     status: todo

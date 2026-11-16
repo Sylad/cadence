@@ -3726,6 +3726,7 @@ lots:
     estimate: 0.5
     created: 2026-11-16
     started: 2026-11-16
+    review: { date: 2026-11-16, verdict: "non conforme : 2 majeurs — une clé evals mal formée coupe la porte de raf done sans rien dire ; docs/config.md ne cite pas la porte evals", commit: fdd4dc8e41aff0eb104aeea10b3ef84b5b9c2fcc }
   - id: L756
     title: "Veille #61 : chaque mesure du banc et chaque run notent l'identifiant exact du modèle (claude-fable-5-2, pas « fable ») — depuis 2.1.321 (09-11) l'alias fable a changé sous nos pieds ; mesure : 100 % des rapports de banc portent l'id exact"
     status: todo

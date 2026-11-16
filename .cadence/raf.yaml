@@ -3630,9 +3630,10 @@ lots:
     finished: 2026-11-16
   - id: L742
     title: "Fiche de version par mesure : chaque rapport de banc note la version de Claude Code, l'identifiant exact du modèle de chaque bras et les réglages d'environnement (D-23, veille #61)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-16
+    started: 2026-11-16
   - id: L743
     title: "Banc : bras Fable 5.2 (effort medium puis high) contre Opus 5.5, après le banc complet du 21-11 (D-23, veille #61)"
     status: todo

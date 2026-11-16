@@ -3656,13 +3656,15 @@ lots:
     finished: 2026-11-16
   - id: L745
     title: "cadence run --liste : un run « conflit » dont tous les commits sont sur main s'affiche intégré ; cadence run --clore <id> retire son worktree et sa branche (issue #62)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-16
     started: 2026-11-16
-    review: { date: 2026-11-16, verdict: "non conforme : 3 bloquants (patch-id ignore la position : même ligne insérée dans un autre bloc identique comptée comme le même patch, clore.ts:63-74 ; commit fait dans un sous-module du worktree perdu par worktree remove --force, run.ts:296 ; dossier du worktree supprimé à la main : HEAD détaché jamais compté puis élagué, clore.ts:38) ; B1/M1/M2/M3 de la 3e revue corrigés", commit: 370f7d97cb5fd24080fb447e3ec5beee402893c1 }
+    review: { date: 2026-11-16, verdict: "conforme : cinquième revue après changement de conception (--clore archive avant de retirer, --liste n'affiche que l'ancêtre) ; chaque cas des quatre revues précédentes rejoué finit avec le travail atteignable par une référence ; 1 mineur (fichier skip-worktree modifié non cité dans les limites de la doc) ; porte verte à e378100a", commit: e378100a5c198b64237d5a189a176ee365f27b92 }
     notes:
       - { date: 2026-11-16, text: "16-11, lead : 4 passes et 4 revues non conformes, chaque revue trouve une nouvelle façon de perdre du travail tant que --clore SUPPRIME. Décision : supprimer la suppression — --clore archive (réf. refs/cadence/archive/<id> sur la tête de la branche et sur chaque HEAD du worktree) avant de retirer quoi que ce soit, et ne retire le dossier du worktree que s'il est propre ; perte de travail impossible par construction." }
+      - { date: 2026-11-16, text: "mineur 5e revue (16-11) : un fichier skip-worktree modifié part avec le worktree propre ; une phrase à ajouter au paragraphe des limites de la doc" }
+    finished: 2026-11-16
   - id: L746
     title: "Mise à jour mensuelle des technos et dépendances (D-1 du registre parent) : versions mineures et correctifs, majeures proposées à part ; noter chaque régression trouvée et sa correction"
     status: todo
@@ -3676,6 +3678,11 @@ lots:
     created: 2026-11-16
   - id: L748
     title: "escalade Fable (L726) manquée : une revue non conforme écrite en attente (plan-en-attente.yaml, main tenue par un autre run) n'est pas vue au lancement du run de correction, donc deux revues non conformes ne comptent que pour une — vécu 16-11 sur L745 (3e passe jouée par Opus)"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-16
+  - id: L749
+    title: "cadence run : l'intégration normale retire son worktree avec --force ; un commit fait dans un sous-module du worktree et non poussé y est perdu (limite relevée par L745, 16-11)"
     status: todo
     estimate: 0.25
     created: 2026-11-16

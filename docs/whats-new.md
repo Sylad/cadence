@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **2.0.11**: the plugin evaluation replays once, with the plugin only, a case below the threshold, and stops a release only if it is still below on the replay.
 - **2.0.10**: the bench now measures the real `cadence run` (pieces and declared model reach the arm); time judged against each bench's own noise; first green bench.
 - **2.0.9**: proportionate release gate (mechanical bench before a release, full bench on Saturdays); a bench arm that delivers nothing is not measured; red suites replayed alone; red bench.
 - **2.0.8**: `cadence run` picks each pass's model: Opus, Fable at the 3rd fix or after two non-compliant reviews; Sonnet measured, not kept; release smoke ignores a parent npm's dry-run; mechanical bench.
@@ -104,6 +105,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**2.0.11**: the plugin evaluation no longer stops a release on one run in six. When the repository has `scripts/eval-plugin.mjs`, the step of `cadence release` becomes `node scripts/eval-plugin.mjs npm run eval:plugin -- --trust-plugin`: a case below the threshold is replayed once, with the plugin only, and the step fails only if that case is still below on the replay; `rejeu.md` in the results folder (also at the top of `report.html`) says « rejoué » with both scores ([docs/releasing.md](releasing.md)).
 
 **2.0.10**: the bench finally measures `cadence run`. Until 2.0.9 it gave the routing an empty list of pieces, so the `cadence-run` arm played Claude-alone's brief, and it lost the arm's declared model, so the Sonnet arm ran on Opus (study in `docs/etudes/banc3-lenteur.md`; the 2.0.8 and 2.0.9 publication records carry a correction). Each bench's time is now judged against its own noise, measured on pairs of identical arms; that noise expires after 14 days and the Saturday full bench measures it again with an A-against-A pass, the median of the last three pairs counting; the arms' order alternates between passes. Bench 6, whose request literally asks to add the page to the plan, is replaced by bench 7 in the short and mechanical benches. Measured: the mechanical bench is green, 904 s for `cadence run` against 1425 s for Claude alone over three benches (on bench 3, 217 s and 1.6 M tokens against 752 s and 8.7 M) ([publication record](v2/publications/2.0.10.md)).
 

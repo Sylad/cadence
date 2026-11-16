@@ -81,6 +81,12 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [2.0.11] - 2026-11-16
+
+### Changed
+
+- The plugin evaluation no longer stops a release on one run in six (L740, [docs/releasing.md](docs/releasing.md)): the step of `cadence release` becomes `node scripts/eval-plugin.mjs npm run eval:plugin -- --trust-plugin` when the repository has that file, which replays once, with the plugin only, a case below the threshold and fails only if it is still below on the replay; `rejeu.md` (and the top of `report.html`) says « rejoué » with both scores.
+
 ## [2.0.10] - 2026-11-15
 
 ### Added

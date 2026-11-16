@@ -31,7 +31,7 @@ export function versionClaude(commande = 'claude'): string {
 /** Les réglages suivis d'une session : son environnement, les réglages utilisateur (CLAUDE_CONFIG_DIR ou ~/.claude) et le fichier de réglages du bras. */
 export function reglagesClaude(env: NodeJS.ProcessEnv, reglagesBras?: string): Record<string, string> {
   const r: Record<string, string> = {};
-  const variables = (source: string, e: Record<string, unknown>) => { for (const [k, v] of Object.entries(e)) if (SUIVIES.test(k) && v !== undefined) r[`${source}${k}`] = String(v); };
+  const variables = (source: string, e: Record<string, unknown>) => { for (const [k, v] of Object.entries(e)) if (SUIVIES.test(k) && v !== undefined) r[`${source}${k}`] = String(v) || '(vide)'; };
   variables('env ', env);
   const dossier = env.CLAUDE_CONFIG_DIR ?? join(env.HOME ?? homedir(), '.claude');
   for (const [source, f] of [['réglages utilisateur', join(dossier, 'settings.json')], ...(reglagesBras ? [[`réglages du bras ${basename(reglagesBras)}`, reglagesBras]] : [])]) {

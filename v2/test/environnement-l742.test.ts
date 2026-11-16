@@ -40,9 +40,10 @@ describe('les réglages suivis', () => {
     writeFileSync(join(home, '.claude', 'settings.json'), JSON.stringify({ effortLevel: 'high', theme: 'dark', env: { CLAUDE_CODE_MAX_OUTPUT_TOKENS: '64000', KUBECONFIG: '/k' } }));
     const bras = join(home, 'reglages-bras.json');
     writeFileSync(bras, JSON.stringify({ fastMode: false, hooks: {} }));
-    const r = reglagesClaude({ HOME: home, CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES: '1', CLAUDE_CODE_USER_EMAIL: 'x@y', CLAUDE_CODE_OAUTH_TOKEN: 'secret', CLAUDE_CODE_SESSION_ID: 'id', ANTHROPIC_API_KEY: 'k', PATH: '/bin' }, bras);
+    const r = reglagesClaude({ HOME: home, CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES: '1', CLAUDE_CODE_USER_EMAIL: 'x@y', CLAUDE_CODE_OAUTH_TOKEN: 'secret', CLAUDE_CODE_SESSION_ID: 'id', ANTHROPIC_API_KEY: 'k', PATH: '/bin', CLAUDE_CODE_DISABLE_CRON: '' }, bras);
     expect(r).toEqual({
       'env CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES': '1',
+      'env CLAUDE_CODE_DISABLE_CRON': '(vide)',
       'réglages utilisateur effortLevel': 'high',
       'réglages utilisateur env CLAUDE_CODE_MAX_OUTPUT_TOKENS': '64000',
       'réglages du bras reglages-bras.json fastMode': 'false',

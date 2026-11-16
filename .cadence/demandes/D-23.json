@@ -12,6 +12,13 @@
   {
    "date": "2026-11-16",
    "texte": "Réponse au tri de la veille #61. A : mettre Claude Code à jour sur Big-Blue avant le banc complet du samedi 21-11 et noter le passage de version dans le rapport (geste du lead, critère : claude --version ≥ 2.1.325 et version écrite dans le rapport de samedi). B : chaque rapport de banc note la version de Claude Code, l'identifiant exact du modèle et les réglages (L742, critère : un rapport réel porte ces champs). C : bras Fable 5.2 effort medium puis high contre Opus 5.5 après le banc du 21-11 (L743, critère : qualité au moins égale à Opus sur tests cachés et mutations, pour un coût plus bas)."
+  },
+  {
+   "date": "2026-11-16",
+   "texte": "B livré par L742 (commits feat(L742) et fix(L742)) : chaque rapport de banc v2 (.md en tête, .json champ environnement) porte la version de Claude Code, le modèle exact de chaque bras lu dans ses sessions, le contexte max et les réglages suivis, et se compare au rapport précédent ; cadence2 bench comparer <a> <b>. Preuve : v2/test/environnement-l742.test.ts (800 tests v2 verts), et un vrai passage micro (racine jetable, bras haiku et fable, Claude Code 2.1.325) dont le rapport dit « Bras F : alias fable → claude-fable-5-2 ». Reste à voir : un rapport de ~/bench-cadence (prochain passage réel). A (geste du lead) et C (L743) restent ouverts : D-23 reste ouverte."
   }
+ ],
+ "runs": [
+  "20261116090017-4026280"
  ]
 }

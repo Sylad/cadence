@@ -8,7 +8,7 @@ import { releaseIssueLines } from './issues.js';
 import { commandesFumee, fumerPaquet } from './release-fumee.js';
 import { ciAvantEcriture } from './release-ci.js';
 import { hasEntries, nothingToRelease, releaseFileLine, removeFragments, versionSection } from './changelog-fragments.js';
-import { draftWhatsNew, SHORT_LINE_MAX, type WhatsNewDraft } from './whats-new-forms.js';
+import { draftWhatsNew, LONG_PARAGRAPH, SHORT_LINE_MAX, whatsNewStructureIssue, type WhatsNewDraft } from './whats-new-forms.js';
 
 const BUMPS = ['patch', 'minor', 'major'] as const;
 type Bump = (typeof BUMPS)[number];
@@ -252,12 +252,12 @@ function plan(root: string, bump: Bump, today: Day): Planned {
 function whatsNewIssues(text: string, version: string): string[] {
   const lines = text.split('\n');
   const issues: string[] = [];
-  // « Version by version » coupe le fichier : la liste courte est avant, les paragraphes longs sont après (sauf l'introduction, premier paragraphe de la section).
+  // « Version by version » coupe le fichier : la liste courte est avant, les paragraphes longs sont après. L761 : l'introduction n'est
+  // plus « le premier paragraphe de la section » — une ligne `**x.y.z**:` en tête est un paragraphe de version et compte dans l'ordre.
   const heading = lines.findIndex((l) => /^##\s+Version by version\s*$/.test(l));
   const split = heading < 0 ? lines.length : heading;
-  const intro = heading < 0 ? -1 : lines.findIndex((l, i) => i > heading && l.trim() !== '');
   const check = (form: string, absent: string, misplaced: string, pattern: RegExp, from: number, to: number, where: string, max?: number) => {
-    const hits = lines.map((l, i) => ({ l, i, v: i >= from && i < to ? pattern.exec(l)?.[1] : undefined })).filter((x) => x.v !== undefined && x.i !== intro);
+    const hits = lines.map((l, i) => ({ l, i, v: i >= from && i < to ? pattern.exec(l)?.[1] : undefined })).filter((x) => x.v !== undefined);
     const at = hits.findIndex((h) => h.v === version);
     if (at < 0) {
       issues.push(`${WHATS_NEW} : ${form} ${absent} — l'écrire ${where}`);
@@ -268,7 +268,14 @@ function whatsNewIssues(text: string, version: string): string[] {
     return hits[at].i;
   };
   const own = check('ligne de « In two lines »', 'manquante', 'mal placée', /^- \*\*(\d+\.\d+\.\d+)\*\*:/, 0, split, 'en tête de la liste', SHORT_LINE_MAX);
-  check('paragraphe long', 'manquant', 'mal placé', /^\*\*(\d+\.\d+\.\d+)\*\*:/, split, lines.length, 'juste après l’introduction de « Version by version »');
+  const longAt = check('paragraphe long', 'manquant', 'mal placé', LONG_PARAGRAPH, split, lines.length, 'en tête des paragraphes de version de « Version by version », après l’introduction');
+  // L761 : l'introduction est ce qui précède le premier paragraphe de version ; un paragraphe d'un autre genre plus bas (R10 : le
+  // paragraphe long glissé avant l'introduction) dit que la version n'est pas à sa place.
+  if (longAt >= 0) {
+    const sectionEnd = lines.findIndex((l, i) => i > longAt && /^##\s/.test(l));
+    const intro = lines.findIndex((l, i) => i > longAt && (sectionEnd < 0 || i < sectionEnd) && l.trim() !== '' && lines[i - 1].trim() === '' && !LONG_PARAGRAPH.test(l));
+    if (intro >= 0) issues.push(`${WHATS_NEW} : paragraphe long mal placé (avant le texte de la ligne ${intro + 1}, qui n’est pas un paragraphe de version) — le mettre après l’introduction de « Version by version »`);
+  }
   // Le test « deux lignes » du dépôt lit toute la section « In two lines », jusqu'au prochain titre « ## », et toute ligne `- **x.y.z**` (deux-points ou non) :
   // les autres lignes que celle de la version qui sort comptent (1.22.0, 28-10 : un paragraphe long y était tombé, la publication a échoué).
   const start = Math.max(0, lines.findIndex((l) => /^##\s+In two lines\s*$/.test(l)));
@@ -331,6 +338,17 @@ export function gardeBancV2(version: string, verifier: () => { code: number; sor
 const PUBLICATIONS = 'docs/v2/publications';
 
 /**
+ * L761 : un docs/whats-new.md dont la structure n'est pas reconnue (titres absents, doublés ou inversés) refuse la commande avant
+ * tout écrit, plutôt qu'elle écrive une forme au mauvais endroit. Sans fichier, rien à vérifier (comme avant).
+ */
+function refuseUnknownWhatsNew(root: string): void {
+  const path = join(root, WHATS_NEW);
+  if (!existsSync(path)) return;
+  const issue = whatsNewStructureIssue(readFileSync(path, 'utf8'));
+  if (issue) throw new RafError(`release : ${WHATS_NEW} : structure non reconnue, ${issue} — attendu « ## In two lines » (liste courte) puis « ## Version by version » (introduction facultative, puis un paragraphe \`**x.y.z**:\` par version, la plus récente en tête) ; corriger le fichier, rien n'a été écrit`);
+}
+
+/**
  * L753 : docs/whats-new.md tel que le commit de version le portera, les formes absentes de la version écrites depuis la section de
  * version ; la CI rejouée (L698) reçoit ce texte quand la commande en écrit, sinon la copie de l'arbre de travail.
  */
@@ -365,6 +383,7 @@ export function release(rest: string[], dryRun: boolean, root: string, today: Da
   const bump = rest[0] as Bump | undefined;
   if (rest.length !== 1 || !bump || !BUMPS.includes(bump)) throw new RafError('usage : cadence release patch|minor|major [--dry-run]');
   const p = plan(root, bump, today);
+  refuseUnknownWhatsNew(root);
   gardeBancV2(p.version, () => {
     const r = spawnSync('node', [join(root, 'v2', 'bin', 'cadence2.js'), 'bench', 'verifier-publication'], { cwd: root, encoding: 'utf8', timeout: 60_000 });
     const delai = r.error || r.signal ? `cadence2 n'a pas répondu en 60 s (${r.error?.message ?? r.signal}) — ` : '';

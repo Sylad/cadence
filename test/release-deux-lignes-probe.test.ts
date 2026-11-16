@@ -54,14 +54,16 @@ describe('L418 sonde — « In two lines » lu en entier avant le tag', () => {
     const r = release(project(doc(`- **1.2.4**: s.\n${l}\n`)));
     expect(r.code).toBe(1);
   });
-  it('le fichier sans « Version by version » : paragraphe long de la version qui sort signalé, pas de plantage', () => {
+  // L761 : une structure non reconnue est refusée avant tout écrit (code 2, message imprimé), plus seulement signalée en 1.
+  it('le fichier sans « Version by version » : refusé, structure non reconnue, pas de plantage', () => {
     const r = release(project('# W\n\n## In two lines\n\n- **1.2.4**: s.\n\n**1.2.4**: long.\n'));
-    expect(r.code).toBe(1);
+    expect(r.code).toBe(2);
+    expect(r.out).toMatch(/whats-new\.md : structure non reconnue, titre « ## Version by version » introuvable/);
   });
-  it('fichier vide : exit 1 avec écarts, pas d’exception', () => {
+  it('fichier vide : refusé avec un message, pas d’exception', () => {
     const r = release(project(''));
-    expect(r.code).toBe(1);
-    expect(r.out).toMatch(/whats-new/);
+    expect(r.code).toBe(2);
+    expect(r.out).toMatch(/whats-new\.md : structure non reconnue/);
   });
   it('une section intermédiaire avant « Version by version » n’est pas lue par R5 : une ligne longue y reste sans effet', () => {
     const d = `# W\n\n## In two lines\n\n- **1.2.4**: s.\n\n## Archive\n\n- **1.0.0**: ${'x'.repeat(300)}\n\n## Version by version\n\nIntro.\n\n**1.2.4**: long.\n`;

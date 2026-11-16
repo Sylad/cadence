@@ -145,15 +145,46 @@ export function draftWhatsNew(text: string, version: string, body: string): What
   return { text: lines.join('\n'), written };
 }
 
-/** Le paragraphe long juste après l'introduction de « Version by version » ; faux sans cette section ou sans introduction. */
+/** Une ligne qui ouvre le paragraphe long d'une version (`**x.y.z**:`) : jamais une ligne de l'introduction. */
+export const LONG_PARAGRAPH = /^\*\*(\d+\.\d+\.\d+)\*\*:/;
+const IN_TWO_LINES = /^##\s+In two lines\s*$/;
+const VERSION_BY_VERSION = /^##\s+Version by version\s*$/;
+
+/**
+ * L761 : la structure que la commande sait remplir — « ## In two lines » puis « ## Version by version », une fois chacun. Rend
+ * l'écart en une phrase, ou null ; la commande le refuse avant tout écrit plutôt que d'écrire au mauvais endroit.
+ */
+export function whatsNewStructureIssue(text: string): string | null {
+  const lines = text.split('\n');
+  const at = (re: RegExp) => lines.flatMap((l, i) => (re.test(l) ? [i] : []));
+  const short = at(IN_TWO_LINES);
+  const long = at(VERSION_BY_VERSION);
+  for (const [name, hits] of [['## In two lines', short], ['## Version by version', long]] as const) {
+    if (hits.length === 0) return `titre « ${name} » introuvable`;
+    if (hits.length > 1) return `titre « ${name} » présent ${hits.length} fois (lignes ${hits.map((i) => i + 1).join(', ')})`;
+  }
+  if (long[0] < short[0]) return `« ## Version by version » (ligne ${long[0] + 1}) avant « ## In two lines » (ligne ${short[0] + 1})`;
+  return null;
+}
+
+/**
+ * Le paragraphe long en tête des paragraphes de version de « Version by version » : avant le premier `**x.y.z**:`, l'introduction
+ * (tout ce qui précède, sur un ou plusieurs paragraphes, ou rien) restant au-dessus ; à la fin de la section quand elle n'a encore
+ * aucune version. Faux sans cette section. L761 : sans introduction, l'ancien premier paragraphe n'est plus pris pour elle.
+ */
 function insertLong(lines: string[], long: string): boolean {
-  const heading = lines.findIndex((l) => /^##\s+Version by version\s*$/.test(l));
+  const heading = lines.findIndex((l) => VERSION_BY_VERSION.test(l));
   if (heading < 0) return false;
-  const intro = lines.findIndex((l, i) => i > heading && l.trim() !== '');
-  if (intro < 0 || /^##\s/.test(lines[intro])) return false;
-  let end = intro;
-  while (end < lines.length && lines[end].trim() !== '') end++;
-  lines.splice(end, 0, '', long);
+  const next = lines.findIndex((l, i) => i > heading && /^##\s/.test(l));
+  const end = next < 0 ? lines.length : next;
+  const first = lines.findIndex((l, i) => i > heading && i < end && LONG_PARAGRAPH.test(l));
+  if (first >= 0) {
+    lines.splice(first, 0, long, '');
+    return true;
+  }
+  let last = end - 1;
+  while (last > heading && lines[last].trim() === '') last--;
+  lines.splice(last + 1, 0, '', long);
   return true;
 }
 

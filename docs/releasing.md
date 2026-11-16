@@ -196,7 +196,12 @@ form of the version found **nowhere** in the file, the command writes it from th
 - the « In two lines » line, first of the list: `- **x.y.z**: ` then the head of each entry (its first clause, cut before ` (`, `; `, `. ` or ` — `
   outside code, links, parentheses and « … »), joined by `; `; a head that would take the line over 240 characters is skipped and the next ones
   tried, and a first head too long alone is cut at a comma or a space outside code, ending with `…`;
-- the long paragraph, right after the introduction of « Version by version »: `**x.y.z**: ` then every entry, whole, on one line.
+- the long paragraph, first of the version paragraphs of « Version by version »: `**x.y.z**: ` then every entry, whole, on one line.
+  The introduction is whatever comes before the first `**x.y.z**:` paragraph (one paragraph, several, or none): with no introduction
+  the new paragraph goes right under the title, above the previous version, never below it (L761).
+
+The command only fills a file it recognises: `## In two lines` then `## Version by version`, each once. A title missing, doubled
+or in the other order stops it before anything is written (code 2, `structure non reconnue, …`): fix the file, then run it again (L761).
 
 Links written from the repository's root (`docs/releasing.md`, `CHANGELOG.md`) are rewritten for `docs/` (`releasing.md`, `../CHANGELOG.md`).
 The text is the fragments' text: read it and rewrite it by hand before the version commit when the prose deserves it (the file stays
@@ -205,8 +210,8 @@ the check below reports it as before. `--dry-run` says `écrirait` and writes no
 plays the version commit with the forms the command writes.
 
 The check then reads both forms. The « In two lines » line of the version is the
-first of the list and at most 240 characters; the long paragraph is the first of « Version by version », right after its
-introduction (the newest version first, as the file is read). Exit code 1 when a form is still missing (no section to write it in, no entry to draw it from), misplaced or too long: the
+first of the list and at most 240 characters; the long paragraph is the first `**x.y.z**:` paragraph of « Version by version »,
+after its introduction and with no other kind of paragraph below it (the newest version first, as the file is read). Exit code 1 when a form is still missing (no section to write it in, no entry to draw it from), misplaced or too long: the
 version files are written, the commit is not ready. `--dry-run` reads the forms the same way (nothing is written) and exits 1 on the same findings, so the forms can be checked before the real run.
 
 ### The lead's steps

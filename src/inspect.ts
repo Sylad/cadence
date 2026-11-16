@@ -51,9 +51,12 @@ export interface Cause {
   holders: string[];
   /** Vagues d'avant où la même cause est déjà passée (les plus récentes d'abord). */
   seenIn: string[];
-  /** Un lot du plan qui la traite, ou rien. */
-  planLot: { id: string; status: string } | null;
-  /** Récidive : déjà vue, et aucun lot du plan ne l'a supprimée (aucun lot, ou un lot qui n'est pas terminé n'est pas une suppression livrée). */
+  /** Un lot du plan qui la traite, ou rien ; `after` : il a été terminé après la vague (L741), son mécanisme n'a pas pu jouer dedans. */
+  planLot: { id: string; status: string; finished?: string; after?: boolean } | null;
+  /**
+   * Récidive : déjà vue, et aucun lot du plan ne l'a supprimée (aucun lot, ou un lot qui n'est pas terminé n'est pas une suppression livrée). Une cause traitée par un lot
+   * terminé après la vague n'en est pas une (L741) : ce que la vague a perdu, le mécanisme livré depuis le supprime, et c'est la vague suivante qui le mesure.
+   */
   recidive: boolean;
   proposal: string | null;
 }
@@ -71,6 +74,8 @@ export interface PlanLot {
   id: string;
   title: string;
   status: string;
+  /** Date de fin du lot (AAAA-MM-JJ), s'il est terminé. */
+  finished?: string;
 }
 
 interface Entry {
@@ -358,11 +363,15 @@ export function inspectWave(runsDir: string, wave: string, plan: PlanLot[], reta
   // Le plan qui traite une cause est celui du projet de la vague : les lots des autres projets du dossier n'en disent rien.
   const projects = new Set([...lots.map((l) => l.lot), ...losses.map((l) => l.lot)].map((l) => l.split(':')[0]!));
   const ownPlan = plan.filter((p) => projects.has(p.project) || projects.has(p.project.split('/').pop()!));
+  const waveDay = /^\d{4}-\d{2}-\d{2}/.exec(wave)?.[0] ?? null;
   const causes: Cause[] = groupCauses(losses).map((c) => {
     const seenIn = earlier.filter((e) => e.causes.some((x) => x.category === c.category && x.cause === c.cause)).map((e) => e.wave);
     const planLot = planLotFor(c, ownPlan);
-    const recidive = seenIn.length > 0;
-    return { ...c, seenIn, planLot: planLot ? { id: `${planLot.project}:${planLot.id}`, status: planLot.status } : null, recidive, proposal: planLot && planLot.status !== 'done' ? null : proposalFor(c) };
+    // L741 : la vague du 07-11 relue le 16-11 redonnait « correction non jouée » en récidive et la commande raf add, alors que L682 (terminé le 12-11) la traitait depuis.
+    const after = planLot?.status === 'done' && planLot.finished !== undefined && waveDay !== null && planLot.finished > waveDay;
+    const recidive = seenIn.length > 0 && !after;
+    const lotRef = planLot ? { id: `${planLot.project}:${planLot.id}`, status: planLot.status, ...(after ? { finished: planLot.finished, after } : {}) } : null;
+    return { ...c, seenIn, planLot: lotRef, recidive, proposal: planLot && (planLot.status !== 'done' || after) ? null : proposalFor(c) };
   });
   causes.sort((a, b) => Number(b.recidive) - Number(a.recidive) || b.minutes - a.minutes);
   const active = lots.reduce((s, l) => s + WORK_STATES.reduce((a, k) => a + (l.states[k] ?? 0), 0), 0);
@@ -381,6 +390,7 @@ function causeLines(c: Cause): string[] {
   const minutes = RETAKE_CAUSES.has(c.cause) ? 'durée dans git, non mesurée' : `${c.minutes} min`;
   const head = `${c.recidive ? '⚠' : '-'} ${c.category} · ${c.cause} : ${minutes}, ${c.count} fois, ${c.lots.length} lot(s)${holders}${level}${seen}`;
   if (c.proposal) return [head, `    ${c.planLot ? `lot du plan à relire : ${c.planLot.id} (${c.planLot.status}) ; ` : ''}proposition : ${c.proposal}`];
+  if (c.planLot?.after) return [head, `    traitée après la vague : ${c.planLot.id} (${c.planLot.status} le ${c.planLot.finished}), à mesurer sur la vague suivante`];
   return c.planLot ? [head, `    au plan : ${c.planLot.id} (${c.planLot.status})`] : [head];
 }
 

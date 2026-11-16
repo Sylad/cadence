@@ -295,7 +295,7 @@ export interface OrchestrateConfig {
    */
   escalation?: { model: string };
   /**
-   * Prélèvement de budget à la dernière passe (L584) : quand un lot dont la revue converge n'a plus de quoi payer « correction + revue courte », la vague relève son budget du manque,
+   * Prélèvement de budget à la dernière passe (L584) : quand un lot dont la revue converge, ou dont la correction joue la réponse du lead (L741), n'a plus de quoi payer « correction + revue courte », la vague relève son budget du manque,
    * dans la limite de ce plafond (tokens comptés, cumulé sur le lot). `0` désactive : le lot est rendu « correction non jouée (budget) » comme avant (défaut : 300000).
    */
   budgetTopUp: number;

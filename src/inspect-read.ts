@@ -18,7 +18,7 @@ function planLotsOf(projects: Array<{ name: string; dir: string }>): PlanLot[] {
   const out: PlanLot[] = [];
   for (const { name, dir } of projects) {
     try {
-      for (const l of planLoader(dir)().lots()) out.push({ project: name, id: l.id, title: l.title, status: l.status });
+      for (const l of planLoader(dir)().lots()) out.push({ project: name, id: l.id, title: l.title, status: l.status, ...(l.finished ? { finished: l.finished } : {}) });
     } catch {
       // plan illisible : ses lots ne comptent pas parmi ceux qui traitent une cause
     }

@@ -314,6 +314,12 @@ Before/after measure: count the `correction non jouée (budget)` of the `.cadenc
 L676 was handed back at 559 676 / 600 000 tokens counted with its majors uncorrected, while 175 k sat unused for an escalation that could only come after that fix. The share
 left (`escalationReserve` in the state) may then be too small for the escalation, which `toFix` reports as `escalade <model> non jouée` as before; the correction is made. It shows as a
 warning (`correction payée sur la part de l'escalade : N token(s) pris, M encore retenus`) and a line of the wave log. Not for the minors pass, nor once the escalation is engaged.
+
+**The lead's answer is played (L741).** A fix that comes right after a question the lead answered is the lead's decision: when the escalation share does not cover its
+shortfall, the top-up above applies even if the review does not converge, with the same caps (`orchestrate.budgetTopUp`, the wave's 155 k reserve). L579 (04-11) was handed back
+`correction non jouée (budget)` 27 907 tokens short, its escalation engaged and the lead's answer unplayed, and the lead replayed the fix by hand. The warning reads
+`budget du lot relevé de N token(s) à la dernière passe (la correction joue la réponse du lead)`. Replayed on the ten lots handed back `correction non jouée (budget)` from 03-11
+to 07-11 (`test/budget-correction-non-jouee-l741.test.ts`), every one now gets its fix played by the wave.
 Measure: 0 lot handed back for budget with an open major over 3 waves. (L682 also doubled at `raf add` the estimate of a lot whose title cited `src/orchestrate/cycle/`; L708 removed it:
 the title misses lots that touch the folder without naming it, and 0.25 → 0.5 j stays at the 600 k floor of the budget.)
 

@@ -71,18 +71,27 @@ const converging = (l: LotState): boolean => {
 };
 
 /**
- * Prélèvement de la dernière passe (L584) : avant une passe fix que le budget du lot refuserait, un lot dont la revue converge reçoit le manque sur le budget restant de la vague
- * (qui doit payer la réserve `REVIEW_RESERVE`), dans la limite de `orchestrate.budgetTopUp` cumulé sur le lot. Le lot est rendu « correction non jouée (budget) » sinon, comme avant. Vrai si le budget a été relevé.
+ * La réponse du lead à jouer (L741) : la correction qui suit une question répondue est la décision du lead ; le budget du lot ne la rend plus, sauf si la part de
+ * l'escalade la paie (`takeFromEscalation`, appelée après). L579 (04-11) : escalade engagée, question répondue, 747 906 / 875 000 tokens comptés, rendu
+ * « correction non jouée (budget) » avec la réponse non jouée pour 27 907 tokens, et le lead a rejoué la correction à la main.
+ */
+const answered = (l: LotState, shortfall: number): boolean => Boolean(l.pendingAnswer) && shortfall > heldForEscalation(l);
+
+/**
+ * Prélèvement de la dernière passe (L584) : avant une passe fix que le budget du lot refuserait, un lot dont la revue converge, ou dont la correction joue la réponse du lead (L741),
+ * reçoit le manque sur le budget restant de la vague (qui doit payer la réserve `REVIEW_RESERVE`), dans la limite de `orchestrate.budgetTopUp` cumulé sur le lot. Le lot est rendu
+ * « correction non jouée (budget) » sinon, comme avant. Vrai si le budget a été relevé.
  */
 function topUpBudget(c: LotCtx): boolean {
   const l = c.lot;
   const shortfall = fixShortfall(l);
   const taken = l.budgetTopUp ?? 0;
   const w = c.wave.budget;
-  if (!shortfall || l.budget === undefined || !converging(l) || taken + shortfall > c.config.budgetTopUp || w.limit - w.consumed < REVIEW_RESERVE) return false;
+  const why = converging(l) ? `la revue converge : ${l.constats.length} majeur(s) restant(s)` : answered(l, shortfall) ? 'la correction joue la réponse du lead' : null;
+  if (!shortfall || l.budget === undefined || !why || taken + shortfall > c.config.budgetTopUp || w.limit - w.consumed < REVIEW_RESERVE) return false;
   l.budget += shortfall;
   l.budgetTopUp = taken + shortfall;
-  l.warnings.push(`budget du lot relevé de ${shortfall} token(s) à la dernière passe (la revue converge : ${l.constats.length} majeur(s) restant(s)), ${l.budgetTopUp} / ${c.config.budgetTopUp} prélevés sur la vague`);
+  l.warnings.push(`budget du lot relevé de ${shortfall} token(s) à la dernière passe (${why}), ${l.budgetTopUp} / ${c.config.budgetTopUp} prélevés sur la vague`);
   c.wave.log(`${lotKey(l.project, l.lot)} · budget relevé de ${shortfall} token(s) pour la correction et la revue courte (${l.budgetTopUp} / ${c.config.budgetTopUp} prélevés)`);
   return true;
 }
@@ -104,7 +113,7 @@ function takeFromEscalation(c: LotCtx): boolean {
   return true;
 }
 
-/** La passe fix que le budget du lot refuse, après le prélèvement de la dernière passe (L584) puis la part de l'escalade (L682) : toute autre étape n'est pas concernée. */
+/** La passe fix que le budget du lot refuse, après le prélèvement de la dernière passe (L584, réponse du lead L741) puis la part de l'escalade (L682) : toute autre étape n'est pas concernée. */
 export const fixRefused = (c: LotCtx, kind: SessionKind): boolean => kind === 'fix' && !fixAffordable(c.lot) && !topUpBudget(c) && !takeFromEscalation(c);
 
 /** Cause d'une suspension demandée par `--stop-after-current` (L79). */

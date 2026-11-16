@@ -3762,9 +3762,12 @@ lots:
     created: 2026-11-16
   - id: L760
     title: "La clé references: de cadence.yaml a deux lecteurs incompatibles : cadence run (aiguiller) attend une liste de { mots, docs }, cadence ref (readReferencesConfig, src/config.ts) attend { dir } — un même cadence.yaml ne peut servir les deux ; vu 16-11 par expertise-gis L5"
-    status: todo
+    status: done
     estimate: 0.5
     created: 2026-11-16
+    started: 2026-11-16
+    review: { date: 2026-11-16, verdict: "conforme (passe 2) : une seule forme de references: lue par cadence ref et cadence run, ancienne forme lue avec message de migration, ~ développé, refus avant worktree testé ; 600aa02c corrige un vrai défaut (traps avant fork) ; porte verte rejouée par le lead ; note : ~user crée un dossier littéral (documenté)", commit: 771ff04ebd54a3911b76a24322e74f4d5bf70358 }
+    finished: 2026-11-16
   - id: L761
     title: "release : un paragraphe **x.y.z**: en tête de « Version by version » n'est pas pris pour l'introduction — sans introduction, la commande écrit la nouvelle version sous l'ancienne et sort quand même en 0 (revue de L753, 16-11)"
     status: done

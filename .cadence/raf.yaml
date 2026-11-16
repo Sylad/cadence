@@ -3709,9 +3709,10 @@ lots:
     finished: 2026-11-16
   - id: L753
     title: "cadence release : écrire elle-même les deux formes de docs/whats-new.md (ligne « In two lines » et paragraphe « Version by version ») à partir des fragments changelog.d, au lieu de s'arrêter — vécu 2 fois le 16-11 (2.0.11 et 2.0.12), un agent chaque fois"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-16
+    started: 2026-11-16
   - id: L754
     title: "Régression d'éval livrer-sh-sans-bloc (0,83 puis 0,67, publication 2.0.12 arrêtée le 16-11) : depuis L744, la doc dit « sans clé deliver : rien à déployer », ce qui pousse le modèle à dire que cadence deliver se passe de clé ; rétablir : cadence deliver sans bloc deliver refuse et ne devine pas ./livrer.sh, il faut déclarer script: ; seul le livreur, faute de tout script de livraison, conclut à « rien à déployer »"
     status: done
@@ -3722,11 +3723,12 @@ lots:
     finished: 2026-11-16
   - id: L755
     title: "Un lot qui modifie un skill, un agent ou leur doc rejoue les cas d'éval du plugin qui les concernent avant d'être clos (porte ou raf done), pas seulement à la publication — L744 a passé deux revues et n'a été vu rouge par l'éval qu'à la publication de 2.0.12, 7 h plus tard (D-26) ; coût visé ~0,40 $ et ~1 min par cas ; mesure : 0 éval rouge à la publication sur un défaut d'un lot déjà clos"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-16
     started: 2026-11-16
-    review: { date: 2026-11-16, verdict: "non conforme : 2 majeurs — une clé evals mal formée coupe la porte de raf done sans rien dire ; docs/config.md ne cite pas la porte evals", commit: fdd4dc8e41aff0eb104aeea10b3ef84b5b9c2fcc }
+    review: { date: 2026-11-16, verdict: "conforme (passe 2) : clé evals mal formée refusée avec message clair (test rouge sur fdd4dc8e), docs/config.md à jour, aucun appel facturé dans les tests, porte verte rejouée par le lead à 3d012c16 ; note : un motif paths sans correspondance éteint son entrée en silence", commit: 3d012c164bd3fbb96ad444677eee5ff62d239347 }
+    finished: 2026-11-16
   - id: L756
     title: "Veille #61 : chaque mesure du banc et chaque run notent l'identifiant exact du modèle (claude-fable-5-2, pas « fable ») — depuis 2.1.321 (09-11) l'alias fable a changé sous nos pieds ; mesure : 100 % des rapports de banc portent l'id exact"
     status: todo

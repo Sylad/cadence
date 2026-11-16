@@ -1,53 +1,98 @@
-// L745 (issue #62) : un run fini sans intégration (conflit, avance rapide refusée, porte rouge…) dont le lead a ensuite intégré les commits à la main
-// restait « conflit » dans cadence run --liste, worktree et branche gardés. --liste le dit intégré à la main quand tous ses commits sont sur la cible
-// (même commit, ou même patch rejoué : git cherry), ou, revue M1, quand chaque fichier qu'il change a sur la cible le contenu de sa tête (conflit résolu
-// à la main : le patch-id change) ; cadence run --clore <id> retire alors son worktree et sa branche, et le note dans l'état du run. Une résolution qui
-// diffère du run n'est pas une preuve : --clore la refuse en nommant les fichiers, et --force clôt sans preuve, noté comme tel.
+// L745 (issue #62) : un run fini sans intégration (conflit, porte rouge…) que le lead a intégré à la main restait « conflit » dans cadence run --liste.
+// 4e passe : une règle explicite au lieu d'heuristiques, écrite en tableau dans docs/v2/2026-11-09-cadence-run.md (« Tableau de --liste et --clore »), une fonction
+// par ligne. « integre a la main » demande une preuve pour CHAQUE commit du run ; tout le reste (git en échec, worktree non vide, cas non prévu) vaut
+// « non intégré », et seul --clore --force clôt alors, en nommant les commits perdus. Plus de reconnaissance par le contenu des fichiers ni de git cherry.
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { etatVu, occupantRun, retirerRun, type Etat } from './run.js';
 
 /** Un run qui vit encore ou se reprend (--reponse) n'est pas fini : ni « intégré à la main », ni clos. */
 const REPRENABLES = ['en-cours', 'interrompu', 'attente', 'quota'];
-const git = (cwd: string, ...a: string[]) => spawnSync('git', a, { cwd, encoding: 'utf8' });
-const sha = (repo: string, ref: string) => { const r = git(repo, 'rev-parse', '--verify', '-q', ref); return r.status === 0 ? r.stdout.trim() : ''; };
-/** Revue r2 : les fichiers changés entre deux commits, lus avec -z (noms tels quels, ni cités ni échappés, jamais renvoyés à git) ; null si git échoue. */
-const changes = (repo: string, de: string, a: string) => { const r = git(repo, 'diff', '--name-only', '-z', '--no-renames', de, a); return r.status === 0 ? r.stdout.split('\0').filter(Boolean) : null; };
+/** Réglages imposés à chaque commande : un sous-module n'est jamais ignoré, un nom de fichier n'est jamais cité. */
+const REGLAGES = ['-c', 'diff.ignoreSubmodules=none', '-c', 'core.quotePath=false'];
+/** Le patch d'un commit, le même quels que soient les réglages du dépôt : binaire en entier, gitlink d'un sous-module compris, ni renommage ni filtre. */
+const PATCH = ['diff-tree', '--stdin', '--root', '-p', '--full-index', '--binary', '--no-renames', '--no-ext-diff', '--no-textconv', '--no-color',
+  '--submodule=short', '--ignore-submodules=none'];
 
-/** `tete` sur un refus : les commits du run manquent à la cible, seul refus que --force passe. */
-export type Integration = { integre: true; tete: string; cible: string; preuve: string } | { integre: false; raison: string; tete?: string; cible?: string };
+export class GitEnEchec extends Error {}
+export interface Commit { sha: string; fusion: boolean; sujet: string }
+/** `perdus` sur un refus : les commits du run sans preuve sur la cible, seul refus que --force passe. */
+export type Integration = { integre: true; tetes: string[]; cible: string; preuve: string }
+  | { integre: false; raison: string; tetes?: string[]; cible?: string; perdus?: Commit[] };
 
-/** La tête du run : sa branche, sinon la tête notée à la fin du run (`tete`, objet encore présent), sinon le HEAD de son worktree. */
-function teteDuRun(e: Etat): string {
-  return sha(e.repo, `refs/heads/${e.branche}`) || (e.tete ? sha(e.repo, `${e.tete}^{commit}`) : '') || (existsSync(e.worktree) ? sha(e.worktree, 'HEAD') : '');
+/** Ligne 1 : une commande git en échec (code non nul, signal, lancement impossible) n'est jamais lue comme une réponse ; integrationManuelle en fait un refus. */
+export function gitOuEchec(cwd: string, a: string[], entree?: Buffer | string): Buffer {
+  const r = spawnSync('git', [...REGLAGES, ...a], { cwd, input: entree, maxBuffer: Infinity });
+  if (r.status !== 0) throw new GitEnEchec(`git ${a[0]} a échoué dans ${cwd} : ${String(r.stderr ?? '').trim() || r.error?.message || `code ${r.status}`}`);
+  return r.stdout;
+}
+const lignes = (cwd: string, ...a: string[]) => gitOuEchec(cwd, a).toString().split('\n').filter(Boolean);
+/** Le commit d'une branche locale, '' si elle n'existe pas (for-each-ref rend 0 et rien : une absence, pas un échec). */
+const branche = (repo: string, nom: string) => lignes(repo, 'for-each-ref', '--format=%(refname) %(objectname)', `refs/heads/${nom}`)
+  .find((l) => l.startsWith(`refs/heads/${nom} `))?.split(' ')[1] ?? '';
+const nomme = (c: Commit) => `${c.sha.slice(0, 7)} ${c.sujet}${c.fusion ? ' (commit de fusion)' : ''}`;
+
+/** Ligne 2 : les têtes du run, toutes à prouver : sa branche, le HEAD de son worktree (détaché compris) et la tête notée à la fin du run si git l'a encore. */
+export function tetesDuRun(e: Etat): string[] {
+  const tetes = [branche(e.repo, e.branche)];
+  if (existsSync(e.worktree)) {
+    const [racine, head] = lignes(e.worktree, 'rev-parse', '--show-toplevel', 'HEAD^{commit}');
+    if (realpathSync(racine) !== realpathSync(e.worktree)) throw new GitEnEchec(`${e.worktree} n'est plus un worktree git (dépôt trouvé : ${racine})`);
+    tetes.push(head);
+  }
+  const notee = e.tete ? /^([0-9a-f]{40,64}) commit /.exec(gitOuEchec(e.repo, ['cat-file', '--batch-check'], `${e.tete}\n`).toString()) : null;
+  return [...new Set([...tetes, notee?.[1] ?? ''].filter(Boolean))];
 }
 
-/** Revue L745 (M1) : les fichiers que le run change depuis son départ de la cible (merge-base), et ceux dont la cible n'a pas le contenu de la tête du run.
- * Revue r2 : l'intersection se fait ici, sans pathspec ; un git diff qui échoue rend null, jamais « rien de différent ». */
-function contenuSurCible(e: Etat, tete: string, cible: string): { fichiers: string[]; differents: string[] } | null {
-  const depart = git(e.repo, 'merge-base', cible, tete).stdout.trim() || e.base;
-  const fichiers = changes(e.repo, depart, tete), ecarts = changes(e.repo, tete, cible);
-  return fichiers && ecarts ? { fichiers, differents: fichiers.filter((f) => ecarts.includes(f)) } : null;
+/** Ligne 3 : les fichiers modifiés ou non suivis du worktree (sous-modules compris), que le retrait du worktree supprimerait. */
+export function fichiersNonCommites(e: Etat): string[] {
+  if (!existsSync(e.worktree)) return [];
+  return lignes(e.worktree, 'status', '--porcelain', '--untracked-files=all', '--ignore-submodules=none').map((l) => l.slice(3));
 }
 
-/** Tous les commits du run (base..tête) sont-ils sur la cible, ou leur contenu ? Sinon, la raison en une phrase. */
+/** Ligne 5 : les commits atteignables depuis une tête du run et pas depuis la cible, fusions comprises ; tous les autres sont des ancêtres de la cible. */
+export function commitsHorsCible(repo: string, tetes: string[], cible: string): Commit[] {
+  const l = lignes(repo, 'rev-list', '--format=%P|%s', ...tetes, '--not', cible);
+  return Array.from({ length: l.length / 2 }, (_, i) => {
+    const [parents, ...sujet] = l[2 * i + 1].split('|');
+    return { sha: l[2 * i].slice('commit '.length), fusion: parents.includes(' '), sujet: sujet.join('|') };
+  });
+}
+
+/** Le patch-id de chaque commit simple atteignable depuis `de` et pas depuis `sauf` ; --verbatim : un patch qui ne diffère que par des espaces est un autre patch. */
+function patchIds(repo: string, de: string[], sauf: string[]): Map<string, string> {
+  const commits = gitOuEchec(repo, ['rev-list', '--no-merges', ...de, '--not', ...sauf]);
+  const ids = gitOuEchec(repo, ['patch-id', '--verbatim'], gitOuEchec(repo, PATCH, commits)).toString().split('\n').filter(Boolean);
+  return new Map(ids.map((l) => { const [id, commit] = l.split(' '); return [commit, id]; }));
+}
+
+/** Lignes 6 à 8 : parmi les commits hors de la cible, ceux qu'aucun commit de la cible ne rejoue à l'identique (même patch-id) ; une fusion et un commit
+ * vide n'ont pas de patch-id : ils restent sans preuve. */
+export function commitsSansPatchSurCible(repo: string, tetes: string[], cible: string, hors: Commit[]): Commit[] {
+  const duRun = patchIds(repo, tetes, [cible]), surCible = new Set(patchIds(repo, [cible], tetes).values());
+  return hors.filter((c) => c.fusion || !surCible.has(duRun.get(c.sha) ?? ''));
+}
+
+/** Le tableau entier, dans l'ordre de ses lignes : intégré seulement si chaque commit du run est un ancêtre de la cible ou y a son patch à l'identique. */
 export function integrationManuelle(e: Etat): Integration {
-  const tete = teteDuRun(e), cible = sha(e.repo, `refs/heads/${e.cible}`);
-  if (!cible) return { integre: false, raison: `la branche cible ${e.cible} n'existe plus` };
-  if (!tete) return { integre: false, raison: `branche ${e.branche} et worktree absents, tête du run inconnue : intégration invérifiable` };
-  const n = git(e.repo, 'rev-list', '--count', `${e.base}..${tete}`);
-  if (n.status !== 0 || n.stdout.trim() === '0') return { integre: false, raison: 'le run n\'a aucun commit : rien n\'a été intégré' };
-  const c = git(e.repo, 'cherry', '-v', cible, tete, e.base);
-  if (c.status !== 0) return { integre: false, raison: `git cherry a échoué : ${c.stderr.trim()}` };
-  const absents = c.stdout.split('\n').filter((l) => l.startsWith('+ ')).map((l) => `${l.slice(2, 9)}${l.slice(42)}`);
-  if (!absents.length) return { integre: true, tete, cible, preuve: `tous ses commits sont sur ${e.cible}` };
-  const contenu = contenuSurCible(e, tete, cible);
-  if (contenu && !contenu.differents.length) return { integre: true, tete, cible, preuve: `les fichiers du run (${contenu.fichiers.join(', ')}) ont sur ${e.cible} le contenu de sa tête (conflit résolu à la main)` };
-  return { integre: false, tete, cible, raison: `${absents.length} commit(s) du run absent(s) de ${e.cible} : ${absents.join(' ; ')} ; intègre-les d'abord (contenu différent sur ${e.cible} : `
-    + `${contenu ? contenu.differents.join(', ') : 'invérifiable, git diff a échoué'} ; si ta résolution les a changés exprès, clos sans preuve : cadence run --clore ${e.id} --force)` };
+  const non = (raison: string): Integration => ({ integre: false, raison });
+  try {
+    const cible = branche(e.repo, e.cible), tetes = tetesDuRun(e), sales = fichiersNonCommites(e);
+    if (!cible) return non(`la branche cible ${e.cible} n'existe plus`);
+    if (!tetes.length) return non(`branche ${e.branche} et worktree absents, tête du run inconnue : intégration invérifiable`);
+    if (sales.length) return non(`le worktree ${e.worktree} a des modifications non commitées : ${sales.join(', ')}`);
+    if (lignes(e.repo, 'rev-list', '--count', ...tetes, '--not', e.base)[0] === '0') return non('le run n\'a aucun commit : rien n\'a été intégré');
+    const hors = commitsHorsCible(e.repo, tetes, cible), perdus = hors.length ? commitsSansPatchSurCible(e.repo, tetes, cible, hors) : [];
+    if (!perdus.length) return { integre: true, tetes, cible, preuve: `tous ses commits sont sur ${e.cible}${hors.length ? ` (${hors.length} par le même patch rejoué)` : ''}` };
+    return { integre: false, tetes, cible, perdus, raison: `${perdus.length} commit(s) du run absent(s) de ${e.cible} : ${perdus.map(nomme).join(' ; ')} ; intègre-les d'abord `
+      + `(même commit ou même patch) ; s'ils y sont sous une autre forme (conflit résolu à la main) ou ne servent plus, clos en les perdant : cadence run --clore ${e.id} --force` };
+  } catch (x) {
+    if (!(x instanceof GitEnEchec)) throw x;
+    return non(`${x.message} : intégration invérifiable`);
+  }
 }
 
-/** L'état que --liste montre : « integre a la main » pour un run fini non intégré dont les commits ou leur contenu sont sur la cible, ou déjà clos. */
+/** L'état que --liste montre : « integre a la main » pour un run fini non intégré que le tableau dit intégré, ou déjà clos. */
 export function etatListe(e: Etat): string {
   if (e.clos?.force) return `clos le ${e.clos.date.slice(0, 10)} par --force, sans preuve d'intégration (était ${e.etat})`;
   if (e.clos) return `integre a la main (${e.cible} = ${e.clos.cible.slice(0, 7)}), clos le ${e.clos.date.slice(0, 10)} (était ${e.etat})`;
@@ -57,8 +102,8 @@ export function etatListe(e: Etat): string {
   return i.integre ? `integre a la main (était ${vu} ; worktree et branche : cadence run --clore ${e.id})` : vu;
 }
 
-/** cadence run --clore <id> [--force] : retire le worktree et la branche d'un run fini non intégré dont les commits ou leur contenu sont sur la cible ;
- * refuse sinon, en disant pourquoi. `force` passe seulement le refus « commits absents de la cible » (la tête du run est connue et donnée). */
+/** Lignes 9 et 10 : cadence run --clore <id> [--force] retire le worktree et la branche d'un run que le tableau dit intégré ; refuse sinon, en donnant la raison.
+ * `force` passe un seul refus, « commits absents de la cible », et nomme ces commits : ce sont eux qui sont perdus. */
 export function clore(e: Etat, out: (l: string) => void, force = false): number {
   const refus = (r: string) => { out(`cadence run --clore ${e.id} refusé : ${r}`); return 1; };
   if (e.clos) { out(`cadence run ${e.id} : déjà clos le ${e.clos.date.slice(0, 10)}`); return 0; }
@@ -67,17 +112,15 @@ export function clore(e: Etat, out: (l: string) => void, force = false): number 
   const p = occupantRun(e.fichier);
   if (REPRENABLES.includes(vu) || p) return refus(`le run est ${vu}${p ? ` (processus ${p.pid})` : ''} : il se reprend (cadence run --reponse ${e.id} "…") ou s'attend, il ne se clôt pas`);
   const i = integrationManuelle(e);
-  if (!i.integre && !(force && i.tete && i.cible)) return refus(i.raison);
-  if (existsSync(e.worktree)) {
-    const sale = git(e.worktree, 'status', '--porcelain');
-    if (sale.stdout.trim()) return refus(`le worktree ${e.worktree} a des modifications non commitées : ${sale.stdout.trim().split('\n').map((l) => l.slice(3)).join(', ')}`);
-  }
+  if (!i.integre && !(force && i.perdus)) return refus(i.raison);
   const echec = retirerRun(e);
   if (echec) return refus(echec);
-  const etat = JSON.parse(readFileSync(e.fichier, 'utf8')) as Etat, tete = i.tete as string, cible = i.cible as string;
-  etat.clos = { date: new Date().toISOString(), cible, tete, ...(i.integre ? {} : { force: true as const }) };
+  const etat = JSON.parse(readFileSync(e.fichier, 'utf8')) as Etat, tetes = i.tetes as string[], cible = i.cible as string;
+  etat.clos = { date: new Date().toISOString(), cible, tete: tetes[0], ...(i.integre ? {} : { force: true as const }) };
   writeFileSync(e.fichier, JSON.stringify(etat, null, 1));
-  out(i.integre ? `cadence run ${e.id} : clos — ${i.preuve} (${cible.slice(0, 7)}) ; worktree ${e.worktree} et branche ${e.branche} retirés`
-    : `cadence run ${e.id} : clos sans preuve d'intégration (--force) ; worktree ${e.worktree} et branche ${e.branche} retirés ; tête du run : ${tete} (git branch <nom> ${tete.slice(0, 7)} la retrouve tant que git la garde)`);
+  const retires = `worktree ${e.worktree} et branche ${e.branche} retirés`;
+  out(i.integre ? `cadence run ${e.id} : clos — ${i.preuve} (${cible.slice(0, 7)}) ; ${retires}`
+    : `cadence run ${e.id} : clos sans preuve d'intégration (--force) ; ${retires} ; ${i.perdus?.length} commit(s) perdu(s), absent(s) de ${e.cible} : `
+      + `${i.perdus?.map(nomme).join(' ; ')} ; tête(s) du run : ${tetes.join(', ')} (git branch <nom> <sha> les retrouve tant que git les garde)`);
   return 0;
 }

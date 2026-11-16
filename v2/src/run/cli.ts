@@ -19,8 +19,9 @@ export const AIDE_RUN = `  cadence run "<demande>" [--piece chemin]… [--lot L1
   cadence run --liste                    les runs du dépôt et leur état ; « interrompu » : en-cours, processus mort (L709) : --reponse reprend la même session ;
                                          « integre a la main » : run fini non intégré (conflit, refus…) dont tous les commits sont sur la cible (L745)
   cadence run --clore <id> [--force]     retire le worktree et la branche d'un run « integre a la main » et le note clos ; refusé sinon, avec la raison
-                                         « integre a la main » : même commit ou même patch (git cherry), ou même contenu de ses fichiers (conflit résolu à la main) ;
-                                         --force : clos sans preuve, quand la résolution a changé ses fichiers exprès (noté « par --force » dans --liste)
+                                         « integre a la main » : chaque commit du run (branche et HEAD du worktree, fusions comprises) est un ancêtre de la cible
+                                         ou y a le même patch-id ; git en échec, worktree avec un fichier modifié ou non suivi, tout autre cas : non intégré ;
+                                         --force : seul moyen de clore un run non intégré (conflit résolu à la main…), il nomme les commits perdus
   cadence run --help | -h                cette aide, sans rien créer
   registre (L701) : sans --demande-humaine ni --registre D-n, la demande est une consigne du lead : rien n'est inscrit au registre (.cadence/demandes/)
            --demande-humaine l'inscrit (texte mot pour mot, D-<n> suivant) ; --registre D-n rattache le run à cette entrée existante

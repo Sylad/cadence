@@ -15,6 +15,7 @@ import { corrections, cost, inspect, perf } from './cli/stats-commands.js';
 import { cmdConfig, cmdLead } from './cli/lead-commands.js';
 import { cmdAttente, heldPlanWrite } from './cli/attente-commands.js';
 import { cmdDemande } from './cli/demande-commands.js';
+import { cmdEval } from './cli/eval-commands.js';
 import { claudeHook } from './claude-hook.js';
 import { refCommand } from './ref/command.js';
 import { release } from './release.js';
@@ -102,6 +103,7 @@ Une seule aide : « raf --help », « cadence --help » et « cadence help » im
   cadence release patch|minor|major [--dry-run]   prépare le commit de version (package.json, package-lock.json, plugin.json, marketplace.json, CHANGELOG.md, qui assemble les fragments de changelog.d/ s'il existe et les retire) sans commiter ni publier ; imprime les étapes du lead et vérifie docs/whats-new.md : refus sur un arbre sale, un [Unreleased] vide sans fragment, un fragment mal formé ou une version déjà taguée
   cadence verify [--retry s] [--sha rév]   rejoue deliver.verify hors livraison : 0 vert (et, au sha de la dernière livraison rouge, l’inscrit au journal des livraisons), 1 effet rouge, 2 rien à vérifier
   cadence verify --gate --sha rév [--project dossier]   porte du projet (orchestrate.build puis orchestrate.test) : reprend le verdict enregistré par la vague quand son sha est le même et son arbre identique, sans rien rejouer (la sortie dit « verdict repris de la porte de la vague ») ; sinon la rejoue (« verdict rejoué : raison ») au sha dans l'arbre principal s'il est propre au sha, sinon dans un worktree jetable aux dépendances copiées (orchestrate.worktreeDeps), puis le retire : 0 vert, 1 rouge avec les tests en échec, 2 rien à rejouer ; le verdict (0 ou 1) est noté par sha et le hook pre-push refuse un push dont le sha n'a pas de verdict vert (CADENCE_PUSH_UNGATED=1 passe outre)
+  cadence eval <lot> [--dry-run]   rejoue, bras « with » seul, les cas d'éval du plugin (evals/) que la clé evals de cadence.yaml lie aux fichiers des commits du lot, et note chaque verdict au sha de HEAD (facturé, ~0,40 $ et ~1 min par cas) ; raf done refuse un lot dont un de ces cas n'a pas de verdict vert pour le contenu actuel de ses fichiers (L755) ; refus si un fichier couvert n'est pas commité ; 0 tous verts ou rien à rejouer, 1 un cas rouge ; --dry-run dit les cas et les commandes
   raf news new <lot…> [--title t] | list | check | stamp | build [-o dossier]   (aussi « cadence news … »)
 
 Un commit appartient à un lot quand son message cite l'identifiant : « feat(L3): … », « L3/t1 ».
@@ -211,6 +213,7 @@ const WITH_PLAN: Record<string, (c: Ctx) => number | Promise<number>> = {
   session: cmdSession,
   deliver: (c) => (c.values.constat ? cmdConstat(c) : cmdDeliver(c)),
   verify: cmdVerify,
+  eval: cmdEval,
   skills: cmdSkills,
   local: cmdLocal,
   news: cmdNews,

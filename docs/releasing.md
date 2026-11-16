@@ -227,3 +227,29 @@ that file; `package.json` is left alone, its scripts being a config the ratchet 
 if the replay is still below the threshold, has no complete result or the ceiling is spent. A first pass stopped by the ceiling (exit 2,
 partial) is never replayed. Read the case in the report before deciding it is the plugin and not the wording of the case. `npm test` only checks that the
 files are well formed (`test/plugin-evals.test.ts`); `evals/` is not part of the npm package.
+
+### Replaying the cases of a lot (before `raf done`)
+
+The full suite runs at the release, hours after the lots it judges are closed: on 16-11, L744 (the `lead` skill and the `livreur`
+agent) passed two reviews and was seen red by `livrer-sh-sans-bloc` only at the release of 2.0.12, seven hours later (L755). So a
+lot replays the cases that concern it before it is closed. The `evals` key of `cadence.yaml` says which cases cover which files
+(same patterns as `docs.sync` and `bounds`; the case's own folder, `evals/<case>/**`, always counts):
+
+```yaml
+evals:
+  - paths: [skills/deliver/**, skills/lead/**, agents/livreur.md, docs/deliver.md, docs/lead.md, docs/skills.md]
+    cases: [deliver-sha, livrer-sh-sans-bloc]
+```
+
+`cadence eval <lot>` reads the files of the lot's work commits, picks the cases they touch and runs each one with the plugin arm only
+(`--case <name> --ablation none -j 3`: the release command, `npm run eval:plugin`, wrapped by `scripts/eval-plugin.mjs` when the
+repository has them, else `claude plugin eval .`), results in `evals/results/<lot>-<case>-<time>/`. Each verdict is recorded at the sha
+of `HEAD` in the state folder shared by the worktrees (`<git common dir>/cadence/evals-lots.json`), so a lot evaluated in its worktree
+is closed from the main tree. A covered file left uncommitted is refused: the verdict would not say what was judged. About $0.40 and
+one minute per case.
+
+`raf done <lot>` then refuses a lot that touches a covered file while one of its cases has no green verdict for the **current content**
+of its files: never replayed, red at its last replay, or files changed since (a plan commit, a rebase or a cherry-pick changes nothing).
+`--force` only warns. Without an `evals` key nothing changes. A test (`test/eval-lot-l755.test.ts`) checks that every case of `evals/`
+is cited, that every skill is covered, and that the files of L744 replay `livrer-sh-sans-bloc`. Measure: no red case at a release on a
+defect of a lot already closed.

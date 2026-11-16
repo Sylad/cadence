@@ -5,7 +5,9 @@ import { gitRoot, tryGit } from './git.js';
 import { redAcceptations } from './orchestrate/accept.js';
 import { lotBranch } from './orchestrate/worktree.js';
 import { lotKey, RunStore } from './orchestrate/state.js';
-import { RafError } from './plan.js';
+import { evalEntriesOf, evalRefusal, filesOfCommits } from './lot-evals.js';
+import { type Plan, RafError } from './plan.js';
+import { lotWork } from './audit.js';
 
 /**
  * Un lot clos avec une acceptation à vert: false bloque les vagues suivantes du dépôt (verrou des tests d'acceptation, L366) :
@@ -69,4 +71,19 @@ export function refuseHandedBackWithoutCode(root: string, lotId: string, force: 
     warn(`avertissement : ${text}`);
     return;
   }
+}
+
+/**
+ * Un lot dont les commits de travail touchent un fichier que couvre un cas d'éval du plugin (clé `evals` de cadence.yaml) n'est pas clos
+ * tant que ce cas n'a pas de verdict vert pour le contenu actuel de ses fichiers (L755, D-26 : L744 vu rouge par l'éval 7 h après sa clôture,
+ * à la publication de 2.0.12). `cadence eval <lot>` rejoue les cas. Un plan en lecture seule ne lit pas git : rien à refuser. `--force` n'en fait qu'un avertissement.
+ */
+export function refuseUnevaluatedPlugin(c: { root: string; configPath: string; plan: Plan; lot: string; force: boolean; warn: (line: string) => void }): void {
+  const entries = c.plan.readonly ? [] : evalEntriesOf(c.configPath);
+  if (!entries.length) return;
+  const repo = gitRoot(c.root) ?? c.root;
+  const text = evalRefusal(repo, entries, c.lot, filesOfCommits(repo, lotWork(c.plan, c.root, c.lot).map((w) => w.sha)));
+  if (!text) return;
+  if (!c.force) throw new RafError(`${text} (--force pour passer outre)`);
+  c.warn(`avertissement : ${text}`);
 }

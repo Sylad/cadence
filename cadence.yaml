@@ -99,3 +99,15 @@ bounds:
     tests: [test/changelog-fragments-l679.test.ts]
   - paths: [package.json, 'docs/*.md']
     tests: [test/docs-publiees-l626.test.ts, test/orchestrate-pages-l599.test.ts]
+
+# Cas d'éval du plugin par fichier (L755, D-26) : un lot dont les commits touchent un de ces fichiers rejoue les cas cités avant d'être
+# clos (`cadence eval <lot>`, bras « with » seul) ; `raf done` le refuse tant qu'un cas n'a pas de verdict vert pour le contenu actuel de ses
+# fichiers. Le dossier du cas (evals/<cas>/**) compte d'office. Le 16-11, L744 (skills/lead, agents/livreur) a fait tomber livrer-sh-sans-bloc,
+# vu à la publication de 2.0.12 seulement, 7 h après sa clôture. Mesure : 0 éval rouge à la publication sur un défaut d'un lot déjà clos.
+evals:
+  - paths: [skills/deliver/**, skills/lead/**, agents/livreur.md, docs/deliver.md, docs/lead.md, docs/skills.md]
+    cases: [deliver-sha, livrer-sh-sans-bloc]
+  - paths: [skills/orchestrate/**, skills/lead/**, docs/orchestrate.md, docs/lead.md, docs/skills.md]
+    cases: [orchestrate-id-avec-slash]
+  - paths: [skills/session-start/**, skills/session-close/**, skills/lead/**, skills/deliver/**, agents/livreur.md, agents/code-reviewer.md, docs/raf.md, docs/lead.md, docs/skills.md]
+    cases: [raf-done-sans-revue]

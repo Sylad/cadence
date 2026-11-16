@@ -1,6 +1,6 @@
 // Les commandes qui écrivent le plan, un lot à la fois (L488, sorti de cli.ts).
 import { relative, resolve } from 'node:path';
-import { refuseHandedBackWithoutCode, refuseRedAcceptation } from '../raf-close-checks.js';
+import { refuseHandedBackWithoutCode, refuseRedAcceptation, refuseUnevaluatedPlugin } from '../raf-close-checks.js';
 import { statusCommand } from '../raf-status.js';
 import { PLAN_LEGACY } from '../config.js';
 import { audit, isNonConformingVerdict, lotWork, planCommits, unreviewedWork } from '../audit.js';
@@ -47,6 +47,7 @@ export function cmdSetStatus(c: Ctx): number | Promise<number> {
   if (status === 'done' && !rest[0].includes('/')) {
     refuseRedAcceptation(root, configPath, rest[0], !!values.force, io.err);
     refuseHandedBackWithoutCode(root, rest[0], !!values.force, io.err);
+    refuseUnevaluatedPlugin({ root, configPath, plan, lot: rest[0], force: !!values.force, warn: io.err });
   }
   // Le plan ne lit pas git : lui dire combien de commits du lot sa revue ne couvre pas quand elle est exigée.
   const unreviewed = status === 'done' && plan.reviewSince && !plan.readonly && !values.force ? unreviewedWork(plan, root, rest[0]) : 0;

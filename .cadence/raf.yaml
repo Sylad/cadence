@@ -3660,7 +3660,9 @@ lots:
     estimate: 0.25
     created: 2026-11-16
     started: 2026-11-16
-    review: { date: 2026-11-16, verdict: "non conforme : 1 bloquant (bump de sous-module absent de main invisible avec diff.ignoreSubmodules=all → --clore supprime la branche, clore.ts:15) ; 3 majeurs (git status en échec laisse --clore retirer du travail non commité ; commits sur HEAD détaché du worktree perdus ; git cherry ignore les commits de fusion)", commit: 3ae5dbf22a5ea029f11d4f8a5eb4101e34eacb46 }
+    review: { date: 2026-11-16, verdict: "non conforme : 3 bloquants (patch-id ignore la position : même ligne insérée dans un autre bloc identique comptée comme le même patch, clore.ts:63-74 ; commit fait dans un sous-module du worktree perdu par worktree remove --force, run.ts:296 ; dossier du worktree supprimé à la main : HEAD détaché jamais compté puis élagué, clore.ts:38) ; B1/M1/M2/M3 de la 3e revue corrigés", commit: 370f7d97cb5fd24080fb447e3ec5beee402893c1 }
+    notes:
+      - { date: 2026-11-16, text: "16-11, lead : 4 passes et 4 revues non conformes, chaque revue trouve une nouvelle façon de perdre du travail tant que --clore SUPPRIME. Décision : supprimer la suppression — --clore archive (réf. refs/cadence/archive/<id> sur la tête de la branche et sur chaque HEAD du worktree) avant de retirer quoi que ce soit, et ne retire le dossier du worktree que s'il est propre ; perte de travail impossible par construction." }
   - id: L746
     title: "Mise à jour mensuelle des technos et dépendances (D-1 du registre parent) : versions mineures et correctifs, majeures proposées à part ; noter chaque régression trouvée et sa correction"
     status: todo

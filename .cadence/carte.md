@@ -68,3 +68,8 @@
 - Workflow : au lancement, `revueDuPlan` (v2/src/run/escalade.ts) lit la revue du plan (`raf list --json`) puis les `raf review <lot>` de `.cadence/plan-en-attente.yaml` ; la dernière est la revue courante.
 - Décision (revue r1) : l'argv en attente se lit avec la table d'options de raf, déplacée de src/cli/context.ts vers `scripts/options-raf.mjs` (+ `.d.mts` aux types littéraux, comparée par test/options-raf-l748.test.ts ; publiée dans `files` et copiée par l'instantané). Option inconnue = plan en attente illisible, nommé.
 - Décision (revue r1) : une revue conforme, au plan ou en attente, remplace les précédentes comme au plan sous L726 ; seules les non conformes écrites après elle (et celles vues par des runs) comptent. Tests : v2/test/run-modele-attente-l748.test.ts.
+
+## Modèle des agents du plugin (L757, D-4)
+
+- Décision : `livreur` et `precheck-reader` déclarent `model: sonnet` ; les 9 autres agents (juges compris) n'en déclarent aucun et héritent du modèle de la session. Test : test/modele-agents-l757.test.ts (liste exacte, recopie par `cadence skills install`, `readAgents` ne passe pas `model` à `--agents` : dans une vague le `--model` de l'étape décide).
+- Workflow de mesure : `node scripts/jetons-agents.mjs [--agent livreur] [--since|--until ISO] [--dernieres 5] [--json]` relie chaque sous-agent (`<session>/subagents/*.jsonl`) à son appel Agent par le prompt, compte les jetons par modèle (message.id une fois) et marque `RATÉE` une réponse « Question » ou sans « livré »/« poussé ». Lecture et critère : docs/mesures/modele-agents-l757.md.

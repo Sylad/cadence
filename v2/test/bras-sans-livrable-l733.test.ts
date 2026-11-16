@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Executeur, Mesure } from '../src/bench/bras.js';
-import { passage } from '../src/bench/cli.js';
+import { horlogeAPas, passage } from '../src/bench/cli.js';
 import { sansLivrable } from '../src/bench/sans-juge.js';
 import { BARRE_SPEC, ligneHistorique, PUBLIE, statut, titreVerdict, verdictSansJuge, type ResultatBanc } from '../src/bench/verdict.js';
 import { dossierTemp } from './temp.js';
@@ -14,7 +14,8 @@ import { dossierTemp } from './temp.js';
 const git = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encoding: 'utf8' }).trim();
 const BRIEF = join(import.meta.dirname, '..', 'briefs', 'bras-A.md');
 const sortie = JSON.stringify({ session_id: 's', total_cost_usd: 0, modelUsage: {} });
-const base = { ref: 'A', cand: 'cadence-run', hebdo: false, juge: 'opus', maintenant: new Date('2026-11-15T15:00:00Z'), empreinte: 'e1', out: () => {} };
+/** L752 : horloge des bras à une minute par lecture, comme L751 ; avec l'horloge réelle, « temps total : 1 s contre 0 s » rougissait sous charge. */
+const base = { ref: 'A', cand: 'cadence-run', hebdo: false, juge: 'opus', maintenant: new Date('2026-11-15T15:00:00Z'), empreinte: 'e1', out: () => {}, horloge: horlogeAPas('2026-11-15T15:00:00Z', 60_000) };
 const prepReel = (await import('../src/bench/preparer.js')).preparer;
 const RUN = '2026-11-15-1600-e1';
 

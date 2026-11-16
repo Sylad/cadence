@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileS
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Executeur } from '../src/bench/bras.js';
-import { bancsALaFois, bench, commandeBanc, enParallele, passage, PARALLELES } from '../src/bench/cli.js';
+import { bancsALaFois, bench, commandeBanc, enParallele, horlogeAPas, passage, PARALLELES } from '../src/bench/cli.js';
 import { nomCache } from '../src/bench/sans-juge.js';
 import { PUBLIE, statut, verdictSansJuge, type ResultatBanc } from '../src/bench/verdict.js';
 import { dossierTemp } from './temp.js';
@@ -30,8 +30,7 @@ const commit = (cwd: string, f = 'fait.txt') => { writeFileSync(join(cwd, f), 'x
 const sortie = JSON.stringify({ session_id: 's', total_cost_usd: 0, modelUsage: {} });
 /** L751 : horloge des bras en ligne, une minute par lecture ; chaque bras lit début puis fin, donc dure 60 s quelle que soit la charge machine
  * (sous charge, l'horloge réelle donnait « temps total : 1 s contre 0 s », rouge, au test des tests d'origine retirés). */
-const minuteParLecture = () => { let t = Date.parse('2026-11-13T15:00:00Z'); return () => new Date((t += 60_000)); };
-const base = { ref: 'A', cand: 'cadence-run', hebdo: false, juge: 'opus', maintenant: new Date('2026-11-13T15:00:00Z'), empreinte: 'e1', out: () => {}, horloge: minuteParLecture() };
+const base = { ref: 'A', cand: 'cadence-run', hebdo: false, juge: 'opus', maintenant: new Date('2026-11-13T15:00:00Z'), empreinte: 'e1', out: () => {}, horloge: horlogeAPas('2026-11-13T15:00:00Z', 60_000) };
 const prepReel = (await import('../src/bench/preparer.js')).preparer;
 
 describe('nom d\'un test d\'origine posé à côté de ceux du bras', () => {
@@ -127,27 +126,27 @@ describe('bancs d\'un passage en parallèle, un processus par banc (L689)', () =
     const res = await enParallele([30, 10, 20, 5], 2, async (ms) => { enCours++; max = Math.max(max, enCours); await new Promise((f) => setTimeout(f, ms)); enCours--; return ms; });
     expect(res).toEqual([30, 10, 20, 5]); expect(max).toBe(2);
   });
-  it('trois bancs joués en même temps par de vrais processus cadence2 : ordre alterné gardé, en-cours.json des bancs en parallèle, durée ≈ un banc', async () => {
+  it('trois bancs joués en même temps par de vrais processus cadence2 : ordre alterné gardé, en-cours.json des bancs en parallèle, premiers bras au rendez-vous', async () => {
     const r = racine(['1-a', '3-b', '7-c']), bin = dossierTemp('banc-l689-bin-');
-    // faux claude : une seconde par session, puis un commit dans le clone ; il note le début de chaque session
-    writeFileSync(join(bin, 'claude'), `#!/bin/bash\ndate +%s%N >> "${r}/debuts"\nsleep 1\necho x > fait.txt; git add -A; git -c user.email=t@t -c user.name=t commit -qm bras\nprintf '${sortie}'\n`);
+    // L752 : faux claude au rendez-vous, sans seuil de temps (sous charge, « < 900 ms entre les trois débuts » et « < 10 s » rougissaient) : chaque session
+    // note son début puis attend que trois sessions aient commencé (15 s au plus) ; joués l'un après l'autre, les bancs laisseraient la première seule.
+    writeFileSync(join(bin, 'claude'), `#!/bin/bash\nd="${r}/debuts"; echo x >> "$d"\nfor i in $(seq 300); do [ $(wc -l < "$d") -ge 3 ] && break; sleep 0.05; done\n`
+      + `[ $(wc -l < "$d") -ge 3 ] || echo seule >> "${r}/seules"\necho x > fait.txt; git add -A; git -c user.email=t@t -c user.name=t commit -qm bras\nprintf '${sortie}'\n`);
     chmodSync(join(bin, 'claude'), 0o755);
     const vus: string[] = [], sorties: string[] = [];
     const espion = setInterval(() => { try { vus.push(readFileSync(join(r, 'en-cours.json'), 'utf8')); } catch { /* pas encore */ } }, 50);
-    const t0 = Date.now();
+    // L752 : durées des bras des enfants à pas fixe (une minute), comme l'horloge des bras en ligne ; le verdict ne dépend plus de la charge
     const v = await passage({ ...base, racine: r, numeros: ['1', '3', '7'], niveau: 'mecanique', exec: () => { throw new Error('jamais en ligne'); }, prep: prepReel, home: r,
       out: (x) => sorties.push(x), depot: '/depot (branche main, 12345678)',
-      enfants: { lanceur: [process.execPath, '--import', join(FOND, 'ts.mjs'), join(FOND, 'cadence.mjs')], paralleles: 3, env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } } });
+      enfants: { lanceur: [process.execPath, '--import', join(FOND, 'ts.mjs'), join(FOND, 'cadence.mjs')], paralleles: 3, env: { ...process.env, PATH: `${bin}:${process.env.PATH}` }, pas_horloge_ms: 60_000 } });
     clearInterval(espion);
-    const duree = Date.now() - t0;
     expect(v.criteres.filter((c) => !c.ok)).toEqual([]);
+    expect(v.criteres.find((c) => c.nom === 'temps total')?.valeur).toBe('180 s contre 180 s'); // trois bancs, un bras d'une minute chacun : l'horloge à pas fixe est passée aux enfants
     const rap = JSON.parse(readFileSync(join(r, 'rapports', '2026-11-13-1600-e1.json'), 'utf8'));
     expect(rap.resultats.map((x: { banc: string; clones: unknown }) => [x.banc, x.clones])).toEqual([
       ['1-a', { c1: 'A', c2: 'cadence-run' }], ['3-b', { c1: 'cadence-run', c2: 'A' }], ['7-c', { c1: 'A', c2: 'cadence-run' }]]);
-    const debuts = readFileSync(join(r, 'debuts'), 'utf8').trim().split('\n').map((x) => Number(x) / 1e6).sort((a, b) => a - b);
-    expect(debuts).toHaveLength(6);
-    expect(debuts[2] - debuts[0]).toBeLessThan(900); // les premiers bras des trois bancs démarrent ensemble, pas l'un après l'autre (1 s chacun)
-    expect(duree).toBeLessThan(6000 + 4000); // six sessions d'une seconde en série dépasseraient 6 s, plus le démarrage des processus
+    expect(readFileSync(join(r, 'debuts'), 'utf8').trim().split('\n')).toHaveLength(6);
+    expect(existsSync(join(r, 'seules'))).toBe(false); // les premiers bras des trois bancs se sont attendus : ils tournaient ensemble
     expect(vus.some((x) => Object.keys(JSON.parse(x).en_parallele).length >= 2)).toBe(true);
     expect(existsSync(join(r, 'en-cours.json'))).toBe(false);
     expect(sorties[0]).toBe('banc mecanique : dépôt mesuré /depot (branche main, 12345678), empreinte e1, 3 banc(s) à la fois');

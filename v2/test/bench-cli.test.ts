@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, utimesSync, readFileSync, readdirSync, writeFile
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Executeur } from '../src/bench/bras.js';
-import { archiver, controlesEclair, empreinte, passage, pretAPasser } from '../src/bench/cli.js';
+import { archiver, controlesEclair, empreinte, horlogeAPas, passage, pretAPasser } from '../src/bench/cli.js';
 import { statut } from '../src/bench/verdict.js';
 import { run } from '../src/cli.js';
 import { creerExecuteur } from '../src/bench/bras.js';
@@ -31,6 +31,8 @@ const exec: Executeur = (args, o) => {
     : { X: { bloquants: 0, majeurs: 0, mineurs: 0 }, Y: { bloquants: 0, majeurs: 0, mineurs: 0 }, prefere: 'egal', ui: 'na', raisons: '' }));
   return { stdout: JSON.stringify({ session_id: 's', total_cost_usd: 0, modelUsage: {} }), code: 0 };
 };
+/** L752 : horloge des bras à une minute par lecture, comme L751 ; avec l'horloge réelle, un verdict vert pouvait rougir sous charge (« 1 s contre 0 s »). */
+const minute = () => horlogeAPas('2026-11-08T10:00:00Z', 60_000);
 const prep = (_b: unknown, cible: string) => {
   mkdirSync(cible, { recursive: true });
   execFileSync('bash', ['-c', 'git init -q -b main && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m base'], { cwd: cible });
@@ -41,7 +43,7 @@ describe('passage du banc', () => {
   it('joue les bras un banc après l\'autre, ordre alterné, et écrit rapport et historique', async () => {
     const r = racine(); const ordre: string[] = [];
     const exec2: Executeur = (args, o) => { if (!args.includes('--resume') && !/dans \S+\.json/.test(args[args.indexOf('-p') + 1])) ordre.push(o.cwd.split('/').slice(-2).join('/')); return exec(args, o); };
-    const v = await passage({ racine: r, ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec: exec2, prep: prep as never,
+    const v = await passage({ racine: r, ref: 'A', cand: 'C', hebdo: false, juge: 'opus', horloge: minute(), exec: exec2, prep: prep as never,
       maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: () => {} });
     expect(v.vert).toBe(true);
     expect(ordre).toEqual(['1-a/c1', '1-a/c2', '2-b/c1', '2-b/c2']);
@@ -63,7 +65,7 @@ describe('passage du banc', () => {
       if (o.cwd.endsWith('1-a/c1')) return { stdout: JSON.stringify({ session_id: 's', is_error: true, modelUsage: {} }), code: 0 };
       return exec(args, o);
     };
-    const v = await passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec: exec2, prep: prep as never,
+    const v = await passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', horloge: minute(), exec: exec2, prep: prep as never,
       maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: () => {} });
     expect(juges).toBe(0);
     expect(v.vert).toBe(false);
@@ -73,7 +75,7 @@ describe('passage du banc', () => {
     const r = racine(); const cwds: string[] = [];
     const prep2 = (b: { id: string }, cible: string) => { if (b.id === '1-a') throw new Error('futur visible'); return prep(b, cible); };
     const exec2: Executeur = (args, o) => { if (!/dans \S+\.json/.test(args[args.indexOf('-p') + 1])) cwds.push(o.cwd); return exec(args, o); };
-    const v = await passage({ racine: r, ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec: exec2, prep: prep2 as never,
+    const v = await passage({ racine: r, ref: 'A', cand: 'C', hebdo: false, juge: 'opus', horloge: minute(), exec: exec2, prep: prep2 as never,
       maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: () => {} });
     expect(cwds.length).toBe(2);
     expect(cwds.every((c) => c.includes('2-b'))).toBe(true);
@@ -82,7 +84,7 @@ describe('passage du banc', () => {
     expect(res.mesures.A.echec).toContain('préparation : futur visible');
   });
 
-  const lancer = (r: string) => passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec, prep: prep as never,
+  const lancer = (r: string) => passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', horloge: minute(), exec, prep: prep as never,
     maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: () => {} });
   it('verrou : pid vivant refuse, pid mort est repris, libéré après', async () => {
     const r = racine();
@@ -101,18 +103,18 @@ describe('passage du banc', () => {
   it('en-cours.json : présent pendant un bras (banc, phase), absent après, même après une levée', async () => {
     const r = racine(); const vus: Record<string, unknown>[] = [];
     const espion: Executeur = (a, o) => { const f = join(r, 'en-cours.json'); if (existsSync(f)) vus.push(JSON.parse(readFileSync(f, 'utf8'))); return exec(a, o); };
-    await passage({ racine: r, numeros: ['1', '2'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec: espion, prep: prep as never,
+    await passage({ racine: r, numeros: ['1', '2'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', horloge: minute(), exec: espion, prep: prep as never,
       maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: () => {} });
     expect(vus[0]).toMatchObject({ run: '2026-11-08-1100-e1', candidat: 'C', reference: 'A', bancs_total: 2, banc: '1-a', repetition: 1, phase: 'bras A', termines: 0 });
     expect(vus.some((v) => v.banc === '2-b' && v.termines === 1)).toBe(true);
     expect(existsSync(join(r, 'en-cours.json'))).toBe(false);
     const r2 = racine(); writeFileSync(join(r2, 'bras.yaml'), 'A:\n  modele: opus\n  brief: /nulle/part\n');
-    await expect(passage({ racine: r2, ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec, prep: prep as never, maintenant: new Date(), empreinte: 'e1', home: r2, out: () => {} })).rejects.toThrow();
+    await expect(passage({ racine: r2, ref: 'A', cand: 'C', hebdo: false, juge: 'opus', horloge: minute(), exec, prep: prep as never, maintenant: new Date(), empreinte: 'e1', home: r2, out: () => {} })).rejects.toThrow();
     expect(existsSync(join(r2, 'en-cours.json'))).toBe(false);
   });
   it('phase : un bras qui lève est étiqueté « bras X »', async () => {
     const r = racine();
-    const v = await passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec: () => { throw new Error('boum'); }, prep: prep as never,
+    const v = await passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', horloge: minute(), exec: () => { throw new Error('boum'); }, prep: prep as never,
       maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: () => {} });
     expect(v.vert).toBe(false);
     const res = JSON.parse(readFileSync(join(r, 'runs', '2026-11-08-1100-e1', '1-a', 'resultat.json'), 'utf8'));
@@ -208,7 +210,7 @@ describe('banc éclair', () => {
   it('un seul banc joué, hebdo: false, contrôles imprimés avant le verdict, dans le rapport et l\'historique', async () => {
     const r = racine(); const sortie: string[] = []; const cwds = new Set<string>();
     const exec2: Executeur = (args, o) => { if (!/dans \S+\.json/.test(args[args.indexOf('-p') + 1])) cwds.add(o.cwd.split('/').slice(-2)[0]); return exec(args, o); };
-    const v = await passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec: exec2, prep: prep as never,
+    const v = await passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', horloge: minute(), exec: exec2, prep: prep as never,
       maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: (l) => sortie.push(l), eclair: true });
     expect(v).toMatchObject({ vert: true, eclair_ok: true });
     expect([...cwds]).toEqual(['1-a']);
@@ -222,7 +224,7 @@ describe('banc éclair', () => {
   });
   it('contrôles éclair rouges : eclair_ok false dans l\'historique, ROUGE au rapport', async () => {
     const r = racine();
-    const v = await passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', prep: prep as never, eclair: true,
+    const v = await passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', horloge: minute(), prep: prep as never, eclair: true,
       exec: (args, o) => (o.cwd.endsWith('c2') ? { stdout: JSON.stringify({ session_id: 's', modelUsage: {} }), code: 0 } : exec(args, o)),
       maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: () => {} });
     expect(v.eclair_ok).toBe(false);
@@ -231,12 +233,12 @@ describe('banc éclair', () => {
   });
   it('sans éclair : pas de eclair_ok dans l\'historique', async () => {
     const r = racine();
-    await passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec, prep: prep as never, maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: () => {} });
+    await passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', horloge: minute(), exec, prep: prep as never, maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: () => {} });
     expect(JSON.parse(readFileSync(join(r, 'historique.jsonl'), 'utf8').trim())).not.toHaveProperty('eclair_ok');
   });
   it('le passage est nommé à l\'heure de Paris (M-5)', async () => {
     const r = racine();
-    await passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec, prep: prep as never, maintenant: new Date('2026-11-07T23:30:00Z'), empreinte: 'e1', home: r, out: () => {} });
+    await passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', horloge: minute(), exec, prep: prep as never, maintenant: new Date('2026-11-07T23:30:00Z'), empreinte: 'e1', home: r, out: () => {} });
     expect(readdirSync(join(r, 'runs'))).toEqual(['2026-11-08-0030-e1']);
     expect(readFileSync(join(r, 'rapports', '2026-11-08-0030-e1.md'), 'utf8')).toMatch(/^# Banc 2026-11-08 /);
   });
@@ -254,7 +256,7 @@ describe('banc éclair', () => {
 });
 
 describe('répétitions (R18)', () => {
-  const base = { ref: 'A', cand: 'C', hebdo: false, juge: 'opus', prep: prep as never, maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1' };
+  const base = { ref: 'A', cand: 'C', hebdo: false, juge: 'opus', horloge: minute(), prep: prep as never, maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1' };
   it('N = 2 : quatre bras par banc, ordre alterné par banc et par répétition, clones r1/r2, ids #k', async () => {
     const r = racine(); const ordre: string[] = [];
     const exec2: Executeur = (args, o) => { if (!/dans \S+\.json/.test(args[args.indexOf('-p') + 1])) ordre.push(o.cwd.split('/').slice(-3).join('/')); return exec(args, o); };
@@ -305,7 +307,7 @@ describe('répétitions (R18)', () => {
 describe('garde de publication (C-1, I-7)', () => {
   it('l\'historique porte la référence et le modèle du candidat lu dans bras.yaml', async () => {
     const r = racine(); writeFileSync(join(r, 'bras.yaml'), readFileSync(join(r, 'bras.yaml'), 'utf8').replace(/C:\n  modele: opus/, 'C:\n  modele: fable'));
-    await passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec, prep: prep as never,
+    await passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', horloge: minute(), exec, prep: prep as never,
       maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: () => {} });
     expect(JSON.parse(readFileSync(join(r, 'historique.jsonl'), 'utf8').trim())).toMatchObject({ candidat: 'C', reference: 'A', modele_candidat: 'fable' });
   });
@@ -320,7 +322,7 @@ describe('travail du bras (I-2)', () => {
   /** Banc 1-a : c1 = A (commite), c2 = C (fait `bras`). */
   const jouer = async (bras: (cwd: string) => void, prep2 = prep) => {
     const r = racine(); let juges = 0;
-    const v = await passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', prep: prep2 as never, garderClones: true,
+    const v = await passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', horloge: minute(), prep: prep2 as never, garderClones: true,
       exec: (args, o) => { if (/dans \S+\.json/.test(args[args.indexOf('-p') + 1])) juges++; else if (o.cwd.endsWith('c2')) { bras(o.cwd); return { stdout: JSON.stringify({ session_id: 's', modelUsage: {} }), code: 0 }; } return exec(args, o); },
       maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: () => {} });
     return { v, juges, C: JSON.parse(readFileSync(join(r, 'runs', '2026-11-08-1100-e1', '1-a', 'resultat.json'), 'utf8')).mesures.C };
@@ -348,7 +350,7 @@ describe('nettoyage des clones (I-3)', () => {
   const jouer = async (garderClones?: boolean) => {
     const r = racine();
     const exec2: Executeur = (args, o) => { if (!/dans \S+\.json/.test(args[args.indexOf('-p') + 1])) { mkdirSync(`${o.cwd}.captures`, { recursive: true }); writeFileSync(`${o.cwd}.captures/a.png`, 'p'); } return exec(args, o); };
-    await passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec: exec2, prep: prep as never, garderClones,
+    await passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', horloge: minute(), exec: exec2, prep: prep as never, garderClones,
       maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: () => {} });
     return join(r, 'runs', '2026-11-08-1100-e1', '1-a');
   };
@@ -371,7 +373,7 @@ describe('nettoyage des clones (I-3)', () => {
 describe('banc invalide (I-5)', () => {
   it('un banc.yaml invalide met ses deux bras en échec, le passage continue ; un fichier sous bancs/ est ignoré', async () => {
     const r = racine(); writeFileSync(join(r, 'bancs', '1-a', 'banc.yaml'), 'projet: p\n'); writeFileSync(join(r, 'bancs', 'LISEZMOI.md'), 'x');
-    const v = await passage({ racine: r, ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec, prep: prep as never,
+    const v = await passage({ racine: r, ref: 'A', cand: 'C', hebdo: false, juge: 'opus', horloge: minute(), exec, prep: prep as never,
       maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: () => {} });
     expect(v.vert).toBe(false);
     const res = (id: string) => JSON.parse(readFileSync(join(r, 'runs', '2026-11-08-1100-e1', id, 'resultat.json'), 'utf8'));

@@ -93,7 +93,13 @@ export function brasDuPassage(racine: string, ref: string, cand: string): Record
   const bras = chargerBras(racine);
   return cand === jumeau(ref) && bras[ref] && !bras[cand] ? { ...bras, [cand]: { ...bras[ref], nom: cand } } : bras;
 }
-export type Enfants = { lanceur: string[]; paralleles: number; env?: NodeJS.ProcessEnv };
+/** `pas_horloge_ms` (L752, tests) : horloge des bras joués dans les enfants, avancée de ce pas à chaque lecture depuis `maintenant` ; sinon l'horloge réelle. */
+export type Enfants = { lanceur: string[]; paralleles: number; env?: NodeJS.ProcessEnv; pas_horloge_ms?: number };
+/** Horloge qui avance de `pas_ms` à chaque lecture (L751, L752) : chaque bras lit début puis fin et dure `pas_ms`, quelle que soit la charge machine. */
+export function horlogeAPas(depart: string | Date, pas_ms: number): () => Date {
+  let t = new Date(depart).getTime();
+  return () => new Date((t += pas_ms));
+}
 
 type OptPassage = { racine: string; numeros?: string[]; ref: string; cand: string; hebdo: boolean; juge: string; repetitions?: number; garderClones?: boolean;
   exec: Executeur; prep: typeof preparer; maintenant: Date; empreinte: string; home: string; out: (l: string) => void; eclair?: boolean;
@@ -101,7 +107,7 @@ type OptPassage = { racine: string; numeros?: string[]; ref: string; cand: strin
 
 /** Un banc (une répétition) à jouer, sérialisable pour un processus enfant. `joues` (L737) : passages antérieurs de ce banc, pour alterner l'ordre des bras. */
 export type Tache = { racine: string; dirRun: string; run: string; ref: string; cand: string; N: number; juge: string; garderClones: boolean;
-  maintenant: string; home: string; sansJuge: boolean; bid: string; i: number; k: number; joues?: number };
+  maintenant: string; home: string; sansJuge: boolean; bid: string; i: number; k: number; joues?: number; pas_horloge_ms?: number };
 /** `rejeu` (L734) : clones gardés dont la suite est rouge, à rejouer seuls après les autres bancs du passage. */
 type Joue = { r: ResultatBanc; clones: Record<string, string>; rejeu?: { bid: string; dossier: string; bras: Record<string, { clone: string; base: string }> } };
 
@@ -172,7 +178,8 @@ const PHASE = '@phase ';
 /** Processus enfant (`cadence2 bench _banc <tache.json>`) : joue le banc avec claude, écrit `<tache.json>.joue.json`, ses phases sur la sortie. */
 export function bancEnfant(f: string, out: (l: string) => void): number {
   const t = JSON.parse(readFileSync(f, 'utf8')) as Tache;
-  writeFileSync(`${f}.joue.json`, JSON.stringify(jouerBanc(t, executeurClaude, preparer, out, (p) => out(PHASE + p))));
+  const horloge = t.pas_horloge_ms ? horlogeAPas(t.maintenant, t.pas_horloge_ms) : undefined; // L752 : posée par les tests (Enfants.pas_horloge_ms)
+  writeFileSync(`${f}.joue.json`, JSON.stringify(jouerBanc(t, executeurClaude, preparer, out, (p) => out(PHASE + p), horloge)));
   return 0;
 }
 
@@ -180,7 +187,7 @@ export function bancEnfant(f: string, out: (l: string) => void): number {
 function bancDansEnfant(t: Tache, e: Enfants, dir: string, out: (l: string) => void, signaler: (phase: string) => void): Promise<Joue> {
   return new Promise((fin) => {
     const id = idTache(t); const f = join(dir, `${id.replace('#', '-r')}.tache.json`);
-    writeFileSync(f, JSON.stringify(t));
+    writeFileSync(f, JSON.stringify(e.pas_horloge_ms ? { ...t, pas_horloge_ms: e.pas_horloge_ms } : t));
     let termine = false; let erreur: string | undefined;
     const finir = (cause?: string) => {
       if (termine) return;

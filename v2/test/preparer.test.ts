@@ -52,7 +52,8 @@ describe('preparer', () => {
     const t0 = Date.now();
     expect(() => preparer(banc(dir, base, 'true', `sleep ${marque} & sleep ${marque}`), cible, 500)).toThrow(/install : délai de .* dépassé, voir .*install\.log/);
     expect(() => preparer(banc(dir, base, `sleep ${marque}`), cible, 500)).toThrow(/tests : délai de .* dépassé, voir .*tests-base\.log/);
-    expect(Date.now() - t0).toBeLessThan(15000);
+    // L752 : borne logique, pas seuil de machine (« < 15 s » pouvait rougir sous charge) : attendre l'un des sleep coûterait 40 s à lui seul
+    expect(Date.now() - t0).toBeLessThan(40_000);
     expect(spawnSync('pgrep', ['-f', `sleep ${marque.replace('.', '[.]')}`]).status).toBe(1);
   });
 });

@@ -146,15 +146,19 @@ describe('hook lecture obligatoire', () => {
       expect(mes.ouvertes.length === 0 || mes.partielles.length === 1, piece).toBe(true);
     }
   });
-  it('rapide : transcript de 20 Mo lu en moins d\'une seconde (pièce lue à la fin)', () => {
+  it('rapide : transcript de 20 Mo lu en moins d\'une seconde au calme (pièce lue à la fin)', () => {
     const m = monde();
+    // L752 : témoin mesuré juste avant, même hook sur un transcript d'une ligne (démarrage de node, lecture des pièces) ; sous charge il ralentit
+    // comme le gros, et la borne suit : une seconde au calme, cinq témoins au plus sous charge. Une lecture quadratique la dépasse toujours.
+    m.ecrire(lu({ file_path: m.doc }));
+    const t1 = performance.now(); permis(hook(ecriture(m), env(m, [m.doc]))); const temoin = performance.now() - t1;
     const fd = openSync(m.t, 'w');
     const bruit = `${appel('Bash', { command: 'x'.repeat(2000) })}\n${lu({ file_path: join(m.clone, 'src', 'a.ts') }).join('\n')}\n${resultat('t0').replace('"x"', `"${'y'.repeat(5000)}"`)}\n`;
     for (let k = 0; k < 20 << 20; k += bruit.length) writeSync(fd, bruit);
     writeSync(fd, `${lu({ file_path: m.doc }).join('\n')}\n`); closeSync(fd);
     const t0 = performance.now(); const r = hook(ecriture(m), env(m, [m.doc])); const ms = performance.now() - t0;
     permis(r);
-    expect(ms).toBeLessThan(1000);
+    expect(ms).toBeLessThan(Math.max(1000, 5 * temoin));
   });
 });
 

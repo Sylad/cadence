@@ -1,10 +1,10 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Executeur } from '../src/bench/bras.js';
 import { bench, passage } from '../src/bench/cli.js';
-import { ajouterSession, claudeVide, ecartsEnvironnement, environnement, reglagesClaude, type Environnement } from '../src/bench/environnement.js';
+import { ajouterSession, claudeVide, ecartsEnvironnement, enteteEnvironnement, environnement, reglagesClaude, versionClaude, type Environnement } from '../src/bench/environnement.js';
 import { conclureSequence } from '../src/sequence/verdict.js';
 import type { MesureEtape, ResultatSequence } from '../src/sequence/passage.js';
 import { ioTest } from './cli.test.js';
@@ -52,6 +52,31 @@ describe('les réglages suivis', () => {
   it('sans effort ni variable : l\'absence est écrite', () => {
     expect(reglagesClaude({ HOME: dossierTemp('env-l742-') })).toEqual({ effort: 'non réglé (défaut de Claude Code)', 'env CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES': 'non posée' });
   });
+  it('CLAUDE_CONFIG_DIR : les réglages utilisateur se lisent dans ce dossier, pas dans ~/.claude, et la variable est notée', () => {
+    const home = dossierTemp('env-l742-'), conf = join(home, 'conf');
+    mkdirSync(join(home, '.claude')); mkdirSync(conf);
+    writeFileSync(join(home, '.claude', 'settings.json'), JSON.stringify({ effortLevel: 'low' }));
+    writeFileSync(join(conf, 'settings.json'), JSON.stringify({ effortLevel: 'xhigh', model: 'opus' }));
+    expect(reglagesClaude({ HOME: home, CLAUDE_CONFIG_DIR: conf })).toEqual({
+      'env CLAUDE_CONFIG_DIR': conf, 'réglages utilisateur effortLevel': 'xhigh', 'réglages utilisateur model': 'opus', 'env CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES': 'non posée' });
+  });
+  it('un fichier de réglages illisible (utilisateur ou bras) est écrit « illisible (<fichier>) », sans arrêter la lecture des autres', () => {
+    const home = dossierTemp('env-l742-'), bras = join(home, 'bras.json'), user = join(home, '.claude', 'settings.json');
+    mkdirSync(join(home, '.claude'));
+    writeFileSync(user, '{ pas du json'); writeFileSync(bras, JSON.stringify({ effortLevel: 'medium' }));
+    expect(reglagesClaude({ HOME: home }, bras)).toMatchObject({ 'réglages utilisateur': `illisible (${user})`, 'réglages du bras bras.json effortLevel': 'medium' });
+    writeFileSync(user, '{}'); writeFileSync(bras, 'cassé');
+    expect(reglagesClaude({ HOME: home }, bras)).toMatchObject({ 'réglages du bras bras.json': `illisible (${bras})`, effort: 'non réglé (défaut de Claude Code)' });
+  });
+});
+
+describe('la version de Claude Code au lancement', () => {
+  const faux = (sortie: string) => { const f = join(dossierTemp('claude-l742-'), 'claude'); writeFileSync(f, `#!/bin/sh\nprintf '${sortie}'\n`); chmodSync(f, 0o755); return f; };
+  it('« 2.1.325 (Claude Code) » donne 2.1.325', () => expect(versionClaude(faux('2.1.325 (Claude Code)\\n'))).toBe('2.1.325'));
+  it('claude absent ou muet : « inconnue »', () => {
+    expect(versionClaude(join(dossierTemp('claude-l742-'), 'absent'))).toBe('inconnue');
+    expect(versionClaude(faux(''))).toBe('inconnue');
+  });
 });
 
 describe('deux environnements comparés', () => {
@@ -61,9 +86,37 @@ describe('deux environnements comparés', () => {
       { bras: 'F', claude: { ...ajouterSession(claudeVide({ effort }), flux(version, fable)) } },
     ]);
   it('identiques : aucune différence', () => expect(ecartsEnvironnement(env('2.1.325', 'claude-fable-5-2'), env('2.1.325', 'claude-fable-5-2'))).toEqual([]));
+  it('le contexte max d\'un modèle présent dans les deux est comparé', () => {
+    const a = env('2.1.325', 'claude-fable-5-2'), b = env('2.1.325', 'claude-fable-5-2');
+    b.bras.F.contexte_max['claude-fable-5-2'] = 200_000;
+    expect(ecartsEnvironnement(a, b)).toEqual(['contexte max de claude-fable-5-2 (F) : 1 000 000 → 200 000']);
+  });
+  it('un bras qui lance un sous-agent dans un passage et pas dans l\'autre ne change pas l\'environnement (revue L742, constat 3)', () => {
+    const avec = environnement('2.1.325', { A: 'opus', F: 'fable' }, [
+      { bras: 'A', claude: ajouterSession(claudeVide({ effort: 'high' }), flux('2.1.325', 'claude-opus-5-5', ['claude-haiku-5-5'])) },
+      { bras: 'F', claude: ajouterSession(claudeVide({ effort: 'high' }), flux('2.1.325', 'claude-fable-5-2')) },
+    ]);
+    expect(avec.bras.A.autres_modeles).toEqual(['claude-haiku-5-5']);
+    expect(ecartsEnvironnement(env('2.1.325', 'claude-fable-5-2'), avec)).toEqual([]);
+    expect(ecartsEnvironnement(avec, env('2.1.325', 'claude-fable-5-2'))).toEqual([]);
+  });
   it('la version, le modèle derrière un alias et un réglage changés sont nommés', () => {
     expect(ecartsEnvironnement(env('2.1.293', 'claude-fable-5-1'), env('2.1.325', 'claude-fable-5-2', 'medium'))).toEqual([
       'Claude Code : 2.1.293 → 2.1.325', 'alias fable : claude-fable-5-1 → claude-fable-5-2', 'effort (A) : high → medium', 'effort (F) : high → medium']);
+  });
+});
+
+describe('l\'en-tête d\'un rapport', () => {
+  const bras = (version: string, reglages: Record<string, string>) => ajouterSession(claudeVide(reglages), flux(version, 'claude-opus-5-5'));
+  it('une session qui annonce une autre version que claude --version (mise à jour pendant le passage) : « ; sessions : »', () => {
+    const e = environnement('2.1.325', { A: 'opus', F: 'opus' }, [{ bras: 'A', claude: bras('2.1.325', {}) }, { bras: 'F', claude: bras('2.1.326', {}) }]);
+    expect(enteteEnvironnement(e, null)[1]).toBe('Claude Code : 2.1.325 (claude --version au lancement) ; sessions : 2.1.325, 2.1.326');
+    const memes = environnement('2.1.325', { A: 'opus' }, [{ bras: 'A', claude: bras('2.1.325', {}) }]);
+    expect(enteteEnvironnement(memes, null)[1]).toBe('Claude Code : 2.1.325 (claude --version au lancement)');
+  });
+  it('deux bras aux réglages différents : une ligne « Réglages de » par bras ; aucun réglage : « aucun »', () => {
+    const e = environnement('2.1.325', { A: 'opus', F: 'opus' }, [{ bras: 'A', claude: bras('2.1.325', { effort: 'high' }) }, { bras: 'F', claude: bras('2.1.325', {}) }]);
+    expect(enteteEnvironnement(e, null).slice(-2)).toEqual(['Réglages de A : effort = high', 'Réglages de F : aucun']);
   });
 });
 

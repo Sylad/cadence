@@ -29,3 +29,10 @@
 - `stepEuros` (src/cost.ts) chiffre l'écriture de cache à `cacheWritePrice` (cacheWrite de `perf.prices`, sinon entrée × 2, avec avertissement) : perf, table et `--status` d'orchestrate, `cadence cost`.
 - Décision revue r1 : une étape qui ne porte que `counted` (journal ancien) **et** le budget chiffré par `orchestrate --dry-run` se répartissent `COUNTED_WRITE_SHARE` = 90 % en écriture de cache, 10 % en sortie (l'entrée hors cache, une centaine de tokens, est négligée comme dans `cadence cost`). Avant : 90 % au prix d'entrée.
 - Écran : `a:L1 — estimation du lot : 5,17 € (budget de 750000 tokens au prix sonnet, 90 % en écriture de cache)`. Test : test/orchestrate-estimation-cache-l704.test.ts.
+
+## Banc v2 : environnement d'un passage (L742, revue r1)
+
+- Chaque rapport de banc (court, mécanique, micro, bruit, éclair, séquence) porte en tête la version de Claude Code, le modèle exact de chaque bras, le contexte max et les réglages suivis (v2/src/bench/environnement.ts), comparés au rapport précédent de `rapports/`.
+- Écran : la ligne `⚠ Environnement différent de <passage> : …` s'imprime sur la sortie du passage, **séquences comprises** (`conclureSequence` reçoit `out`, une fois par répétition).
+- Décision revue r1 : les autres modèles facturés (sous-agents, `modelUsage`) sont écrits mais **jamais comparés** — lancer un sous-agent dépend de la session, pas de l'environnement ; `CLAUDE_CODE_SUBAGENT_MODEL` reste un réglage suivi, comparé.
+- Tests : v2/test/environnement-l742.test.ts (« sessions : », « Réglages de », CLAUDE_CONFIG_DIR, fichier illisible, claude absent ou muet, contexte max, sous-agent sans ⚠), v2/test/sequence-cli.test.ts (⚠ sur la sortie d'une séquence).

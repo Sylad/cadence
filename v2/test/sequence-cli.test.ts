@@ -98,6 +98,15 @@ describe('cadence2 bench sequence : passage', () => {
     expect(io.sortie.join('\n')).toMatch(/VERT — séquence s1, répétition 1\/1/);
     expect(existsSync(join(r, 'en-cours.json')) || existsSync(join(r, 'passage.lock'))).toBe(false);
   });
+  it('L742 : la ligne ⚠ d\'un environnement changé est aussi écrite sur la sortie de la séquence (docs/v2/banc.md)', async () => {
+    const r = racine(), { exec } = faux(r), io = ioTest({ BENCH_ROOT: r, HOME: r });
+    mkdirSync(join(r, 'rapports'));
+    writeFileSync(join(r, 'rapports', '2026-11-01-0900-e0.json'), JSON.stringify({ environnement: { claude_code: '2.1.293', bras: {} } }));
+    expect(await sequence(['s1'], io, { ...dep(r, exec), version: '2.1.325' })).toBe(0);
+    const ligne = '⚠ Environnement différent de 2026-11-01-0900-e0 : Claude Code : 2.1.293 → 2.1.325';
+    expect(io.sortie).toContain(ligne);
+    expect(readFileSync(join(r, 'rapports', '2026-11-09-1100-e1-s1-r1.md'), 'utf8').split('\n')[2]).toBe(ligne);
+  });
   it('--repetitions 2 : UN run id, répétitions 1 et 2 en historique et en rapports, dossiers r1 et r2, en-cours.json avec la répétition', async () => {
     const r = racine(), { exec, vu } = faux(r), io = ioTest({ BENCH_ROOT: r, HOME: r });
     expect(await sequence(['s1', '--repetitions', '2', '--garder-clones'], io, dep(r, exec))).toBe(0);

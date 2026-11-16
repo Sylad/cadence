@@ -77,7 +77,8 @@ export function environnement(claude_code: string, alias: Record<string, string>
 const liste = (l: string[]) => (l.length ? l.join(', ') : 'non lu (aucune session n\'a démarré)');
 const nombre = (n: number) => n.toLocaleString('fr-FR').replace(/\s/g, ' ');
 
-/** Les différences de b par rapport à a : version, modèle exact de chaque alias, puis, bras par bras, autres modèles, contexte max et réglages. */
+/** Les différences de b par rapport à a : version, modèle exact de chaque alias, puis, bras par bras, contexte max et réglages. Jamais les autres modèles
+ * facturés : un sous-agent lancé dépend de la session, pas de l'environnement (revue L742) ; CLAUDE_CODE_SUBAGENT_MODEL est un réglage, comparé. */
 export function ecartsEnvironnement(a: Environnement, b: Environnement): string[] {
   const d: string[] = [];
   const diff = (nom: string, x: string, y: string) => { if (x !== y) d.push(`${nom} : ${x} → ${y}`); };
@@ -87,7 +88,6 @@ export function ecartsEnvironnement(a: Environnement, b: Environnement): string[
   for (const al of Object.keys(mb).filter((k) => ma[k])) diff(`alias ${al}`, ma[al].sort().join(', '), mb[al].sort().join(', '));
   for (const n of Object.keys(b.bras).filter((k) => a.bras[k])) {
     const x = a.bras[n], y = b.bras[n];
-    if (x.modeles.length && y.modeles.length) diff(`autres modèles de ${n}`, x.autres_modeles.join(', ') || 'aucun', y.autres_modeles.join(', ') || 'aucun');
     for (const m of Object.keys(y.contexte_max).filter((k) => x.contexte_max[k] !== undefined)) diff(`contexte max de ${m} (${n})`, nombre(x.contexte_max[m]), nombre(y.contexte_max[m]));
     for (const k of [...new Set([...Object.keys(x.reglages), ...Object.keys(y.reglages)])].sort()) diff(`${k} (${n})`, x.reglages[k] ?? 'absent', y.reglages[k] ?? 'absent');
   }

@@ -30,7 +30,7 @@ export async function sequence(args: string[], io: Io, dep: Dep = {}): Promise<n
   try {
     passageSequences({ racine, id, ref, cand, juge: option(args, 'juge') ?? 'opus', exec: dep.exec ?? executeurClaude, maintenant, empreinte: emp, home: io.env.HOME,
       out: io.out, ...(dep.pret && { pret: dep.pret }), jscpd: dep.jscpd, prep: dep.prep, delaiMs: dep.delaiMs, horloge: dep.horloge, garderClones: args.includes('--garder-clones') }, n, (r, repetition) => {
-      const v = conclureSequence(racine, r, ref, cand, { maintenant: io.now(), empreinte: emp, modele_candidat: modele, repetition, repetitions: n, alias, version });
+      const v = conclureSequence(racine, r, ref, cand, { maintenant: io.now(), empreinte: emp, modele_candidat: modele, repetition, repetitions: n, alias, version, out: io.out });
       verts.push(v.vert);
       io.out(`${v.vert ? 'VERT' : 'ROUGE'} — séquence ${id}, répétition ${repetition}/${n}, run ${r.run} : ${racine}/rapports/${r.run}-${r.sequence}-r${repetition}.md`);
     }, (message, repetition, run) => {

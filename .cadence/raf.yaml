@@ -3722,9 +3722,10 @@ lots:
     finished: 2026-11-16
   - id: L755
     title: "Un lot qui modifie un skill, un agent ou leur doc rejoue les cas d'éval du plugin qui les concernent avant d'être clos (porte ou raf done), pas seulement à la publication — L744 a passé deux revues et n'a été vu rouge par l'éval qu'à la publication de 2.0.12, 7 h plus tard (D-26) ; coût visé ~0,40 $ et ~1 min par cas ; mesure : 0 éval rouge à la publication sur un défaut d'un lot déjà clos"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-16
+    started: 2026-11-16
   - id: L756
     title: "Veille #61 : chaque mesure du banc et chaque run notent l'identifiant exact du modèle (claude-fable-5-2, pas « fable ») — depuis 2.1.321 (09-11) l'alias fable a changé sous nos pieds ; mesure : 100 % des rapports de banc portent l'id exact"
     status: todo

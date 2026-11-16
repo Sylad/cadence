@@ -3618,6 +3618,11 @@ lots:
     started: 2026-11-15
     review: { date: 2026-11-15, verdict: "conforme : un cas d'éval sous le seuil est rejoué une fois avant d'arrêter la release (scripts/eval-plugin.mjs, appelé par cadence release), rapport « rejoué » avec les deux mesures ; package.json inchangé (cliquet)", commit: 82347c9b00370d54e07ea40b7074cf0ffa1d442d }
     finished: 2026-11-15
+  - id: L741
+    title: "correction non jouée : la vague fait elle-même le geste que le lead reprend à la main (niveau : source) ; mesure : 0 reprise du lead « correction non jouée » par vague"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-16
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

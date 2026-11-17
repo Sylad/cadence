@@ -8,6 +8,7 @@ cadence run --reponse <id> "<texte>"
 cadence run --liste [--inactif <minutes>]
 cadence run --clore <id>
 cadence run --archives
+cadence run --purger [--dry-run]
 cadence run --help        # ou -h
 ```
 
@@ -84,6 +85,24 @@ Limites, écrites pour qu'on ne les découvre pas : les fichiers ignorés par `.
 
 `cadence run --archives` liste chaque archive (`git for-each-ref refs/cadence/archive/`) avec son sha court, la date et le sujet du commit, et sous chacune la commande qui en refait une branche : `git branch archive-<id> refs/cadence/archive/<id>`. Les archives sont des références locales : git ne les ramasse jamais (`git gc`), ne les pousse pas, et elles ne paraissent pas dans `git branch`. Pour en retirer une, quand on est sûr de ne plus en vouloir : `git update-ref -d refs/cadence/archive/<id>`.
 
+### Run qui se reprend, déjà intégré à la main (L767)
+
+Le 17-11, deux runs intégrés à la main n'étaient pas clos, worktree gardé. Pour un run qui se reprend, `--liste` ne regardait pas la cible (il montrait son état et la commande de reprise) et `--clore` le refusait (« il se reprend »). Un run `interrompu`, `attente` ou `quota` **dont aucun processus vivant ne tient le verrou** et dont la tête est un ancêtre de la cible (même règle que ci-dessus, au moins un commit) s'affiche donc `interrompu, sa tête est sur main (<sha>) : intégré à la main ? worktree et branche : cadence run --clore <id>`, et `--clore` le clôt comme un run fini (archives d'abord, worktree retiré seulement s'il est propre). Un run en cours, ou en quota avec son processus qui attend, n'est jamais lu ni clos ; un run qui se reprend et n'est pas sur la cible reste refusé.
+
+### `--purger` : vider le dossier des runs (L767)
+
+Le dossier `../.cadence-run/` gardait tout : 51 dossiers de captures et 174 fichiers d'état le 17-11. `cadence run --purger` retire, pour chaque run **du dépôt courant** fini depuis plus de N jours, ses fichiers à côté de l'état et du worktree : l'état (`<projet>-<id>.json`), le verrou, `<worktree>.captures/`, `<worktree>.question.md`, `<worktree>.reglages/`, et son journal `fond-<heure>.log` quand plus aucun run gardé ne le cite. `--dry-run` liste les mêmes lignes (`à purger <id> (intégré le <date>) : <fichiers>`) sans rien retirer. Les archives git (`refs/cadence/archive/`) restent.
+
+- **Candidats** : un run `integre` (fini à la dernière écriture de son état) ou clos par `--clore` (fini à sa date de clôture), dont le dossier du worktree n'existe plus et dont aucun processus ne tient le verrou. Tout autre run n'est jamais touché : en cours, interrompu, en attente d'une réponse, en quota, rendu au lead (`conflit`, `porte-rouge`…), même worktree disparu. Un run fini et ancien dont le worktree est gardé est nommé (`gardé <id> : worktree gardé : <chemin>`) ; le retirer, puis relancer la purge. L'état est retiré en dernier : un échec au milieu laisse le run listé, et la purge suivante reprend.
+- **Délai** : `run.purgeAfterDays` du `cadence.yaml` du dépôt, 14 par défaut ; `0` prend tout run fini. Une autre valeur qu'un entier positif ou nul est refusée (code 1) avant toute suppression.
+
+```yaml
+run:
+  purgeAfterDays: 14
+```
+
+Code : `v2/src/run/purger.ts` ; tests : `v2/test/run-purger-l767.test.ts`.
+
 **Run interrompu, `--fond` (L709, issue #55 du compte pro).** Le 11-11, au compte pro, deux runs `--fond` se sont arrêtés à la minute où la session Claude Code qui les avait lancés s'est fermée : 2 runs perdus, 3 h de créneau, et rien pour les reprendre. Trois corrections :
 
 - `--fond` relance le run détaché (nouvelle session et nouveau groupe de processus, journal dans `../.cadence-run/fond-<heure>.log`), avec les options de Node du lanceur. Surtout, les sessions `claude` du run ne reçoivent plus ce qu'une session Claude Code transmet à ses commandes et qui les lie à elle : `CLAUDE_PID`, `CLAUDE_SSH_*`, `CLAUDE_CODE_CHILD_SESSION`, `CLAUDE_CODE_MESSAGING_*` (sa socket), `CLAUDE_CODE_SDK_HAS_HOST_AUTH_REFRESH` (l'authentification rafraîchie par l'hôte), `CLAUDE_CODE_HOST_SESSION_ID` et `CLAUDE_CODE_SESSION_ID`. Une session lancée sans elles s'authentifie seule (vérifié le 12-11 sur Big-Blue). Le test `v2/test/run-fond-l709.test.ts` lance un run `--fond` depuis un shell qui exporte ces variables, tue tout le groupe de ce shell, puis vérifie que le run et sa session vivent, sans ces variables, et que le run va jusqu'à l'intégration.
@@ -137,6 +156,7 @@ En cas d'échec, le worktree est gardé avec l'état du run (`../.cadence-run/<p
 | `--fond` | Le run se détache et survit à la session qui l'a lancée (vécu au compte pro le 10-11 : un lot mort avec la session précédente, puis deux runs le 11-11, issue #55) ; journal dans `../.cadence-run/`. Ses sessions ne gardent aucun lien avec la session lanceuse (L709). Le journal dit qui était le run et ce qui l'a arrêté (L711). |
 | `KUBECONFIG` | Comme les vagues : sans `orchestrate.prodAccess: true`, la session n'a ni `kubectl`, ni `helm`, ni `KUBECONFIG` ; avec, elle joue le banc du projet. |
 | `run.worktreeOutside` | Couper le `CLAUDE.md` parent (−5,3 k jetons au premier tour, mesuré le 12-11), dépôt par dépôt : il porte parfois des consignes de sécurité, d'où le défaut `false` (L705). |
+| `--purger`, `run.purgeAfterDays` | Le dossier des runs grossit sans fin (51 dossiers de captures, 174 états le 17-11) : retirer les fichiers des runs finis depuis N jours, jamais ceux d'un run qui se reprend ou dont le worktree est gardé ; `--dry-run` pour lister d'abord (L767). |
 | `--sans-porte` | Un dépôt sans porte déclarée n'est pas intégré en silence : il faut le choisir explicitement. |
 | `--help`, `-h` | L'usage, sans rien créer (issue #54 : « --help » partait en demande, laissait worktree, branche et état). Un autre argument qui commence par `-` est refusé en code 2 avant toute création. |
 

@@ -109,8 +109,9 @@ describe('cadence run --liste : affichage seul (L745, 5e passe)', () => {
     expect(integration({ ...e, cible: 'absente' })).toEqual({ integre: false, cible: '', absents: 'inconnu (branche absente absente)' });
     git(repo, ...ID, 'merge', '-q', '--no-edit', e.branche);
     writeFileSync(e.fichier, JSON.stringify({ ...e, etat: 'attente' }));
-    const l = (await lancer(repo, '--liste')).texte;
-    expect(l).toMatch(new RegExp(`^${e.id}  attente  `, 'm'));
+    const l = (await lancer(repo, '--liste')).texte; // L767 : la tête sur la cible se dit, l'état reste « attente » (run-purger-l767.test.ts)
+    expect(l).toMatch(new RegExp(`^${e.id}  attente, sa tête est sur main `, 'm'));
+    expect(l).not.toContain('integre a la main');
     expect(l).not.toContain('commits absents');
   });
 

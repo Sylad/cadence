@@ -5,7 +5,8 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { etatVu, occupantRun, oublierReglages, type Etat } from './run.js';
 
-/** Un run qui vit encore ou se reprend (--reponse) n'est pas fini : ni « intégré à la main », ni clos. */
+/** Un run qui vit encore ou se reprend (--reponse) n'est pas fini : ni « intégré à la main », ni clos — sauf, sans processus vivant, quand sa tête est déjà
+ * sur la cible (L767). */
 const REPRENABLES = ['en-cours', 'interrompu', 'attente', 'quota'];
 export const ARCHIVES = 'refs/cadence/archive/';
 export interface Tete { ref: string; sha: string }
@@ -81,7 +82,11 @@ export function etatListe(e: Etat): { etat: string; absents?: string } {
     return { etat: e.clos.integre ?? !e.clos.force ? `integre a la main (${e.cible} = ${e.clos.cible.slice(0, 7)}), ${quand} (${etait})` : `${quand} sans intégration, travail archivé : cadence run --archives (${etait})` };
   }
   const vu = etatVu(e);
-  if (vu === 'integre' || REPRENABLES.includes(vu)) return { etat: vu };
+  if (vu === 'integre' || vu === 'en-cours') return { etat: vu };
+  if (REPRENABLES.includes(vu)) { // L767 : intégré à la main pendant qu'il attendait (interrompu, question, quota) : sans processus vivant, --clore le clôt
+    const i = occupantRun(e.fichier) ? undefined : integration(e);
+    return { etat: i?.integre ? `${vu}, sa tête est sur ${e.cible} (${i.cible.slice(0, 7)}) : intégré à la main ? worktree et branche : cadence run --clore ${e.id}` : vu };
+  }
   const i = integration(e);
   return i.integre ? { etat: `integre a la main (était ${vu} ; worktree et branche : cadence run --clore ${e.id})` } : { etat: vu, absents: i.absents };
 }
@@ -94,7 +99,8 @@ export function clore(e: Etat, out: (l: string) => void): number {
   const vu = etatVu(e);
   if (vu === 'integre') return refus('intégré par cadence run, son worktree et sa branche sont déjà retirés');
   const p = occupantRun(e.fichier);
-  if (REPRENABLES.includes(vu) || p) return refus(`le run est ${vu}${p ? ` (processus ${p.pid})` : ''} : il se reprend (cadence run --reponse ${e.id} "…") ou s'attend, il ne se clôt pas`);
+  // L767 : un run qui se reprend se clôt seulement quand aucun processus ne le tient et que sa tête est déjà sur la cible (intégré à la main)
+  if (p || (REPRENABLES.includes(vu) && !integration(e).integre)) return refus(`le run est ${vu}${p ? ` (processus ${p.pid})` : ''} : il se reprend (cadence run --reponse ${e.id} "…") ou s'attend, il ne se clôt pas`);
   let wt: ReturnType<typeof worktreeConnu>, tetes: Tete[];
   try {
     wt = worktreeConnu(e); tetes = tetesDuRun(e, wt);

@@ -7,6 +7,7 @@ import { MODELES, modeleRun } from './aiguillage.js';
 import { etatVu, executerRun, fichierRun, occupantRun, repondreRun, type Etat } from './run.js';
 import { heureLocale, type Quota } from './quota.js';
 import { archives, clore, etatListe } from './clore.js';
+import { purger, PURGE_JOURS_DEFAUT } from './purger.js';
 import { origineRapport } from '../rapport.js';
 import { causeListe, identite, veiller } from '../trace.js';
 import { noteBloquee, SEUIL_INACTIF_MIN } from '../inactif.js';
@@ -21,10 +22,14 @@ export const AIDE_RUN = `  cadence run "<demande>" [--piece chemin]… [--lot L1
                                          « session bloquée ? » (L763, issue #63) : session vivante sans commande en cours ni écriture depuis <min> minutes
                                          (${SEUIL_INACTIF_MIN} par défaut), avec la commande de reprise ;
                                          « integre a la main » : run fini sans intégration dont la tête de branche est un ancêtre de la cible (L745) ; sinon son état
-                                         et une ligne « commits absents de la cible : N »
+                                         et une ligne « commits absents de la cible : N » ; L767 : un run interrompu, en attente ou en quota sans processus
+                                         dont la tête est sur la cible le dit, avec la commande --clore
   cadence run --clore <id>               clôt un run fini, intégré ou non : archive la tête de sa branche et le HEAD de son worktree (refs/cadence/archive/), puis
                                          retire la branche, et le dossier du worktree seulement s'il est propre (sinon il reste, et la commande le dit)
+                                         L767 : un run interrompu, en attente ou en quota sans processus, dont la tête est sur la cible, se clôt aussi
   cadence run --archives                 les archives posées par --clore, et la commande git qui en refait une branche
+  cadence run --purger [--dry-run]       retire les fichiers (état, verrou, captures, question, réglages, journal --fond) des runs intégrés ou clos depuis
+                                         plus de run.purgeAfterDays jours (cadence.yaml, ${PURGE_JOURS_DEFAUT} par défaut), worktree absent ; --dry-run liste sans retirer (L767)
   cadence run --help | -h                cette aide, sans rien créer
   registre (L701) : sans --demande-humaine ni --registre D-n, la demande est une consigne du lead : rien n'est inscrit au registre (.cadence/demandes/)
            --demande-humaine l'inscrit (texte mot pour mot, D-<n> suivant) ; --registre D-n rattache le run à cette entrée existante
@@ -62,6 +67,11 @@ export async function cmdRun(a: string[], io: Io, exec?: Executeur): Promise<num
       const f = fichierRun(io.cwd, a[1]);
       if (!existsSync(f)) { io.err(`cadence run : run inconnu : ${a[1]} (${f})`); return 1; }
       return clore(JSON.parse(readFileSync(f, 'utf8')) as Etat, out);
+    }
+    if (a[0] === '--purger') { // L767
+      if (a.length > 2 || (a[1] && a[1] !== '--dry-run')) { io.err('usage : cadence run --purger [--dry-run]'); return 2; }
+      const racine = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: io.cwd, encoding: 'utf8' }).trim();
+      return purger(racine, join(dirname(racine), '.cadence-run'), { dryRun: a[1] === '--dry-run', out });
     }
     if (a[0] === '--archives') { for (const l of archives(io.cwd)) out(l); return 0; }
     if (a[0] === '--veilleur') return veiller(['run', ...a.slice(1)], io.env, io.cwd, out); // L711 : le parent d'un run --fond, lancé par --fond seul

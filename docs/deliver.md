@@ -327,6 +327,11 @@ day of the last green covers every lot closed until today. With neither `deliver
 line rests on the lead's word, and stderr says so. `--constat` runs no CI, no deploy command and no script; it is
 accepted while a wave runs, since it deploys nothing. Tested by `test/deliver-constat-l718.test.ts`.
 
+On a read-only plan, a constat names only the lots that were already in progress in the plan **as it was at the
+observed sha** (and still are at the head), not those of the head alone (L765): the sha is often older than the head,
+and a lot started after it, merely named in passing by an earlier commit, has no commit under it. The plan missing or
+unreadable at that sha names no lot. Tested by `test/deliver-constat-lot-apres-sha-l765.test.ts`.
+
 ## verify: replay the effect checks, outside a delivery
 
 A green delivery says the effect was right *then*. `cadence verify` replays the

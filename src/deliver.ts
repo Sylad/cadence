@@ -596,7 +596,7 @@ async function verifyAll(
 }
 
 /** Ce qu'il faut pour annoncer les lots livrés et rafraîchir leur article : deliver, et `cadence verify` quand il inscrit une ligne verte (L435). */
-export type DeliveredCtx = Pick<DeliverCtx, 'root' | 'plan' | 'today' | 'articles' | 'publicTitle' | 'planCommit' | 'waveId' | 'block' | 'out' | 'err'> & { config?: Pick<DeliverConfig, 'blocks'> };
+export type DeliveredCtx = Pick<DeliverCtx, 'root' | 'plan' | 'today' | 'articles' | 'publicTitle' | 'planCommit' | 'waveId' | 'block' | 'out' | 'err'> & { config?: Pick<DeliverConfig, 'blocks'>; planAt?: (sha: string) => Plan | null }; // planAt : le plan au sha livré (L765, voir deliveredIds)
 
 /**
  * Ce qui suit la ligne verte du journal, depuis la livraison verte précédente `prev` (celle d'AVANT la ligne écrite) : les lots cités

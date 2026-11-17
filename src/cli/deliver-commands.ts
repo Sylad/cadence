@@ -6,6 +6,7 @@ import { type Day } from '../dates.js';
 import { blockProblem } from '../deliver-blocks.js';
 import { deliver, type DeliveredCtx, parseDeliverConfig, realDeps } from '../deliver.js';
 import { constat, readDeployed, realConstatDeps } from '../deliver-constat.js';
+import { planAtSha } from '../deliver-lots.js';
 import { defaultTarget, realCheckDeps, verifyCommand } from '../verify.js';
 import { waveLaunchDirs } from '../gate-record.js';
 import { verifyGate } from '../verify-gate.js';
@@ -69,7 +70,9 @@ export function cmdConstat(c: Ctx): Promise<number> {
   const holding = waveHolding(root);
   const waveId = holding && !localLotOf(holding.wave) ? holding.wave : undefined;
   const effects = deliveredEffects({ root, configPath, planPath, loadPlan, newsDir, today, waveId, io });
-  const ctx = { ...effects, state: sharedStateDir(root), config, deployed: readDeployed(configPath), sha: rest[0] ?? values.sha, block: values.block, dryRun: !!values['dry-run'] };
+  // Un constat vise souvent un sha antérieur à la tête : les lots se lisent aussi dans le plan de ce sha (L765).
+  const planAt = planAtSha(root, planPath, (path) => Plan.load(path, { ...c.planConfig?.settings, config: configPath }));
+  const ctx = { ...effects, planAt, state: sharedStateDir(root), config, deployed: readDeployed(configPath), sha: rest[0] ?? values.sha, block: values.block, dryRun: !!values['dry-run'] };
   return constat(ctx, realConstatDeps(root, realCheckDeps(root)));
 }
 

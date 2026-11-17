@@ -3835,17 +3835,20 @@ lots:
   - id: L769
     title: "Config des tests, livrée seule : test/porte-mod.test.ts (mod cadence-hud, R5) dans le projet « lourds » de vitest.workspace.ts — dépasse 5 s sous la charge d'une porte complète (porte rouge de L765 le 17-11) ; R2 et R4 de test/vitest-workspace-l583.test.ts mis à jour ; changement déjà écrit dans le run archivé refs/cadence/archive/20261117133218-1841646"
     config: true
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-17
     started: 2026-11-17
-    review: { date: 2026-11-17, verdict: "non conforme : 2 majeurs — code hors config dans le lot (scripts/qualite.mjs c384e01, plugins/cadence-hud/tests/kit.ts 71b787f) ; docs/qualite.md non suivi — rattachés au lot de code L770", commit: 0f410c6a1a033bd2fe1fdf3886b344be7095ceab }
+    review: { date: 2026-11-17, verdict: "conforme : config seule (vitest.workspace.ts et son test) ; les deux commits de code écrits sous L769 sont portés par L770, relu conforme ; fragment changelog.d/L769.md présent", commit: 0f410c6a1a033bd2fe1fdf3886b344be7095ceab }
+    finished: 2026-11-17
   - id: L770
     title: "Cliquet qualité : un lot config: true peut écrire SON fragment changelog.d/<lot>.md (exemption étroite, pas tout changelog.d/*), docs/qualite.md:101-102 à jour ; et délai de 30 s des tests du mod cadence-hud (kit.ts) — porte les commits c384e01 et 71b787f écrits sous L769, qu'un lot de config ne peut contenir (revue L769-b du 17-11)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-17
     started: 2026-11-17
+    review: { date: 2026-11-17, verdict: "conforme : exemption étroite (SON fragment changelog.d/<lot>.md seulement), 2 tests rouges avec l'ancien qualite.mjs, 23/23 verts ; docs/qualite.md à jour ; qualite.mjs sort 0", commit: 7517fcfed35df3f99f781e9682743023c05c82d2 }
+    finished: 2026-11-17
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

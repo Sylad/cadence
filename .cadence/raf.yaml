@@ -3794,6 +3794,8 @@ lots:
     started: 2026-11-17
     review: { date: 2026-11-17, verdict: "conforme : 0 bloquant ; hook ne refuse que Bash run_in_background dans les sessions de cadence run ; --liste --inactif essayé sur le vrai registre ; budgets = croissance mesurée ; porte verte à e2f64f6 ; mineurs : chemin du dossier de hooks écrit deux fois (socle.ts, bras.ts), --liste refuse tout argument en plus", commit: e2f64f67fb592e646a53fdff41518c63d7b7244f }
     finished: 2026-11-17
+    notes:
+      - { date: 2026-11-17, text: "17-11 après-midi : récidive dans le run L765 (correction après porte rouge) — la session a fini sur « la suite complète tourne encore en arrière-plan, je reprends dès qu'elle rend la main » ; run rendu porte-rouge. Le garde de L763 ne couvre pas ce cas (lancement en arrière-plan autre que run_in_background ?)" }
   - id: L764
     title: "verify --gate et la porte d'un run : détecter un environnement périmé avant de jouer — node_modules plus ancien que package-lock.json (4 cas le 17-11 : ol, avatar, codex, jobmail), Node du PATH qui ne satisfait pas .nvmrc ou engines (evatosorus L51, porte rouge sous 22.22.3) ; dire la commande de remise à niveau au lieu d'un rouge trompeur"
     status: doing
@@ -3802,6 +3804,7 @@ lots:
     started: 2026-11-17
     notes:
       - { date: 2026-11-17, text: "revue 1 non conforme (17-11) : 3 majeurs — .nvmrc au patch près refuse un Node que engines accepte (warhammer40k) ; remise à niveau qui vise la copie jetable retirée ; porte affaiblie par un run signalée seulement au journal. Rapport scratchpad revue-L764.md ; correction à relancer après L766 (un run par dépôt)" }
+    review: { date: 2026-11-17, verdict: "conforme : seconde revue — 3 majeurs et m1 corrigés et testés ; essai réel warhammer40k sous Node 22.22.3 : 0 problème ; tests ciblés verts", commit: 4a6e670ba189dd154ca209674cacce16822839ce }
   - id: L765
     title: "deliver --constat <sha> sur un plan en lecture seule annonce « livré : Q-COUPE0 » alors que ce lot n'a aucun commit sous le sha (démarré après, plan de la tête) — ne nommer que les lots dont un commit est ancêtre du sha (vu sur maritime le 17-11, constat d2e7039)"
     status: doing
@@ -3814,8 +3817,14 @@ lots:
     estimate: 0.5
     created: 2026-11-17
     started: 2026-11-17
+    review: { date: 2026-11-17, verdict: "non conforme : 2 majeurs (note unique de maritime empêche une seconde revue de compter ; aucun pre-push hors vague sur maritime, core.hooksPath dans l'arbre)", commit: f61844b8b271c5a204d874a1280dbf1891edfbbd }
   - id: L767
     title: "Dossier .cadence-run : purger les captures, journaux et réglages des runs clos depuis plus de N jours (51 dossiers de captures, 174 fichiers d'état le 17-11) ; cadence run --liste signale un run dont la tête est sur la cible mais pas clos (worktree gardé, 2 vus le 17-11 après intégration à la main)"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-17
+  - id: L768
+    title: "créneau de porte : le plafond ou l'ordre de lancement évite que des lots attendent (niveau : source) ; mesure : 0 attente de créneau « créneau de porte » par vague"
     status: todo
     estimate: 0.25
     created: 2026-11-17

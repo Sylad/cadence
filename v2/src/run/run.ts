@@ -18,6 +18,7 @@ import { CONSIGNE_FINI, garderRapport, origineRapport, type EtatRapport } from '
 import { cheminWorktree, PORTE_MS, reglagesRun } from '../socle.js';
 import { briefRegistre, entreeCommitee, preparerRegistre, registreOuvert, registreTouche } from '../registre.js';
 import { fichiersNonCommites, nommerFichiers, PLAN_EN_ATTENTE } from '../../../scripts/arbre-non-commite.mjs'; // L722 : même lecture que src/repo-held.ts
+import { environnementPerime, ignorerPerime, lignesPerime } from '../../../scripts/environnement-porte.mjs'; // L764 : même lecture que src/verify-gate.ts
 import { debutProcessus, inscrireCreneau, occupantVivant, prendreVerrou, rendreVerrou, roleVerrou } from '../verrou.js';
 
 /** D-15 : le run reprend une minute après l'heure de remise à zéro annoncée, relit son état au plus tard toutes les 10 min (une reprise par --reponse arrête
@@ -32,7 +33,7 @@ export interface Conflit { cible: string; sur: string; fichiers: string[]; resol
 /** L724 : une porte rouge rendue à la session pour correction ; `rouge` : la sortie de la porte, `message` : le dernier mot de la session,
  * `verte` : la porte rejouée après la correction, absente tant qu'elle n'a pas été rejouée. */
 export interface Correction { rouge: string; message?: string; verte?: boolean }
-export type EtatRun = 'en-cours' | 'interrompu' | 'attente' | 'quota' | 'sans-commit' | 'echec' | 'conflit' | 'porte-rouge' | 'sans-porte' | 'refus-integration' | 'integre';
+export type EtatRun = 'en-cours' | 'interrompu' | 'attente' | 'quota' | 'sans-commit' | 'echec' | 'conflit' | 'porte-rouge' | 'environnement-perime' | 'sans-porte' | 'refus-integration' | 'integre';
 /** `rapport`, `rapport_tour`, `rapport_sans_marqueur`, `messages` : ../rapport.ts (EtatRapport, issues #57 et #58). */
 export interface Etat extends EtatRapport { id: string; repo: string; branche: string; cible: string; base: string; worktree: string; fichier: string; demande: string;
   pieces: string[]; taille: string; mode: 'complet' | 'leger'; modele?: string; acces_cluster: boolean; registre?: string; lot?: string; session: string; cout_usd: number;
@@ -111,6 +112,22 @@ const orchestrate = (repo: string): { test?: string; build?: string; prodAccess?
 function commandesDeCadenceYaml(repo: string): string[] {
   const o = orchestrate(repo);
   return [o.test, o.build].filter((c): c is string => typeof c === 'string' && !!c.trim());
+}
+/** L764 : la porte d'un run est lue dans cadence.yaml AU COMMIT DU RUN (le worktree, rebasé sur la cible) : un run qui corrige sa propre commande de porte est
+ * jugé par elle. Quand elle diffère de celle de l'arbre principal, la sortie le dit (une porte affaiblie par le run se voit dans le journal et à la revue). */
+function commandesDuRun(e: Etat, out: (l: string) => void): string[] {
+  const cmds = commandesDeCadenceYaml(e.worktree), principal = commandesDeCadenceYaml(e.repo);
+  if (cmds.join('\n') !== principal.join('\n')) out(`porte lue au commit du run (cadence.yaml changé par le run) : ${cmds.join(' puis ') || 'aucune commande'} — l'arbre principal (${e.cible}) aurait joué : ${principal.join(' puis ') || 'aucune commande'}`);
+  return cmds;
+}
+/** L764 : l'environnement du worktree avant la porte (node_modules en retard sur package-lock.json, Node du PATH hors de .nvmrc ou engines.node) ; la sortie
+ * à rendre quand il est périmé, null sinon (ou CADENCE_PORTE_ENV=jouer, dit dans le journal). */
+function perime(e: Etat, out: (l: string) => void): string | null {
+  const p = environnementPerime(e.worktree, process.env);
+  if (!p.length) return null;
+  const lignes = lignesPerime('porte du run', p);
+  if (ignorerPerime(process.env)) { out(['porte du run : environnement périmé, porte jouée quand même (CADENCE_PORTE_ENV=jouer) — un rouge peut venir de lui :', ...lignes.slice(1, -1)].join('\n')); return null; }
+  return [...lignes, `  après la remise à niveau : cadence run --reponse ${e.id} "environnement remis à niveau" (la session reprend, puis la porte est rejouée)`].join('\n');
 }
 function jouerPorte(cmds: string[], cwd: string): { ok: boolean; sortie: string } {
   for (const c of cmds) {
@@ -262,15 +279,20 @@ function suite(e: Etat, o: Opts): Etat {
   const q = question(e, o);
   if (q) return q;
   if (git(e.worktree, 'rev-list', '--count', `${e.base}..HEAD`) === '0') { e.etat = 'sans-commit'; e.detail = 'la session n\'a rien commité'; return fin(e, o); }
-  const cmds = commandesDeCadenceYaml(e.repo);
-  if (!cmds.length && !o.sansPorte) { e.etat = 'sans-porte'; e.detail = 'cadence.yaml ne déclare ni orchestrate.test ni orchestrate.build : relance avec --sans-porte pour intégrer quand même'; return fin(e, o); }
+  const arretSansCommande = () => { e.etat = 'sans-porte'; e.detail = 'cadence.yaml du run ne déclare ni orchestrate.test ni orchestrate.build : relance avec --sans-porte pour intégrer quand même'; return fin(e, o); };
+  if (!commandesDeCadenceYaml(e.worktree).length && !o.sansPorte) return arretSansCommande();
   const br = git(e.worktree, 'rev-parse', '--abbrev-ref', 'HEAD');
   for (let rebase = 1; ; rebase++) {
     const cible = git(e.repo, 'rev-parse', e.cible), arret = rebaser(e, o, cible);
     if (arret) return arret;
     // Porte complète : une fois ; rouge, la même session corrige une fois et la porte est rejouée (C3 : un seul site de porte).
     for (let essai = 0; ; essai++) {
-      const r = registreTouche(e.worktree, e.registre, cible), p = r ? { ok: false, sortie: r } : jouerPorte(cmds, e.worktree); // L701 : sans option, rien au registre ; --registre D-n, aucune entrée neuve
+      const cmds = commandesDuRun(e, o.out); // L764 : relue à chaque essai, au commit qui sera intégré (après le rebase, après la correction)
+      if (!cmds.length && !o.sansPorte) return arretSansCommande();
+      const r = registreTouche(e.worktree, e.registre, cible); // L701 : sans option, rien au registre ; --registre D-n, aucune entrée neuve
+      const vieux = r ? null : perime(e, o.out);
+      if (vieux) { e.etat = 'environnement-perime'; e.detail = vieux; return fin(e, o); } // L764 : pas de rouge trompeur, pas de correction demandée à la session
+      const p = r ? { ok: false, sortie: r } : jouerPorte(cmds, e.worktree);
       const c = e.corrections?.at(-1), attendue = c?.verte === undefined ? c : undefined;
       if (p.ok) {
         if (attendue) { attendue.verte = true; sauver(e); o.out(correctionFaite(attendue)); }

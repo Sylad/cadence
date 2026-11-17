@@ -18,9 +18,28 @@ import { reportCiParity } from './orchestrate/ci-parity.js';
 import { tryRemote } from './verify-gate-remote.js';
 import { gateBasis } from './verify-gate-plan.js';
 import { GATE_TIMEOUT_MS, type Ran } from './remote-gate.js';
+import { environnementPerime, ignorerPerime, lignesPerime } from '../scripts/environnement-porte.mjs';
 
 /** Lignes de la fin de la sortie montrées quand aucun test n'est identifiable dans une sortie rouge. */
 const TAIL_LINES = 10;
+
+/**
+ * L764 : l'environnement où la porte va jouer (`dir`), lu avant de la jouer : node_modules en retard sur package-lock.json, Node du PATH hors de .nvmrc ou engines.node.
+ * Périmé, la porte n'est pas jouée (code 2, pas un verdict) et la sortie dit la remise à niveau ; `CADENCE_PORTE_ENV=jouer` la joue quand même, avec ces lignes.
+ * Rend true quand la porte ne doit pas jouer.
+ */
+function stale(dir: string, short: string, env: Record<string, string | undefined>, out: (line: string) => void): boolean {
+  const problems = environnementPerime(dir, env);
+  if (!problems.length) return false;
+  const lines = lignesPerime(`verify --gate ${short}`, problems);
+  if (ignorerPerime(env)) {
+    lines[0] = `verify --gate ${short} : environnement périmé, porte jouée quand même (CADENCE_PORTE_ENV=jouer) — un rouge peut venir de lui :`;
+    for (const l of lines.slice(0, -1)) out(l);
+    return false;
+  }
+  for (const l of lines) out(l);
+  return true;
+}
 
 function killGroup(pgid: number): void {
   try {
@@ -130,7 +149,7 @@ function mainTreeMoved(repo: string, sha: string): string | null {
  * La porte déjà jouée par le programme au même sha n'est pas rejouée (L397) : si l'état d'une vague (`ctx.launchDirs`) porte des contrôles enregistrés AU sha, sur un arbre identique, verts et couvrant chaque commande actuelle,
  * leur verdict est repris et la ligne du lieu le dit (vague, lot) ; sinon la porte est rejouée et la ligne qui suit celle du lieu en donne la raison.
  * Le verdict (0 ou 1, pas 2) est noté par sha dans l'état partagé du dépôt (`gate-verdict.ts`, L426) : le hook pre-push refuse un push dont le sha n'a pas de verdict vert.
- * Le worktree est retiré dans tous les cas. 0 vert, 1 rouge (avec les tests en échec), 2 rien à rejouer ou worktree impossible.
+ * Le worktree est retiré dans tous les cas. 0 vert, 1 rouge (avec les tests en échec), 2 rien à rejouer, worktree impossible ou environnement périmé (L764, rien joué).
  */
 export async function verifyGate(ctx: GateCtx): Promise<number> {
   const code = await playGate(ctx);
@@ -167,6 +186,25 @@ function gateSteps(config: OrchestrateConfig): Step[] {
   ];
 }
 
+/** La vague vivante sur le dépôt (son verrou tenu par un processus vivant), null sinon ou si le verrou est illisible. */
+function liveWaveOf(repo: string): string | null {
+  try {
+    return activeLock(join(sharedStateDir(repo), REPO_LOCK))?.wave ?? null;
+  } catch {
+    return null; // verrou illisible : comme s'il n'y avait pas de vague
+  }
+}
+
+/** Les dépendances non suivies copiées dans la copie jetable : `orchestrate.worktreeDeps` (celles absentes de l'arbre principal sont dites), sinon les node_modules et le .venv. */
+async function copyGateDeps(repo: string, dir: string, config: OrchestrateConfig): Promise<{ copied: string[]; missing: string[] }> {
+  if (!config.worktreeDeps) {
+    // Seules les dépendances sont copiées ; les autres dossiers ignorés (données, .env) ne sont ni copiés ni reliés (L455) : un lien rendrait à un test qui compare des chemins par realpath l'arbre principal.
+    return { copied: await copyDeps(repo, dir, ignoredDeps(repo).filter(isCopiedDep)), missing: [] };
+  }
+  const present = config.worktreeDeps.filter((n) => existsSync(join(repo, n)));
+  return { copied: await copyDeps(repo, dir, present), missing: config.worktreeDeps.filter((n) => !present.includes(n)) };
+}
+
 async function playGate(ctx: GateCtx): Promise<number> {
   const { repo, sha, config, out } = ctx;
   const allSteps = gateSteps(config);
@@ -191,15 +229,11 @@ async function playGate(ctx: GateCtx): Promise<number> {
     return 2;
   }
   // Une vague vivante intègre ses lots (HEAD bouge) et commite son plan : l'arbre principal n'est pas un lieu stable, la porte joue dans une copie (L431) ; `verify.inPlace: true` reste obéi.
-  let liveWave: string | null = null;
-  try {
-    liveWave = activeLock(join(sharedStateDir(repo), REPO_LOCK))?.wave ?? null;
-  } catch {
-    // verrou illisible : comme s'il n'y avait pas de vague
-  }
+  const liveWave = liveWaveOf(repo);
   const inPlace = mode === true || (mode === undefined && obstacle === null && liveWave === null);
   if (inPlace) {
     out(`verify --gate ${short} : porte jouée dans l'arbre principal ${repo} (propre, au sha)`);
+    if (stale(repo, short, env, out)) return 2;
     out(replayReason);
     const group: { pgid?: number } = {};
     // L695 : un commit du lead sur la branche pendant la porte la rendrait non probante (06-11, porte de release) : le pre-commit le refuse tant qu'elle tourne.
@@ -247,20 +281,12 @@ async function playGate(ctx: GateCtx): Promise<number> {
       out(`verify --gate : worktree de ${short} impossible — ${gitFailure(e)}`);
       return 2;
     }
-    let copied: string[];
-    let missing: string[] = [];
-    if (config.worktreeDeps) {
-      const present = config.worktreeDeps.filter((n) => existsSync(join(repo, n)));
-      copied = await copyDeps(repo, dir, present);
-      missing = config.worktreeDeps.filter((n) => !present.includes(n));
-    } else {
-      // Seules les dépendances sont copiées ; les autres dossiers ignorés (données, .env) ne sont ni copiés ni reliés (L455) : un lien rendrait à un test qui compare des chemins par realpath l'arbre principal.
-      copied = await copyDeps(repo, dir, ignoredDeps(repo).filter(isCopiedDep));
-    }
+    const { copied, missing } = await copyGateDeps(repo, dir, config);
     const why = mode === false ? 'verify.inPlace: false' : (obstacle ?? `la vague ${liveWave} est vivante sur ce dépôt : HEAD et le plan y bougent`);
     out(`verify --gate ${short} : porte jouée dans une copie jetable ${dir} (${why}) ; dépendances copiées : ${copied.length ? copied.join(', ') : 'aucune'}`);
     // L722 : sans verify.inPlace: false ni vague vivante, `why` les nomme déjà ; sinon la ligne qui suit.
     if (why !== obstacle) sayDirty(repo, short, out);
+    if (stale(dir, short, env, out)) return 2;
     out(replayReason);
     if (missing.length) out(`dépendances déclarées absentes de l'arbre principal, non copiées : ${missing.join(', ')}`);
     const done = await runSteps(steps, (cmd) => sh(cmd, dir, ctx.timeoutMs ?? GATE_TIMEOUT_MS, group, env), out, config, short);

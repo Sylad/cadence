@@ -68,6 +68,8 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // rapport) et chaque rapport note la charge (load average) au départ et à la fin (charge.ts), sans ligne tassée.
   // L763 (issue #63) : run 895 (+7), hooks 215 (+15) : le hook premier-plan.mjs refuse run_in_background dans les sessions du run (une session claude -p
   // n'est jamais réveillée par sa fin), --liste signale une session vivante sans commande ni écriture depuis N minutes (--inactif), sans ligne tassée.
+  // L764 : run 917 (+22) : la porte du run est lue dans le cadence.yaml du run (commandesDuRun, la différence avec l'arbre principal dite) et ne joue pas sur un
+  // environnement périmé (perime, état environnement-perime ; la lecture est dans scripts/environnement-porte.mjs, partagée avec src), sans ligne tassée.
   it('les totaux sont ceux de R29 : noyau 3000, mesure 2303 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742, L752, L756, L762)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
     expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2303]);

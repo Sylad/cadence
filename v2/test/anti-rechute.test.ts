@@ -133,7 +133,7 @@ const FLAGS_CLI: Record<string, string[]> = {
 const prefixe = (k: string) => (k.startsWith('src/bench/') || k === 'src/sequence/cli.ts' || k === 'src/cli.ts' ? 'bench' : 'cadence2'); // l'aide de cli.ts et le banc séquence décrivent les options de « bench »
 // Budgets de R29 : relever un total ou un module (même sous le total) est une violation ; le baisser est permis.
 const BUDGET_R29: Record<string, { total: number; modules: Record<string, number> }> = {
-  noyau: { total: 3000, modules: { plan: 350, accueil: 200, run: 895, porte: 250, deliver: 450, hooks: 215 } }, // R32 : hooks, mécanisme du bras candidat ; issue #57 : run 455, run.ts détassé, messages gardés à toute fin ; L722 : run 466 (+11), le départ nomme les fichiers non commités de l'arbre principal (pas de ligne tassée)
+  noyau: { total: 3000, modules: { plan: 350, accueil: 200, run: 917, porte: 250, deliver: 450, hooks: 215 } }, // R32 : hooks, mécanisme du bras candidat ; issue #57 : run 455, run.ts détassé, messages gardés à toute fin ; L722 : run 466 (+11), le départ nomme les fichiers non commités de l'arbre principal (pas de ligne tassée)
   // L723 : run 520, rebase seul quand la cible avance pendant la porte (conflit rendu à la session, porte rejouée, arbre principal sale nommé), sans ligne tassée
   // L723 (revue, M1) : run 539, un conflit de rebase résolu est ajouté à l'état (conflits, détail de fin) et au journal sans remplacer le rapport du travail, sans ligne tassée
   // L722 (revue r1) : run 532 (-7), la lecture des fichiers non commités vient de scripts/arbre-non-commite.mjs, partagée avec src (copie retirée de run.ts)
@@ -173,6 +173,7 @@ const BUDGET_R29: Record<string, { total: number; modules: Record<string, number
   // L762 : bench 1588 (+62), mesure 2303 : banc mécanique refusé sous la charge du lead (runs vivants, lead hold ; --malgre-charge noté au rapport), charge au départ et à la fin de chaque rapport, sans ligne tassée
   // L760 : run 888 (+3), la clé references: lue par scripts/references.mjs comme cadence ref (ancienne liste avec migration dite, forme mal formée refusée avant le worktree), sans ligne tassée
   // L763 (issue #63) : run 895 (+7), hooks 215 (+15) : premier-plan.mjs refuse run_in_background dans les sessions du run, --liste signale une session bloquée (--inactif), sans ligne tassée
+  // L764 : run 917 (+22) : porte lue dans le cadence.yaml du run (différence avec l'arbre principal dite), environnement périmé détecté avant la porte (état environnement-perime), sans ligne tassée
 };
 function reglesBudget(f: Fichiers): string[] {
   const b = JSON.parse(f['budget.json']) as Record<string, { total: number; modules: Record<string, number> }>;

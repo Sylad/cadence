@@ -25,7 +25,7 @@ Nothing here needs the rest. Take one piece, leave the others:
 
 - **`raf`, the plan** (`raf init`, `raf add`, `raf start`, `raf done`): only if you want the plan in the repository. A plan kept by another tool is read as it is, never written (next section).
 - **`cadence session start` and `cadence session close`**: a morning and an evening report (lots in progress, commits without a lot, what is uncommitted or unpushed). Skip them if your stand-up or `HANDOFF.md` does that; they change nothing in the repository.
-- **`raf hook install`**: warns when a commit cites a lot that is not started. It never blocks a commit unless you set `hook.autostart` to say so.
+- **`raf hook install`**: warns when a commit cites a lot that is not started. It never blocks a commit unless you set `hook.autostart` to say so. Since L766 it also adds a `pre-push` block, the review guard outside any wave: it refuses a push that carries a lot commit with no code review verdict written after it (`CADENCE_PUSH_UNREVIEWED=1` overrides), a sha with no green `cadence verify --gate` where the project declares a gate, and any push from a wave session. Where `core.hooksPath` points inside the tracked tree (`.githooks`), that `pre-push` is a file of the repository: commit it. Detail: [deliver.md](deliver.md), [raf.md](raf.md).
 - **`cadence orchestrate` and `cadence deliver`**: a wave needs a plan it can read, a `raf` plan or a read-only one, and nothing else of the above; it works on a plan cadence never writes. `cadence deliver` is set by its own `deliver:` block and runs without a wave.
 
 ## What plugs into what you have

@@ -64,9 +64,11 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // de séquence interrompue emporte ses étapes jouées et écrit modeles_exacts, sans ligne tassée.
   // L760 : run 888 (+3) : la clé references: lue par scripts/references.mjs comme cadence ref (forme { dir, run }, ancienne liste avec migration dite au lancement,
   // forme mal formée refusée avant le worktree), sans ligne tassée.
-  it('les totaux sont ceux de R29 : noyau 3000, mesure 2241 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742, L752, L756)', () => {
+  // L762 : bench 1588 (+62), mesure 2303 : le banc mécanique refuse de partir sous la charge du lead (runs vivants, lead hold ; --malgre-charge noté au
+  // rapport) et chaque rapport note la charge (load average) au départ et à la fin (charge.ts), sans ligne tassée.
+  it('les totaux sont ceux de R29 : noyau 3000, mesure 2303 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742, L752, L756, L762)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
-    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2241]);
+    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2303]);
   });
   for (const [nom, g] of Object.entries(budget)) {
     it(`groupe ${nom} : la somme des budgets ne dépasse pas ${g.total}`, () =>

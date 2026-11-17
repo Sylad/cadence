@@ -223,7 +223,7 @@ export function verdict(res: ResultatBanc[], ref: string, cand: string, barre: B
 const okRouge = (x: boolean | null | undefined) => (x === null || x === undefined ? '–' : x ? 'ok' : 'ROUGE');
 
 /** `niveau` (L689) : micro ou mécanique ; `depot` : le dépôt dont le banc a lancé le code ; `duree_s` : durée du passage entier. */
-export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdict, e: { date: string; empreinte: string; repetitions?: number; eclair?: string[]; niveau?: string; depot?: string; duree_s?: number; environnement?: string[] }): string {
+export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdict, e: { date: string; empreinte: string; repetitions?: number; eclair?: string[]; niveau?: string; depot?: string; duree_s?: number; environnement?: string[]; charge?: string[] }): string {
   const lignes = res.map((r) => {
     const j = r.jugement; const sj = r.sans_juge; const m = (b: string) => r.mesures[b]; const deux = (f: (x: Meca) => string) => (j ? `${f(j.meca[ref])} · ${f(j.meca[cand])}` : '–');
     const sans = (f: 'suite_ok' | 'caches_ok') => (sj ? [ref, cand].map((b) => `${okRouge(sj[b]?.[f])}${sj[b]?.rejoue && sj[b].rejoue![f] === false ? ' (rejoué)' : ''}`).join(' · ') : '–');
@@ -240,7 +240,7 @@ export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdi
     ...(e.niveau === 'bruit' ? [`Niveau : bruit, ${ref} contre son jumeau sans juge IA (L738) : remesure de l'écart de temps de chaque banc ; ce verdict n'entre ni dans l'historique ni dans la garde`]
       : e.niveau ? [`Niveau : ${e.niveau}, sans juge IA (n'autorise pas la publication)`] : []),
     ...(e.depot ? [`Dépôt mesuré : ${e.depot}`] : []),
-    ...(e.duree_s !== undefined ? [`Durée du passage : ${e.duree_s} s`] : []), '',
+    ...(e.duree_s !== undefined ? [`Durée du passage : ${e.duree_s} s`] : []), ...(e.charge ?? []), '', // L762 : charge de la machine
     `| Banc | Temps ${ref} | Temps ${cand} | Tokens ${ref} | Tokens ${cand} | Préféré | Cachés ${ref} · ${cand} | Mutations ${ref} · ${cand} | Suite ${ref} · ${cand} | Attendu ${ref} · ${cand} | Taille déclarée ${ref} · ${cand} |`,
     '|---|---|---|---|---|---|---|---|---|---|---|', ...lignes, '', '| Critère | Valeur | Seuil | Résultat |', '|---|---|---|---|',
     ...v.criteres.map((c) => `| ${c.nom} | ${c.valeur} | ${c.seuil} | ${c.ok ? 'ok' : c.bloquant ? '**ROUGE**' : c.nom === 'bras qui ont livré le travail' ? '**non livré**' : 'en dessous (indicatif)'} |`), '',
@@ -251,7 +251,7 @@ export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdi
 }
 
 export const ligneHistorique = (v: Verdict, e: { type?: 'sequence'; sequence?: string; run?: string; repetition?: number; repetitions?: number; date: string; empreinte: string; candidat: string; reference: string; modele_candidat: string; bancs: string[]; hebdo: boolean; frais: number; eclair_ok?: boolean;
-  niveau?: string; duree_s?: number; modeles_exacts?: Record<string, string[] | 'id non lu'> }) => // L756 : modele_candidat est l'alias de bras.yaml (garde) ; modeles_exacts, ce que les sessions ont dit
+  niveau?: string; malgre_charge?: boolean; duree_s?: number; modeles_exacts?: Record<string, string[] | 'id non lu'> }) => // L756 : modele_candidat est l'alias de bras.yaml (garde) ; modeles_exacts, ce que les sessions ont dit
   JSON.stringify({ ...e, vert: v.vert, rouges: v.criteres.filter((c) => c.bloquant && !c.ok).map((c) => c.nom), ...(v.non_mesurable && { non_mesurable: v.non_mesurable }) });
 
 const PARIS = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });

@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 import type { Io } from '../cli.js';
 import { ajouterBanc } from './ajouter.js';
 import { chargerBanc, listerBancs, piecesBanc, racineBanc, type Banc } from './banc.js';
+import { chargeMachine, lignesCharge, nombreCoeurs, nommer, occupants, refusCharge, registreCreneaux, type Charge } from './charge.js';
 import { chargerBras, executeurClaude, lancerBras, libererReglages, type DefBras, type Executeur, type Mesure } from './bras.js';
 import { enteteEnvironnement, environnement, ligneComparaison, modelesExacts, passagePrecedent, versionClaude, type Environnement } from './environnement.js';
 import { fuitesDuBras } from './fuites.js';
@@ -103,7 +104,8 @@ export function horlogeAPas(depart: string | Date, pas_ms: number): () => Date {
 
 type OptPassage = { racine: string; numeros?: string[]; ref: string; cand: string; hebdo: boolean; juge: string; repetitions?: number; garderClones?: boolean;
   exec: Executeur; prep: typeof preparer; maintenant: Date; empreinte: string; home: string; out: (l: string) => void; eclair?: boolean;
-  niveau?: Niveau; enfants?: Enfants; depot?: string; bruitCompte?: boolean; version?: () => string; horloge?: () => Date }; // version (L742) : claude --version ; horloge (L751) : début et fin des bras joués en ligne (duree_s, « temps total ») ; les deux remplacées par les tests
+  niveau?: Niveau; enfants?: Enfants; depot?: string; bruitCompte?: boolean; version?: () => string; horloge?: () => Date;
+  charge?: () => number[]; malgreCharge?: string[] }; // charge (L762) : load average, remplacé par les tests ; malgreCharge : occupants nommés quand --malgre-charge a forcé le banc ; version (L742) : claude --version ; horloge (L751) : début et fin des bras joués en ligne (duree_s, « temps total ») ; les deux remplacées par les tests
 
 /** Un banc (une répétition) à jouer, sérialisable pour un processus enfant. `joues` (L737) : passages antérieurs de ce banc, pour alterner l'ordre des bras. */
 export type Tache = { racine: string; dirRun: string; run: string; ref: string; cand: string; N: number; juge: string; garderClones: boolean;
@@ -255,6 +257,7 @@ async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?:
   const passes = lirePassages(o.racine);
   const dejaJoues = (bid: string) => passes.filter((p) => p.resultats.some((r) => banBase(r.banc) === bid)).length;
   const version = (o.version ?? versionClaude)(); // L742 : au lancement, avant toute session
+  const charge = o.charge ?? chargeMachine, depart = charge(); // L762 : charge au départ, avant la première session
   const debut = new Date(); const phases: Record<string, string> = {}; let termines = 0;
   const taches: Tache[] = ids.flatMap((bid, i) => Array.from({ length: N }, (_, k) => ({
     racine: o.racine, dirRun, run: id, ref: o.ref, cand: o.cand, N, juge: o.juge, garderClones: o.garderClones ?? false,
@@ -282,12 +285,13 @@ async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?:
   const e = o.eclair ? controlesEclair(res, o.ref, o.cand) : undefined;
   e?.lignes.forEach((l) => o.out(l));
   const duree_s = Math.round((Date.now() - debut.getTime()) / 1000);
+  const ch: Charge = { coeurs: nombreCoeurs(), depart, fin: charge(), ...(o.malgreCharge && { malgre_charge: o.malgreCharge }) };
   mkdirSync(join(o.racine, 'rapports'), { recursive: true });
   const base = join(o.racine, 'rapports', id);
   const env = environnement(version, Object.fromEntries([o.ref, o.cand].map((n) => [n, bras[n].modele])), res.flatMap((r) => Object.values(r.mesures)), { alias: o.juge, jugements: res.map((r) => r.jugement) });
   const entete = enteteEnvironnement(env, passagePrecedent(o.racine, id));
-  writeFileSync(`${base}.md`, rapport(res, o.ref, o.cand, v, { date, empreinte: o.empreinte, repetitions: N, eclair: e?.lignes, niveau: o.niveau, depot: o.depot, duree_s, environnement: entete }));
-  writeFileSync(`${base}.json`, JSON.stringify({ verdict: v, environnement: env, resultats: res.map((r, i) => ({ ...r, clones: joues[i].clones })) }, null, 2));
+  writeFileSync(`${base}.md`, rapport(res, o.ref, o.cand, v, { date, empreinte: o.empreinte, repetitions: N, eclair: e?.lignes, niveau: o.niveau, depot: o.depot, duree_s, environnement: entete, charge: lignesCharge(ch) }));
+  writeFileSync(`${base}.json`, JSON.stringify({ verdict: v, environnement: env, charge: ch, resultats: res.map((r, i) => ({ ...r, clones: joues[i].clones })) }, null, 2));
   if (entete[0].startsWith('⚠')) o.out(entete[0]);
   if (o.niveau === 'bruit') { // L738 : seul l'écart compte, lu au prochain passage dans rapports/<run>.json ; la garde ne voit pas ce passage
     const ecarts = res.map((r) => ecartPaire(r)); // correctif L738 : toujours montré, compté pour le seuil seulement quand le banc complet l'a joué
@@ -297,7 +301,7 @@ async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?:
   }
   appendFileSync(join(o.racine, 'historique.jsonl'), `${ligneHistorique(v, { date: o.maintenant.toISOString(), empreinte: o.empreinte,
     candidat: o.cand, reference: o.ref, modele_candidat: bras[o.cand].modele, bancs: res.map((r) => r.banc), hebdo: o.hebdo, frais: new Set(res.filter((r) => r.frais).map((r) => banBase(r.banc))).size,
-    ...(e && { eclair_ok: e.ok }), ...(o.niveau && { niveau: o.niveau }), duree_s, modeles_exacts: modelesExacts(env) })}\n`);
+    ...(e && { eclair_ok: e.ok }), ...(o.niveau && { niveau: o.niveau }), ...(o.malgreCharge && { malgre_charge: true }), duree_s, modeles_exacts: modelesExacts(env) })}\n`);
   o.out(`${titreVerdict(v)} — ${duree_s} s — rapport : ${base}.md`);
   return { ...v, eclair_ok: e?.ok };
 }
@@ -438,7 +442,7 @@ export async function bench(args: string[], io: Io, repo = REPO): Promise<number
   if (sous === 'bruit') return remesurerBruit(racine, bancs, emp, repo, io);
   const choix = sous === 'lancer' ? (bancs ? { numeros: bancs.split(',') } : null) : Object.hasOwn(SOUS, sous ?? '') ? SOUS[sous!] : null;
   if (choix === null) {
-    io.err('usage : cadence2 bench micro|mecanique|court|hebdo|eclair|lancer --bancs 1,3|bruit [--bancs 3,7]|complet|statut|verifier-publication|comparer <a> <b>|ajouter [--candidat c] [--reference r] [--repetitions N] [--paralleles N] [--garder-clones]');
+    io.err('usage : cadence2 bench micro|mecanique|court|hebdo|eclair|lancer --bancs 1,3|bruit [--bancs 3,7]|complet|statut|verifier-publication|comparer <a> <b>|ajouter [--candidat c] [--reference r] [--repetitions N] [--paralleles N] [--garder-clones] [--malgre-charge]');
     return 2;
   }
   const rep = entierOption(reste, 'repetitions', 1);
@@ -446,6 +450,15 @@ export async function bench(args: string[], io: Io, repo = REPO): Promise<number
   if (rep === null || demande === null) { io.err('usage : --repetitions N et --paralleles N (entiers ≥ 1) avec micro|mecanique|court|hebdo|eclair|lancer'); return 2; }
   const par = bancsALaFois(choix.niveau, demande);
   if (typeof par === 'string') { io.err(`bench refusé : ${par}`); return 2; }
+  // L762 : le banc mécanique ne part pas sous la charge du lead (runs de cadence run, sessions de lead hold), sauf --malgre-charge, noté au rapport
+  const forcer = reste.includes('--malgre-charge');
+  if (forcer && choix.niveau !== 'mecanique') { io.err('bench refusé : --malgre-charge ne va qu\'avec mecanique'); return 2; }
+  let malgreCharge: string[] | undefined;
+  if (choix.niveau === 'mecanique') {
+    const occ = occupants(registreCreneaux(io.env), io.now());
+    if (forcer) { malgreCharge = nommer(occ); io.out(`banc mécanique forcé malgré la charge (--malgre-charge) : ${malgreCharge.length ? malgreCharge.join(' ; ') : 'aucun run ni session du lead'} ; noté au rapport`); }
+    else { const r = refusCharge(occ); if (r) { io.err(`bench refusé : ${r}`); return 2; } }
+  }
   const ref = option(reste, 'reference') ?? PUBLIE.reference; const cand = option(reste, 'candidat') ?? PUBLIE.candidat;
   let refus: string | null;
   try {
@@ -454,7 +467,7 @@ export async function bench(args: string[], io: Io, repo = REPO): Promise<number
       : pretAPasser(repo, { [ref]: tous[ref], [cand]: tous[cand] }, racine);
   } catch (e) { refus = e instanceof Error ? e.message : String(e); }
   if (refus) { io.err(`bench refusé : ${refus}`); return 2; }
-  const v = await passage({ racine, numeros: choix.numeros, niveau: choix.niveau, ref, cand, eclair: sous === 'eclair',
+  const v = await passage({ racine, numeros: choix.numeros, ...(malgreCharge && { malgreCharge }), niveau: choix.niveau, ref, cand, eclair: sous === 'eclair',
     hebdo: sous === 'hebdo', repetitions: rep, garderClones: reste.includes('--garder-clones'), juge: option(reste, 'juge') ?? 'opus', exec: executeurClaude, prep: preparer,
     maintenant: io.now(), empreinte: emp, home: io.env.HOME ?? '', out: io.out, depot: depotMesure(repo),
     ...(par > 1 && { enfants: { lanceur: [process.execPath, join(repo, 'v2', 'bin', 'cadence2.js')], paralleles: par } }) });

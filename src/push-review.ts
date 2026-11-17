@@ -123,12 +123,19 @@ function verdictGesture(g: ReviewGuard, lot: string): string {
   return g.verdictCommand!.replaceAll('{lot}', lot).replaceAll('{verdict}', '…');
 }
 
-/** Les commits de lots non relus parmi `commits`, groupés par lot (ordre du log). */
+/**
+ * Les commits de lots non relus parmi `commits`, groupés par lot (ordre du log). Les lots d'un commit sont ceux de son SUJET (L771) : la portée
+ * « fix(L770): … » quand elle en cite, sinon les identifiants du sujet (« L770 : … », « … (L769) ») ; les lots cités dans le corps n'y comptent pas.
+ */
 function unreviewedByLot(g: ReviewGuard, commits: Commit[], judge: Judge, tip: string): Map<string, Commit[]> {
   const since = g.plan.readonly ? undefined : g.plan.reviewSince;
   const lots = new Map(g.plan.lots().map((l) => [l.id, l]));
   const out = new Map<string, Commit[]>();
-  for (const [id, linked] of linkCommits(g.plan.lots(), commits, g.plan.refs).byLot) {
+  // Le corps ne désigne pas les lots du commit (L771) : « depuis L679 », « règle L586 » y sont des renvois, pas des lots relus avec lui.
+  const subjects = commits.map((c) => ({ ...c, body: '' }));
+  const bySha = new Map(commits.map((c) => [c.sha, c]));
+  for (const [id, linkedSubjects] of linkCommits(g.plan.lots(), subjects, g.plan.refs).byLot) {
+    const linked = linkedSubjects.map((c) => bySha.get(c.sha) ?? c);
     // Commits de plan, de version, acquittés, ignorés ou d'avant l'adoption du plan : rien à relire (`workCommits`, la même règle que `raf done`).
     const late = workCommits(g.plan, g.root, linked).filter((c) => (!since || c.day >= since) && !judge(lots.get(id)!, c, tip));
     if (late.length) out.set(id, late);

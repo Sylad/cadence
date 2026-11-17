@@ -39,8 +39,25 @@ export function verdictKey(command: string | undefined): string | null {
   return key === '' || key.includes('{lot}') ? null : key;
 }
 
-/** Les notes de verdict d'un lot : celles dont le texte commence par la clé. */
-const verdictNotes = (lot: Lot | undefined, key: string): number => (lot?.notes ?? []).filter((n) => n.text.trim().startsWith(key)).length;
+/**
+ * Les notes de verdict d'un lot, texte → nombre : celles qui contiennent la clé (un outil peut préfixer la note, d'une date par exemple). Un multiensemble, pas un
+ * compte : un plan à note unique (maritime, `fields.notes: note`, que `raf.py note` remplace) n'en a jamais plus d'une, et une seconde revue la remplace.
+ */
+function verdictNotes(plan: Plan, key: string): Map<string, Map<string, number>> {
+  const out = new Map<string, Map<string, number>>();
+  for (const lot of plan.lots()) {
+    const texts = new Map<string, number>();
+    for (const n of lot.notes ?? []) if (n.text.includes(key)) texts.set(n.text.trim(), (texts.get(n.text.trim()) ?? 0) + 1);
+    out.set(lot.id, texts);
+  }
+  return out;
+}
+
+/** Une note de verdict du lot apparaît-elle de `before` à `after` (un texte plus fréquent qu'avant) ? */
+function verdictAdded(before: Map<string, Map<string, number>>, after: Map<string, Map<string, number>>, lot: string): boolean {
+  const was = before.get(lot) ?? new Map<string, number>();
+  return [...(after.get(lot) ?? new Map<string, number>())].some(([text, n]) => n > (was.get(text) ?? 0));
+}
 
 /** Les commits qu'un push emporte : `distant..local`, ou, pour une branche neuve ou un distant inconnu ici, ceux qu'aucune réf du distant n'a déjà. */
 function pushedCommits(root: string, local: string, remote: string | null, remoteName: string): Commit[] {
@@ -50,12 +67,17 @@ function pushedCommits(root: string, local: string, remote: string | null, remot
 /** Le sha distant de la ligne du hook, s'il est connu ici (un distant pas encore récupéré ne borne rien). */
 const knownRemote = (root: string, sha: string | undefined): string | null => (sha && !ZERO.test(sha) && tryGit(root, ['cat-file', '-e', `${sha}^{commit}`]) !== null ? sha : null);
 
+/** Le juge : le commit `c` du lot, emporté par un push dont la tête locale est `tip`, a-t-il un verdict de revue postérieur ? */
+type Judge = (lot: Lot, c: Commit, tip: string) => boolean;
+
 /**
  * Le juge d'un commit de lot : a-t-il un verdict de revue postérieur ? Plan natif : la revue du lot (`raf review`) a relu ce commit ou un descendant
- * (`review.commit`) ; un verdict écrit à la main sans commit relu vaut, comme pour `raf done`. Plan en lecture seule : le lot a, dans le plan d'aujourd'hui,
- * plus de notes de verdict (clé de `orchestrate.verdict`, champ `notes` mappé par `plan.fields`) qu'au commit — une note de verdict est donc venue après lui.
+ * (`review.commit`) ; un verdict écrit à la main sans commit relu vaut, comme pour `raf done`. Plan en lecture seule (revue r1) : un commit du plan
+ * descendant du commit (vers HEAD ou la tête poussée), ou l'arbre de travail au-dessus de HEAD, ajoute au lot une note de verdict (texte qui contient la clé de
+ * `orchestrate.verdict`, champ `notes` mappé par `plan.fields`) absente de son parent. L'historique du plan, pas son état d'aujourd'hui : une seconde revue
+ * qui remplace la note unique compte, et une autre note posée ensuite n'efface pas la revue.
  */
-function reviewJudge(g: ReviewGuard, key: string | null): (lot: Lot, c: Commit) => boolean {
+function reviewJudge(g: ReviewGuard, key: string | null): Judge {
   if (!g.plan.readonly) {
     return (lot, c) => {
       const at = lot.review?.commit;
@@ -63,24 +85,34 @@ function reviewJudge(g: ReviewGuard, key: string | null): (lot: Lot, c: Commit) 
       return at === undefined || isAncestor(g.root, c.sha, at);
     };
   }
-  const now = new Map(g.plan.lots().map((l) => [l.id, verdictNotes(l, key!)]));
-  const past = new Map<string, Map<string, number>>();
+  const now = verdictNotes(g.plan, key!);
+  const head = tryGit(g.root, ['rev-parse', '--verify', '-q', 'HEAD']);
   const dir = mkdtempSync(join(tmpdir(), 'cadence-push-review-'));
-  const notesAt = (sha: string): Map<string, number> => {
-    const text = fileAt(g.root, sha, g.planFile);
-    if (text === null) return new Map();
-    const file = join(dir, `${sha}-${basename(g.planFile)}`);
-    writeFileSync(file, text);
-    try {
-      return new Map(g.loadAt(file).lots().map((l) => [l.id, verdictNotes(l, key!)]));
-    } catch {
-      // Un plan illisible à ce commit : rien n'y était noté de lisible, le verdict d'aujourd'hui compte.
-      return new Map();
+  const cache = new Map<string, Map<string, Map<string, number>>>();
+  /** Les notes de verdict du plan à une révision (un plan absent ou illisible n'en a aucune). */
+  const notesAt = (rev: string): Map<string, Map<string, number>> => {
+    if (cache.has(rev)) return cache.get(rev)!;
+    const text = fileAt(g.root, rev, g.planFile);
+    let notes = new Map<string, Map<string, number>>();
+    if (text !== null) {
+      const file = join(dir, `${cache.size}-${basename(g.planFile)}`);
+      writeFileSync(file, text);
+      try {
+        notes = verdictNotes(g.loadAt(file), key!);
+      } catch {
+        // Un plan illisible à cette révision : rien n'y est lisible, le commit qui le suit dit seul ce qu'il ajoute.
+      }
     }
+    cache.set(rev, notes);
+    return notes;
   };
-  const judge = (lot: Lot, c: Commit) => {
-    if (!past.has(c.sha)) past.set(c.sha, notesAt(c.sha));
-    return (now.get(lot.id) ?? 0) > (past.get(c.sha)!.get(lot.id) ?? 0);
+  /** Les commits de plan descendants de `sha` (HEAD et la tête poussée), du plus ancien au plus récent. */
+  const planCommits = (sha: string, tips: string[]): string[] =>
+    (tryGit(g.root, ['log', '--format=%H', '--ancestry-path', '--reverse', `^${sha}`, ...tips, '--', g.planFile]) ?? '').split('\n').filter(Boolean);
+  const judge = (lot: Lot, c: Commit, tip: string) => {
+    // Le verdict noté dans l'arbre de travail, pas encore commité, au-dessus de HEAD.
+    if (head && (head === c.sha || isAncestor(g.root, c.sha, head)) && verdictAdded(notesAt(head), now, lot.id)) return true;
+    return planCommits(c.sha, [...new Set([tip, head ?? tip])]).some((p) => verdictAdded(notesAt(`${p}^`), notesAt(p), lot.id));
   };
   return Object.assign(judge, { dispose: () => rmSync(dir, { recursive: true, force: true }) });
 }
@@ -92,13 +124,13 @@ function verdictGesture(g: ReviewGuard, lot: string): string {
 }
 
 /** Les commits de lots non relus parmi `commits`, groupés par lot (ordre du log). */
-function unreviewedByLot(g: ReviewGuard, commits: Commit[], judge: (lot: Lot, c: Commit) => boolean): Map<string, Commit[]> {
+function unreviewedByLot(g: ReviewGuard, commits: Commit[], judge: Judge, tip: string): Map<string, Commit[]> {
   const since = g.plan.readonly ? undefined : g.plan.reviewSince;
   const lots = new Map(g.plan.lots().map((l) => [l.id, l]));
   const out = new Map<string, Commit[]>();
   for (const [id, linked] of linkCommits(g.plan.lots(), commits, g.plan.refs).byLot) {
     // Commits de plan, de version, acquittés, ignorés ou d'avant l'adoption du plan : rien à relire (`workCommits`, la même règle que `raf done`).
-    const late = workCommits(g.plan, g.root, linked).filter((c) => (!since || c.day >= since) && !judge(lots.get(id)!, c));
+    const late = workCommits(g.plan, g.root, linked).filter((c) => (!since || c.day >= since) && !judge(lots.get(id)!, c, tip));
     if (late.length) out.set(id, late);
   }
   return out;
@@ -127,7 +159,7 @@ export function reviewRefusal(g: ReviewGuard, input: string, remoteName = 'origi
       const target = remoteRef || ref;
       if (!target.startsWith('refs/heads/')) continue;
       const remote = knownRemote(g.root, remoteSha);
-      const byLot = unreviewedByLot(g, pushedCommits(g.root, local, remote, remoteName), judge);
+      const byLot = unreviewedByLot(g, pushedCommits(g.root, local, remote, remoteName), judge, local);
       if (byLot.size === 0) continue;
       const named = [...byLot].map(([lot, cs]) => `${lot} (${cs.map((c) => c.sha.slice(0, 7)).join(', ')})`).join(', ');
       const gestures = [...byLot.keys()].map((lot) => verdictGesture(g, lot)).join(' ; ');

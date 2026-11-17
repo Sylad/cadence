@@ -178,6 +178,52 @@ describe('hook pre-push (L766) — plan en lecture seule, verdict noté par orch
   });
 });
 
+describe('hook pre-push (L766, revue r1) — plan en lecture seule à note unique (maritime : fields.notes est une chaîne que raf.py note remplace)', () => {
+  const PLAN = 'suivi/plan.yaml';
+  const planText = (note?: string) => `taches:\n  - { code: Q-LEG10, titre: Légende, etat: en_cours${note === undefined ? '' : `, note: "${note}"`} }\n`;
+
+  function singleNoteProject() {
+    const dir = gitRepo();
+    writeFileSync(join(dir, 'cadence.yaml'), `plan:\n  path: ${PLAN}\n  since: 2026-11-01\n  lots: taches\n  idPattern: 'Q-[A-Z]+\\d+'\n  fields: { id: code, title: titre, status: etat, notes: note }\n  statuses: { todo: prevu, doing: en_cours, done: livre }\norchestrate:\n  verdict: ${JSON.stringify('python3 scripts/raf.py note {lot} "revue de code : {verdict}"')}\n`);
+    const base = change(dir, PLAN, planText(), 'init');
+    return { dir, base };
+  }
+
+  it('R13 — non conforme → correctif → seconde revue conforme : le push du correctif et du sommet passe', async () => {
+    const { dir, base } = singleNoteProject();
+    const a = change(dir, 'src/legende.ts', '1\n', 'feat(Q-LEG10): légende');
+    change(dir, PLAN, planText('revue de code : non conforme'), 'plan: Q-LEG10 revue de code notée');
+    const b = change(dir, 'src/legende.ts', '2\n', 'fix(Q-LEG10): légende');
+    const refused = await prePush(dir, push(b, base));
+    expect(refused.code).toBe(3);
+    expect(refused.err).toContain(`Q-LEG10 (${b.slice(0, 7)})`);
+    expect(refused.err).not.toContain(`${a.slice(0, 7)})`);
+    const top = change(dir, PLAN, planText('revue de code : conforme'), 'plan: Q-LEG10 seconde revue notée');
+    expect((await prePush(dir, push(b, base))).code).toBe(0);
+    expect((await prePush(dir, push(top, base))).code).toBe(0);
+  });
+
+  it('R14 — une autre note qui remplace le verdict n\'efface pas la revue', async () => {
+    const { dir, base } = singleNoteProject();
+    const a = change(dir, 'src/legende.ts', '1\n', 'feat(Q-LEG10): légende');
+    change(dir, PLAN, planText('revue de code : conforme'), 'plan: Q-LEG10 revue de code notée');
+    const top = change(dir, PLAN, planText('déployé en prod'), 'plan: Q-LEG10 déployé');
+    expect((await prePush(dir, push(a, base))).code).toBe(0);
+    expect((await prePush(dir, push(top, base))).code).toBe(0);
+  });
+
+  it('R15 — la même note de verdict réécrite après un correctif ne compte pas, mais une note préfixée (date) compte', async () => {
+    const { dir, base } = singleNoteProject();
+    change(dir, 'src/legende.ts', '1\n', 'feat(Q-LEG10): légende');
+    change(dir, PLAN, planText('revue de code : conforme'), 'plan: Q-LEG10 revue de code notée');
+    const b = change(dir, 'src/legende.ts', '2\n', 'fix(Q-LEG10): légende');
+    expect((await prePush(dir, push(b, base))).code).toBe(3);
+    writeFileSync(join(dir, PLAN), planText('2026-11-17 revue de code : conforme'));
+    // Verdict noté dans l'arbre de travail, pas encore commité : le plan tel qu'il est maintenant compte.
+    expect((await prePush(dir, push(b, base))).code).toBe(0);
+  });
+});
+
 describe('verdictKey (L766)', () => {
   it('lit le texte fixe avant {verdict} dans son argument entre guillemets', () => {
     expect(verdictKey('python3 scripts/raf.py note {lot} "revue de code : {verdict}"')).toBe('revue de code :');

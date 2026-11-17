@@ -85,3 +85,9 @@
 
 - `references.dir` sous `~` (`~` seul ou `~/…`) vaut `$HOME` de l'environnement de la commande (src/ref/store.ts, `referencesDir`), comme les `docs` de `references.run` ; `~user` n'est pas développé. L'exemple de docs/config.md (`dir: ~/kb/references`) est joué par `cadence ref add` dans test/references-l760.test.ts.
 - `cadence run` refuse un `references:` mal formé avant le worktree (ni worktree, ni branche, ni état, ni session) et dit la migration de l'ancienne forme à la fin de sa ligne de lancement (`; cadence.yaml : <migration>`). Test : v2/test/run-references-l760.test.ts.
+
+## Garde de revue au push (L766, revue r1)
+
+- Plan en lecture seule : le verdict se lit dans l'**historique** du plan (src/push-review.ts) : un commit de plan descendant du commit de lot (vers HEAD ou la tête poussée), ou l'arbre de travail au-dessus de HEAD, ajoute une note de verdict (texte qui **contient** la clé de `orchestrate.verdict`) absente de son parent. Décision : plus de compte dans le plan d'aujourd'hui (maritime `fields.notes: note`, note unique que `raf.py note` remplace : une seconde revue compte, une autre note n'efface pas la revue ; le même texte réécrit ne compte pas).
+- Workflow hors vague : `raf hook install` pose aussi un bloc `pre-push` (src/hook.ts) en tête du script : refuse une session `CADENCE_ORCHESTRATED`, joue `raf hook pre-push`, rend l'entrée de git au script maison. Il remplace entier un hook de vague ou de porte ; une vague le reconnaît (`installPrePush` ne refuse plus, n'écrit rien, `guardPresent` vrai). Avec `core.hooksPath` dans l'arbre (maritime `.githooks`), le fichier est à commiter une fois : geste à faire dans maritime-atlas (`raf hook install` puis commit de `.githooks/pre-push`).
+- Tests : test/push-review-l766.test.ts (R13-R15), test/hook-pre-push-durable-l766.test.ts (R16 vrai `git push` refusé hors vague, R17, R18). Test L600 sondes mis à jour (le glossaire dit désormais que `raf hook install` pose le pre-push).

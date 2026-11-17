@@ -171,7 +171,7 @@ files and the changelog, then prints the lead's steps (tag, gate, push, CI, publ
 - **small**: ≤ 0.5 day or `quickwin`: a single review, no separate UX pass.
 - **full**: bigger than small: the whole cycle.
 - **quickwin**: the ⚡ flag, set by hand: small whatever the estimate; `raf quickwins` lists them.
-- **git hook**: a git script (`pre-commit`, `post-commit`, `pre-push`), `raf hook install` installs `post-commit` and `pre-commit`; `cadence orchestrate` puts a temporary `pre-push` during a wave and, when a gate is declared, leaves a permanent gate-only `pre-push` (it refuses a push with no green `cadence verify --gate`): keep it. See [raf.md](raf.md).
+- **git hook**: a git script (`pre-commit`, `post-commit`, `pre-push`), all three installed by `raf hook install` (commit the `pre-push` if hooks are tracked); `cadence orchestrate` puts a temporary `pre-push` in a wave, and leaves a gate-only one with a gate. A `pre-push` refuses a push without green gate or review verdict. See [raf.md](raf.md).
 - **Claude Code hook**: a command Claude Code runs around a tool call, declared in `hooks/hooks.json`, played by `cadence claude-hook retour|attente|pipe`. See [lead.md](lead.md).
 - **plan.onWrite**: no hook of git or Claude Code: the `cadence.yaml` command run after each write of the plan, to refresh derived files. See [raf.md](raf.md).
 - **mod hook**: a function hook of the `cadence-hud` mod (`plugins/cadence-hud/hooks/`) that draws the band. See [cadence-hud.md](cadence-hud.md).

@@ -9,14 +9,13 @@ const glossaire = md.slice(md.indexOf('## Glossary'))
 const entree = (terme: string) => glossaire.split('\n').find((l) => l.startsWith(`- **${terme}**`)) ?? ''
 
 describe('L600 sondes — exactitude du vocabulaire', () => {
-  it('« git hook » ne prétend pas que raf hook install pose le pre-push (le code ne le pose que dans une vague)', () => {
+  it('« git hook » dit que raf hook install pose aussi le pre-push (L766 r1, il le posait seulement dans une vague avant) et que la vague a le sien', () => {
     const l = entree('git hook')
     expect(l).not.toBe('')
-    // `raf hook install` pose post-commit et pre-commit ; le pre-push vient d'orchestrate (temporaire, ou laissé avec une porte).
+    // Depuis L766 r1, `raf hook install` pose post-commit, pre-commit et pre-push ; orchestrate garde son pre-push temporaire (ou laissé avec une porte).
+    expect(l).toMatch(/all three installed by `raf hook install`/)
     expect(l).toMatch(/orchestrate[^;]*pre-push|pre-push[^;]*orchestrate/)
-    expect(l).not.toMatch(/raf hook install[^;`]*`?[^;]*installs[^;]*pre-push/)
-    const install = l.split(';')[0] ?? ''
-    expect(/pre-push/.test(install.split('raf hook install')[1] ?? '')).toBe(false)
+    expect(l).toMatch(/review verdict/)
   })
 
   it('la voie express dit qu’elle exclut un lot à écran ou à spec (isExpress)', () => {

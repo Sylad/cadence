@@ -4,11 +4,12 @@ import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative } from 'node:path';
 import { readOrchestrateConfig } from '../config.js';
 import { gitCommonDir, gitRoot, hooksDir, indexLockPath } from '../git.js';
+import { GATE_PRE_PUSH_MARK, hasRafPrePush, WAVE_PRE_PUSH_MARK } from '../hook.js';
 
-const MARK = '# cadence orchestrate — hook pre-push temporaire (retiré à la fin de la vague)';
+const MARK = WAVE_PRE_PUSH_MARK;
 
 /** Le hook que la vague laisse derrière elle quand le projet déclare une porte (L426) : il ne garde que le verdict de la porte au push. */
-const GATE_MARK = '# cadence — hook pre-push de la porte (L426) : refuse un push sans verdict vert de `cadence verify --gate`';
+const GATE_MARK = GATE_PRE_PUSH_MARK;
 
 const gateHook = `#!/bin/sh
 ${GATE_MARK}
@@ -209,11 +210,18 @@ export function cleanPlaywrightOutput(repo: string): void {
 /**
  * Pose le hook pre-push temporaire. Refus (raison) quand un autre hook pre-push existe : le remplacer
  * modifierait un fichier suivi (husky) ou sauterait une règle du projet. Un hook laissé par une vague
- * interrompue (même marque) est simplement remplacé.
+ * interrompue (même marque) est simplement remplacé. Un hook qui porte le bloc durable de `raf hook install` (L766 r1) est gardé tel quel.
  */
 export function installPrePush(repo: string, wave = '?'): { ok: true } | { ok: false; reason: string } {
   const file = hookPath(repo);
-  if (existsSync(file) && !ours(readFileSync(file, 'utf8'))) {
+  const text = existsSync(file) ? readFileSync(file, 'utf8') : null;
+  if (text !== null && hasRafPrePush(text)) {
+    // Le bloc durable de `raf hook install` (L766 r1) joue déjà `raf hook pre-push`, qui lit la vague vivante, et refuse une session d'orchestrate : rien à poser.
+    rememberExclude(repo);
+    addPlaywrightExclude(repo);
+    return { ok: true };
+  }
+  if (text !== null && !ours(text)) {
     return { ok: false, reason: `un hook pre-push existe déjà (${file}) : l'orchestrateur ne le remplace pas` };
   }
   mkdirSync(dirname(file), { recursive: true });
@@ -267,7 +275,8 @@ export function keepGateGuard(repo: string): void {
 /** Pourrait-on poser le hook ? (préconditions, sans écrire) */
 export function canInstallPrePush(repo: string): string | null {
   const file = hookPath(repo);
-  return existsSync(file) && !ours(readFileSync(file, 'utf8')) ? `un hook pre-push existe déjà (${file}) : l'orchestrateur ne le remplace pas` : null;
+  const text = existsSync(file) ? readFileSync(file, 'utf8') : null;
+  return text !== null && !ours(text) && !hasRafPrePush(text) ? `un hook pre-push existe déjà (${file}) : l'orchestrateur ne le remplace pas` : null;
 }
 
 /** git sans bloquer la boucle d'événements (un `ls-remote` peut durer 20 s) ; null en cas d'échec ou de délai. */
@@ -278,10 +287,12 @@ function out(repo: string, args: string[], timeout = 20_000): Promise<string | n
   });
 }
 
-/** Le hook temporaire (reconnu à sa marque) est-il en place ? */
+/** Le hook temporaire (reconnu à sa marque), ou le bloc durable de `raf hook install` qui garde le push de la même façon (L766 r1), est-il en place ? */
 export function guardPresent(repo: string): boolean {
   const file = hookPath(repo);
-  return existsSync(file) && readFileSync(file, 'utf8').includes(MARK);
+  if (!existsSync(file)) return false;
+  const text = readFileSync(file, 'utf8');
+  return text.includes(MARK) || hasRafPrePush(text);
 }
 
 /** Ce qui change quand une session pousse : la référence amont locale et les têtes du dépôt distant. */

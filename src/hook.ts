@@ -8,14 +8,36 @@ const END = '# <<< raf (cadence)';
 /** Code de sortie de `raf hook pre-commit` qui refuse le commit. */
 export const REFUSED = 3;
 
+/** La marque du hook pre-push qu'une vague pose le temps de la vague (src/orchestrate/guard.ts). */
+export const WAVE_PRE_PUSH_MARK = '# cadence orchestrate — hook pre-push temporaire (retiré à la fin de la vague)';
+/** La marque du hook pre-push de la porte que la vague laisse derrière elle (L426). */
+export const GATE_PRE_PUSH_MARK = '# cadence — hook pre-push de la porte (L426) : refuse un push sans verdict vert de `cadence verify --gate`';
+
 const BLOCKS = {
   'post-commit': `${BEGIN}\ncommand -v raf >/dev/null 2>&1 && raf hook post-commit || true\n${END}\n`,
   // Seul un refus (hook.autostart: refuse, code 3) arrête le commit : un raf plus ancien ou en panne le laisse passer.
   'pre-commit': `${BEGIN}\nif command -v raf >/dev/null 2>&1; then raf hook pre-commit; [ $? -ne ${REFUSED} ] || exit 1; fi\n${END}\n`,
+  // L766 r1 : la garde du push hors vague (porte, revue de code, lots de la vague vivante). Une session d'orchestrate ne pousse jamais, comme sous le hook de
+  // la vague. L'entrée de git (les lignes des réfs poussées) est lue une fois, donnée à raf, puis rendue au script maison qui suit le bloc.
+  'pre-push': `${BEGIN}
+if [ -n "$CADENCE_ORCHESTRATED" ]; then echo "cadence : push refusé pendant la vague $CADENCE_ORCHESTRATED (le lead pousse)" >&2; exit 1; fi
+if command -v raf >/dev/null 2>&1; then
+  raf_push_input=$(cat)
+  printf '%s\\n' "$raf_push_input" | raf hook pre-push "$@"
+  [ $? -ne ${REFUSED} ] || exit 1
+  exec 0<<raf_push_input_end
+$raf_push_input
+raf_push_input_end
+fi
+${END}
+`,
 };
 
+/** Un hook pre-push qui porte le bloc raf : il joue `raf hook pre-push` à chaque push, vague ou pas (L766 r1). */
+export const hasRafPrePush = (text: string): boolean => text.includes(BEGIN) && text.includes('raf hook pre-push');
+
 /**
- * Adds the raf blocks to post-commit and pre-commit without touching anything else already there.
+ * Adds the raf blocks to post-commit, pre-commit and pre-push (L766 r1) without touching anything else already there.
  * The pre-commit block goes at the HEAD of the script (L697): a hand-written pre-commit that exits early (`exit 0` when nothing
  * it checks is staged) would never reach a block appended at the end, and a commit on a held branch would go through.
  * A block already there but lower is moved to the head, never duplicated.
@@ -23,17 +45,23 @@ const BLOCKS = {
 export function installHook(cwd: string): { path: string; changed: boolean; moved: string | null } {
   const post = installBlock(cwd, 'post-commit');
   const pre = installBlock(cwd, 'pre-commit');
-  return { path: post.path, changed: post.changed || pre.changed, moved: pre.moved ? pre.path : null };
+  const push = installBlock(cwd, 'pre-push');
+  const moved = [pre, push].filter((b) => b.moved).map((b) => b.path);
+  return { path: post.path, changed: post.changed || pre.changed || push.changed, moved: moved.length ? moved.join(', ') : null };
 }
 
 /** Where each block goes in an existing script: pre-commit at the head (after the shebang), post-commit at the end (read-only, never refuses). */
-const AT_HEAD: Record<keyof typeof BLOCKS, boolean> = { 'pre-commit': true, 'post-commit': false };
+const AT_HEAD: Record<keyof typeof BLOCKS, boolean> = { 'pre-commit': true, 'post-commit': false, 'pre-push': true };
+
+/** Un hook pre-push posé par une vague ou laissé pour la porte : il ne porte aucune règle du projet, le bloc durable le remplace entier (il joue le même `raf hook pre-push`). */
+const cadencePrePush = (name: keyof typeof BLOCKS, text: string) => name === 'pre-push' && (text.includes(WAVE_PRE_PUSH_MARK) || text.includes(GATE_PRE_PUSH_MARK));
 
 function installBlock(cwd: string, name: keyof typeof BLOCKS): { path: string; changed: boolean; moved: boolean } {
   const dir = hooksDir(cwd);
   mkdirSync(dir, { recursive: true });
   const path = join(dir, name);
-  const current = existsSync(path) ? readFileSync(path, 'utf8') : '';
+  const existing = existsSync(path) ? readFileSync(path, 'utf8') : '';
+  const current = cadencePrePush(name, existing) ? '' : existing;
   const present = current.includes(BEGIN);
   const next = present ? (AT_HEAD[name] ? moveBlockToHead(current) : null) : placeBlock(current, name, path);
   if (next === null) return { path, changed: false, moved: false };

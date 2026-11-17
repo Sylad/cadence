@@ -40,6 +40,26 @@ describe('L586 — un lot de config déclaré (config: true) échappe au refus d
     expect(verifier().code).toBe(0);
   });
 
+  it('R1 — L770 : le lot de config n\'écrit que SON fragment ; celui d\'un autre lot ou un autre fichier de changelog.d/ est refusé', () => {
+    for (const autre of ['changelog.d/L2.md', 'changelog.d/README.md', 'changelog.d/L1/x.md', 'changelog.d/L1.md.bak']) {
+      const { verifier, ecrire } = depot('    config: true\n');
+      ecrire('vitest.workspace.ts', 'b');
+      ecrire(autre, '### Changed\n\n- x\n');
+      const r = verifier();
+      expect(r.code, autre).toBe(1);
+      expect(r.texte).toContain(autre);
+    }
+  });
+
+  it('R1 — L770 : un lot de config d\'id « Q4/x » écrit son fragment changelog.d/Q4/x.md ou changelog.d/Q4__x.md', () => {
+    for (const f of ['changelog.d/Q4/x.md', 'changelog.d/Q4__x.md']) {
+      const { verifier, ecrire } = depot('', 'cadence/v/p--Q4__x', 'lots:\n  - id: Q4/x\n    title: "t"\n    config: true\n');
+      ecrire('vitest.workspace.ts', 'b');
+      ecrire(f, '### Changed\n\n- x\n');
+      expect(verifier().code, f).toBe(0);
+    }
+  });
+
   it('R2 — sans config: true, le même changement reste refusé', () => {
     const { verifier, ecrire } = depot('');
     ecrire('vitest.workspace.ts', 'b');

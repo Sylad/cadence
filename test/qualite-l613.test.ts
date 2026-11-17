@@ -59,6 +59,17 @@ describe('L613 — la porte d’intégration reconnaît le lot de config à ses 
     expect(r.texte).toContain('src/code.ts');
   });
 
+  it('R3 — L770 : un commit du lot de config écrit son fragment changelog.d/L1.md, pas celui d\'un autre lot', () => {
+    const ok = integration();
+    ok.commit('feat(L1): workspace', ['vitest.workspace.ts', 'b'], ['changelog.d/L1.md', '### Changed\n\n- x\n']);
+    expect(ok.verifier().code).toBe(0);
+    const ko = integration();
+    ko.commit('feat(L1): workspace', ['vitest.workspace.ts', 'b'], ['changelog.d/L2.md', '### Changed\n\n- x\n']);
+    const r = ko.verifier();
+    expect(r.code).toBe(1);
+    expect(r.texte).toContain('changelog.d/L2.md');
+  });
+
   it('bord — un commit sans lot cité, un lot inconnu du plan, ou un scope multiple dont un lot est de code : refusés', () => {
     for (const message of ['chore: workspace', 'feat(L9): workspace', 'feat(L1,L2): workspace']) {
       const { commit, verifier } = integration();

@@ -9,7 +9,7 @@ export function comparer(base: Mesure, courant: Mesure): { pires: { cle: string;
 export function serialiser(mesure: Mesure): string;
 export function lireBase(racine: string): Mesure;
 export function mesurer(racine: string): Mesure;
-export type Ref = { nom: string; base: Mesure | null; existe?: (chemin: string) => boolean; contenu?: (chemin: string) => string | null; config?: (chemin: string) => string | null; fichiers?: () => string[]; touches?: () => string[]; commits?: () => { sujet: string; fichiers: string[] }[]; lotsConfig?: Set<string>; lotConfig?: boolean };
+export type Ref = { nom: string; base: Mesure | null; existe?: (chemin: string) => boolean; contenu?: (chemin: string) => string | null; config?: (chemin: string) => string | null; fichiers?: () => string[]; touches?: () => string[]; commits?: () => { sujet: string; fichiers: string[] }[]; lotsConfig?: Set<string>; lotConfig?: string };
 export type Pire = { cle: string; avant: number; apres: number; note?: string };
 /** `lien(neuf)` : la source liée ou null ; `lien.proche(neuf)` : la source la plus proche même sous le seuil, avec la part des lignes du fichier neuf qui en viennent. */
 export type Lien = ((neuf: string) => string | null) & { proche?: (neuf: string) => { source: string; part: number } | null };

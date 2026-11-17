@@ -320,7 +320,7 @@ export function lireRef(racine, ref) {
   });
   const lots = lotsDeConfig(config);
   const slug = /--([^/]+)$/.exec(git('branch', '--show-current').stdout.trim())?.[1];
-  return { nom: `${ref} (${sha.slice(0, 7)})`, base: show.status === 0 ? JSON.parse(show.stdout) : null, existe, contenu, config, fichiers, touches, commits, lotsConfig: lots, lotConfig: !!slug && [...lots].some((id) => id.split('/').join('__') === slug) };
+  return { nom: `${ref} (${sha.slice(0, 7)})`, base: show.status === 0 ? JSON.parse(show.stdout) : null, existe, contenu, config, fichiers, touches, commits, lotsConfig: lots, lotConfig: (slug && [...lots].find((id) => id.split('/').join('__') === slug)) || undefined };
 }
 
 // Les plans que cadence lit par défaut (un plan tenu par un autre outil, `plan:` de cadence.yaml, n'est pas cherché : le lot n'y est pas de config).
@@ -345,11 +345,12 @@ function lotsDeConfig(config) {
 }
 
 // Ce qu'un lot de config peut toucher : les configs comparées, leurs tests, et ce que tout lot touche (base du cliquet, plan, CHANGELOG,
-// son fragment changelog.d/<lot>.md depuis L679, docs)
+// docs) ; dans changelog.d/, SON fragment seulement (L679, L770) : changelog.d/<id>.md, ou changelog.d/<id en « __ »>.md pour un id à « / »
 const estConfig = (f) => CONFIGS.includes(f) || f === 'package.json' || basename(f) === '.gitignore';
 const estTest = (f) => /^tests?\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f);
-const estComptabilite = (f) => f === BASELINE || f === 'CHANGELOG.md' || f.startsWith('changelog.d/') || f.startsWith('.cadence/') || f.startsWith('docs/');
-const horsConfig = (f) => !estConfig(f) && !estTest(f) && !estComptabilite(f);
+const estComptabilite = (f) => f === BASELINE || f === 'CHANGELOG.md' || f.startsWith('.cadence/') || f.startsWith('docs/');
+const fragmentDe = (ids, f) => ids.some((id) => f === `changelog.d/${id}.md` || f === `changelog.d/${id.split('/').join('__')}.md`);
+const horsConfig = (ids) => (f) => !estConfig(f) && !estTest(f) && !estComptabilite(f) && !fragmentDe(ids, f);
 
 // Les seuils et les exclusions des trois outils : les relever ferait baisser la mesure sans corriger le code. Tout ce que les
 // outils lisent est comparé, pas seulement le fichier que ce dépôt utilise : ESLint 9 charge eslint.config.js AVANT .mjs, knip
@@ -410,10 +411,8 @@ function clesPackageChangees(racine, ref) {
 }
 
 // Les commits dont le scope (`feat(L1,L2): …`) ne cite que des lots déclarés de config au plan du départ : à la porte d'intégration, qui ne porte pas le nom d'un lot, c'est eux qui portent la config
-const estDeConfig = (c, ref) => {
-  const ids = /^[^(:]*\(([^)]+)\)/.exec(c.sujet)?.[1].split(',').map((i) => i.trim());
-  return !!ids && ids.every((id) => ref.lotsConfig?.has(id));
-};
+const lotsCites = (c) => /^[^(:]*\(([^)]+)\)/.exec(c.sujet)?.[1].split(',').map((i) => i.trim()) ?? [];
+const estDeConfig = (c, ref) => lotsCites(c).length > 0 && lotsCites(c).every((id) => ref.lotsConfig?.has(id));
 
 // Vrai si le libellé « fichier (état) » d'une config changée n'est dû qu'à des commits de lots de config (au moins un) : un commit de code qui y touche, ou un arbre sale, la laisse refusée
 function deLotsDeConfig(libelle, commits, ref) {
@@ -428,12 +427,12 @@ function configChangee(racine, ref) {
   if (!ref?.config || !ref.base) return null;
   // un lot déclaré de config au plan (L586) peut changer les configs, à condition de ne rien toucher d'autre ; les autres mesures le jugent toujours
   if (ref.lotConfig) {
-    const hors = (ref.touches?.() ?? []).filter(horsConfig);
+    const hors = (ref.touches?.() ?? []).filter(horsConfig([ref.lotConfig]));
     return hors.length ? { code: 1, texte: `${hors.join(', ')} : un lot déclaré « config: true » au plan ne touche que les fichiers de config et leurs tests (le reste est du code : un autre lot).` } : null;
   }
   const commits = ref.commits?.() ?? [];
   const changees = [...fichiersChanges(racine, ref), ...clesPackageChangees(racine, ref)].filter((libelle) => !deLotsDeConfig(libelle, commits, ref));
-  const hors = commits.filter((c) => estDeConfig(c, ref)).flatMap((c) => c.fichiers.filter(horsConfig));
+  const hors = commits.filter((c) => estDeConfig(c, ref)).flatMap((c) => c.fichiers.filter(horsConfig(lotsCites(c))));
   if (hors.length) return { code: 1, texte: `${[...new Set(hors)].join(', ')} : un lot déclaré « config: true » au plan ne touche que les fichiers de config et leurs tests (le reste est du code : un autre lot).` };
   if (!changees.length) return null;
   return { code: 1, texte: `${changees.join(', ')} diffère(nt) de ${ref.nom} : un seuil ou une exclusion ne se change pas dans un lot qui est jugé par eux (corriger le code ; changer une config est une décision du plan, livrée seule).` };

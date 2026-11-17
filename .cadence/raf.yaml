@@ -3788,9 +3788,10 @@ lots:
     finished: 2026-11-17
   - id: L763
     title: "#63 cadence run : une session sans interface qui lance une commande en arrière-plan n'est jamais réveillée par sa fin — refuser run_in_background dans la session du run (hook PreToolUse dans les réglages de la session, message : jouer au premier plan avec un timeout) ; --liste signale une session sans enfant ni sortie depuis N min ; mesure : 0 run bloqué en attente d'une notification"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-17
+    started: 2026-11-17
   - id: L764
     title: "verify --gate et la porte d'un run : détecter un environnement périmé avant de jouer — node_modules plus ancien que package-lock.json (4 cas le 17-11 : ol, avatar, codex, jobmail), Node du PATH qui ne satisfait pas .nvmrc ou engines (evatosorus L51, porte rouge sous 22.22.3) ; dire la commande de remise à niveau au lieu d'un rouge trompeur"
     status: todo

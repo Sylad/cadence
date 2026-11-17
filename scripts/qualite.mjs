@@ -344,10 +344,11 @@ function lotsDeConfig(config) {
   return lots;
 }
 
-// Ce qu'un lot de config peut toucher : les configs comparées, leurs tests, et ce que tout lot touche (base du cliquet, plan, CHANGELOG, docs)
+// Ce qu'un lot de config peut toucher : les configs comparées, leurs tests, et ce que tout lot touche (base du cliquet, plan, CHANGELOG,
+// son fragment changelog.d/<lot>.md depuis L679, docs)
 const estConfig = (f) => CONFIGS.includes(f) || f === 'package.json' || basename(f) === '.gitignore';
 const estTest = (f) => /^tests?\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f);
-const estComptabilite = (f) => f === BASELINE || f === 'CHANGELOG.md' || f.startsWith('.cadence/') || f.startsWith('docs/');
+const estComptabilite = (f) => f === BASELINE || f === 'CHANGELOG.md' || f.startsWith('changelog.d/') || f.startsWith('.cadence/') || f.startsWith('docs/');
 const horsConfig = (f) => !estConfig(f) && !estTest(f) && !estComptabilite(f);
 
 // Les seuils et les exclusions des trois outils : les relever ferait baisser la mesure sans corriger le code. Tout ce que les

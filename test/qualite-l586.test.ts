@@ -33,6 +33,13 @@ describe('L586 — un lot de config déclaré (config: true) échappe au refus d
     expect(verifier().code).toBe(0);
   });
 
+  it('R1 — L769 : le lot de config écrit aussi son fragment changelog.d/<lot>.md (comptabilité de tout lot depuis L679)', () => {
+    const { verifier, ecrire } = depot('    config: true\n');
+    ecrire('vitest.workspace.ts', 'b');
+    ecrire('changelog.d/L1.md', '### Changed\n\n- x\n');
+    expect(verifier().code).toBe(0);
+  });
+
   it('R2 — sans config: true, le même changement reste refusé', () => {
     const { verifier, ecrire } = depot('');
     ecrire('vitest.workspace.ts', 'b');

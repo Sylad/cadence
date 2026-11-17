@@ -3800,6 +3800,8 @@ lots:
     estimate: 0.5
     created: 2026-11-17
     started: 2026-11-17
+    notes:
+      - { date: 2026-11-17, text: "revue 1 non conforme (17-11) : 3 majeurs — .nvmrc au patch près refuse un Node que engines accepte (warhammer40k) ; remise à niveau qui vise la copie jetable retirée ; porte affaiblie par un run signalée seulement au journal. Rapport scratchpad revue-L764.md ; correction à relancer après L766 (un run par dépôt)" }
   - id: L765
     title: "deliver --constat <sha> sur un plan en lecture seule annonce « livré : Q-COUPE0 » alors que ce lot n'a aucun commit sous le sha (démarré après, plan de la tête) — ne nommer que les lots dont un commit est ancêtre du sha (vu sur maritime le 17-11, constat d2e7039)"
     status: todo
@@ -3811,6 +3813,11 @@ lots:
     estimate: 0.5
     created: 2026-11-17
     started: 2026-11-17
+  - id: L767
+    title: "Dossier .cadence-run : purger les captures, journaux et réglages des runs clos depuis plus de N jours (51 dossiers de captures, 174 fichiers d'état le 17-11) ; cadence run --liste signale un run dont la tête est sur la cible mais pas clos (worktree gardé, 2 vus le 17-11 après intégration à la main)"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-17
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

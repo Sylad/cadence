@@ -3824,10 +3824,12 @@ lots:
     finished: 2026-11-17
   - id: L767
     title: "Dossier .cadence-run : purger les captures, journaux et réglages des runs clos depuis plus de N jours (51 dossiers de captures, 174 fichiers d'état le 17-11) ; cadence run --liste signale un run dont la tête est sur la cible mais pas clos (worktree gardé, 2 vus le 17-11 après intégration à la main)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-17
     started: 2026-11-17
+    review: { date: 2026-11-17, verdict: "conforme : --dry-run sur le vrai .cadence-run : 0 aujourd'hui, 212 runs (330 Mio) à J+15, ni le run en cours ni les 5 gardés, rien hors .cadence-run ; notes : chemin du worktree non borné au dossier des runs, date de clôture invalide lue comme ancienne, run rendu sans worktree jamais purgé, journal --reponse --fond jamais purgé", commit: 20ef77e2035856d635d4566543117fd9616f17bc }
+    finished: 2026-11-17
   - id: L768
     title: "créneau de porte : le plafond ou l'ordre de lancement évite que des lots attendent (niveau : source) ; mesure : 0 attente de créneau « créneau de porte » par vague"
     status: todo

@@ -79,7 +79,9 @@ show, they close nothing. See `docs/lead.md`.
 
 Then report to the human in a compact table — one row per project — and propose **three** items
 across projects, each with project, lot id and one sentence of justification: finish what is in
-progress, then drift that blocks a delivery, then ready quick wins. **Stop and wait for the priority.**
+progress, then drift that blocks a delivery, then ready quick wins. What comes next depends on `lead.chain` (section 2c, « Chaining by
+default »), which the tour prints on its `enchaînement : on|off` line: **on** (the default), launch the three at once, without
+waiting for an answer — the human corrects the order if they want; **off**, **stop and wait for the priority.**
 
 ## 2. Delegation
 
@@ -174,6 +176,34 @@ and do not deliver it (`cadence deliver` refuses).
 
 ### 2c. Chaining without the human
 
+**Chaining by default (`lead.chain`, L772).** The `cadence.yaml` of the parent folder says whether the lead waits for the
+human between two gestures:
+
+```yaml
+lead:
+  chain: on    # on | off — default on
+```
+
+`cadence lead tour` prints `enchaînement : on (…)` or `enchaînement : off (…)` (before the `verdict UX` line), and
+`cadence.yaml · ✗ erreur : lead.chain …` for any other value: read that line, do not open the file. With **`off`**, nothing
+below this paragraph changes: the tour stops and waits for the priority, and every question goes to the human. With **`on`**:
+
+- **The three proposals of the tour are launched without waiting for an answer** (section 1), in the order proposed, within the
+  limits of « Limits that always apply » (cap, one session per repository). The human can stop or reorder any of them.
+- **No empty slot.** As soon as a run, a review or a delivery hands back (a run ends, a `livreur` line comes back, a reviewer
+  answers), launch the next drawable lot (`tirables, ressources libres` in `cadence lead tour` or `lead release`) in a repository
+  where nothing runs — without waiting and without asking.
+- **A question of a run is settled by the lead** when the answer is **reversible and sourced**: the code, a document of the
+  repository, a norm, or a decision already taken (the plan, the register of requests, an earlier answer of the human). Answer it at
+  once with `cadence run --reponse <id> "<answer>"`, record the choice and its source with `raf note <lot> "…"`, and relay it to
+  the human in one line (`L84 : question tranchée — <answer> (source : …)`).
+- **Only these go up to the human**: an **irreversible** gesture, a **spending** (money, a paid service, a quota decision), a
+  **visual taste with no rule** to settle it, a **contradiction with the register of requests** (the human's own requests). While
+  such a question waits, the other lots go on.
+
+Whatever the setting, the context threshold (« The threshold » below) and the delivery confirmations of section 4 still stop the
+chain.
+
 Once the human has given the **first choice and the order** (the lots, and the priority: `--priority` or the
 `priority:` list of the parent folder's `cadence.yaml`), the lead does not come back to ask « next? ». For each lot a
 wave hands back **ready**, it chains, in this order, one project at a time: re-verify it yourself (section 3, point 2),
@@ -202,8 +232,8 @@ memory (filtered, as `session-close` says), and records three lines for next tim
 that was about to start comes first among them. While it says `sous le seuil`, chain. The lead says in one sentence which side of the threshold
 it is on each time it chains or stops; it never waits for the figure to move (never a polling loop).
 
-**What stays with the human**: the first choice and the order; the questions a session raised (the lead brings them
-back at once and does not answer in the human's place); the UX reservations (by default `raf ux` is recorded on the human's
+**What stays with the human**: the first choice and the order (when the lead chains by default, the three proposals are launched and the human corrects them); the questions a session raised (the lead brings them
+back at once and does not answer in the human's place — when the lead chains by default, only those that are irreversible, a spending, a visual taste without a rule or a contradiction with the register of requests); the UX reservations (by default `raf ux` is recorded on the human's
 verdict and a UX reviewer's captures are looked at by the human; with `lead.ux: lead` only a doubt comes back to them, see below). While a question or a UX reservation is pending on a
 lot, the chain goes on with the other lots and does not wait for it. A delivery that needs the human's confirmation
 (their standing instructions, section 4) is a stop of the chain, not a bypass.

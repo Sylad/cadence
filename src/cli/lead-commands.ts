@@ -7,7 +7,7 @@ import { RafError } from '../plan.js';
 import { issueLines } from '../issues.js';
 import { configSet } from '../config-set.js';
 import { movePriority } from '../priority.js';
-import { findProjects, isProject, leadTour, readDepth, readLeadUx, tourCiLines, tourFreeLine, tourLine, tourNoTestLines, tourStaleBranchLines, tourUnpublishedLines, tourWorktreeLines } from '../lead.js';
+import { findProjects, isProject, leadTour, readDepth, tourCiLines, tourFreeLine, tourLine, tourNoTestLines, tourSettingsLines, tourStaleBranchLines, tourUnpublishedLines, tourWorktreeLines } from '../lead.js';
 import { tourMemoryLines } from '../memory-index.js';
 import { localOverdueLines } from '../local-task.js';
 import { configuredCap, expiredHoldLines, slotsLine } from '../orchestrate/command.js';
@@ -152,13 +152,8 @@ export function cmdLead(c: EarlyCtx): number {
     const roots = tourRoots(parent, depth);
     // … puis l'alerte de la garde de publication (L730, D-22) : un banc complet du samedi rouge, ou manqué, fait revenir la garde au banc complet
     for (const l of [...expiredHoldLines(io.now()), ...localOverdueLines(roots, io.now()), ...tourQuotaLines(io.env, roots, io.now().getTime()), ...tourBancLines(roots, io.env)]) io.out(l);
-    // le réglage lead.ux du cadence.yaml du dossier (L197) : le lead lit ici qui pose le verdict UX, au lieu d'ouvrir le fichier
-    try {
-      if (readLeadUx(parent) === 'lead') io.out('verdict UX : lead (le lead pose raf ux d\'après le rapport du ux-reviewer et les captures ; l\'humain n\'est consulté qu\'en cas de doute)');
-    } catch (e) {
-      // un cadence.yaml illisible a déjà sa ligne d'erreur en tête de tour
-      if (/lead\.ux/.test((e as Error).message)) io.out(`cadence.yaml · ✗ erreur : ${(e as Error).message.replace(/^.*cadence\.yaml : /, '')}`);
-    }
+    // les réglages lead.chain (L772) puis lead.ux (L197) du cadence.yaml du dossier : le lead les lit ici, au lieu d'ouvrir le fichier
+    for (const l of tourSettingsLines(parent)) io.out(l);
   }
   return 0;
 }

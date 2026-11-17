@@ -295,7 +295,7 @@ describe('config set — report décalé et clés lues par lead / orchestrate (L
   });
 
   it('une valeur de lead.ux, depth ou priority que le chargeur refuse arrête le passage, rien n\'est écrit', () => {
-    for (const [key, value, message] of [['lead.ux', 'bogus', /lead\.ux/], ['depth', '0', /depth/], ['priority', '[]', /priority/]] as const) {
+    for (const [key, value, message] of [['lead.ux', 'bogus', /lead\.ux/], ['lead.chain', 'parfois', /lead\.chain/], ['depth', '0', /depth/], ['priority', '[]', /priority/]] as const) {
       const parent = tempDir();
       const a = project(parent, 'alpha', { 'cadence.yaml': COMMENTED });
       const r = cadence(parent, 'config', 'set', key, value, '--all');

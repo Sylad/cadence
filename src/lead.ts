@@ -40,6 +40,37 @@ export function readLeadUx(parent: string): 'lead' | 'human' {
   return ux;
 }
 
+/** Clé `lead.chain` du cadence.yaml du dossier parent (L772) : le lead enchaîne-t-il sans attendre l'humain. `on` (défaut) : les trois propositions du tour sont lancées sans attendre, aucun créneau vide, une question de run réversible et sourcée est tranchée par le lead ; `off` : le tour s'arrête et attend la priorité. YAML lit `on`/`off` nus comme des textes (YAML 1.2), `true`/`false` sont acceptés aussi. */
+export function readLeadChain(parent: string): 'on' | 'off' {
+  const found = readLeadBlock(parent, 'lead.chain', '« on » ou « off »');
+  const c = found?.block.chain;
+  if (c == null) return 'on';
+  if (c === 'on' || c === true) return 'on';
+  if (c === 'off' || c === false) return 'off';
+  throw new RafError(`${found!.file} : lead.chain doit être « on » ou « off », pas ${JSON.stringify(c)}`);
+}
+
+/** Une valeur refusée d'un réglage `lead.<key>` (`chain`, `ux`), en ligne d'erreur du tour ; une autre erreur (yaml illisible) a déjà la sienne en tête de tour. */
+function settingLine(key: string, read: () => string | undefined): string[] {
+  try {
+    const line = read();
+    return line ? [line] : [];
+  } catch (e) {
+    const msg = (e as Error).message;
+    return new RegExp(`lead\\.${key}`).test(msg) ? [`cadence.yaml · ✗ erreur : ${msg.replace(/^.*cadence\.yaml : /, '')}`] : [];
+  }
+}
+
+/** Les lignes de réglage du lead à la fin de `lead tour` : `lead.chain` toujours (L772), puis `lead.ux` quand il vaut `lead` (L197), en dernière ligne. */
+export function tourSettingsLines(parent: string): string[] {
+  return [
+    ...settingLine('chain', () => (readLeadChain(parent) === 'on'
+      ? 'enchaînement : on (lead.chain ; les trois propositions sont lancées d\'emblée, aucun créneau vide, une question réversible et sourcée est tranchée par le lead)'
+      : 'enchaînement : off (lead.chain ; le tour s\'arrête et attend la priorité de l\'humain)')),
+    ...settingLine('ux', () => (readLeadUx(parent) === 'lead' ? 'verdict UX : lead (le lead pose raf ux d\'après le rapport du ux-reviewer et les captures ; l\'humain n\'est consulté qu\'en cas de doute)' : undefined)),
+  ];
+}
+
 /** Le dossier du lead pour `start` (L457) : `start` ou le premier parent dont le cadence.yaml porte la clé `lead:` ou `priority:` ; aucun ne la porte (ou un yaml illisible en chemin) = `start` lui-même. */
 export function findLeadDir(start: string): string {
   for (let dir = start; ; dir = dirname(dir)) {

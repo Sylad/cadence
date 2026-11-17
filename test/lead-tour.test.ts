@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
-import { findProjects, readLeadUx, tourLine, type TourRow } from '../src/lead.js';
+import { findProjects, readLeadChain, readLeadUx, tourLine, type TourRow } from '../src/lead.js';
 import { readPlans } from '../src/perf.js';
 import { sharedStateDir, stateDir, writeLock, writeNext } from '../src/state.js';
 import { cadenceHome, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
@@ -55,7 +55,7 @@ async function parent() {
 
 /** Les lignes de projet du tour : sans la ligne des créneaux ni celle des lots prêts, qui s'impriment toujours (L416). */
 // la ligne du quota hebdo (L700) est toujours imprimée, comme celle des créneaux : elle n'est pas une ligne de projet
-const projectLines = (out: string): string[] => out.split('\n').filter((l) => !l.startsWith('vagues en cours') && !l.startsWith('tirables, ressources libres') && !/^(⚠ )?quota hebdo :/.test(l));
+const projectLines = (out: string): string[] => out.split('\n').filter((l) => !l.startsWith('vagues en cours') && !l.startsWith('tirables, ressources libres') && !l.startsWith('enchaînement : ') && !/^(⚠ )?quota hebdo :/.test(l));
 
 describe('cadence lead tour', () => {
   it('imprime une ligne par projet, plan raf et plan en lecture seule, sans toucher au plan', async () => {
@@ -412,6 +412,49 @@ describe('point d\'entrée', () => {
       const t = await cad(root, 'lead', 'tour');
       expect(t.code).toBe(0);
       expect(t.out).toMatch(/lead\.ux doit être « lead » ou « human »/);
+    });
+  });
+
+  describe('lead.chain du cadence.yaml du dossier (L772)', () => {
+    it('défaut on : sans clé, sans bloc lead ou sans cadence.yaml, le tour dit « enchaînement : on »', async () => {
+      const { root } = await parent();
+      expect(readLeadChain(root)).toBe('on');
+      expect((await cad(root, 'lead', 'tour')).out).toMatch(/^enchaînement : on \(lead\.chain ; /m);
+      writeFileSync(join(root, 'cadence.yaml'), 'priority: [beta]\n');
+      expect(readLeadChain(root)).toBe('on');
+      writeFileSync(join(root, 'cadence.yaml'), 'lead:\n  ux: lead\n');
+      expect(readLeadChain(root)).toBe('on');
+    });
+
+    it.each([['lead:\n  chain: on\n', 'on'], ['lead:\n  chain: true\n', 'on'], ['lead:\n  chain: off\n', 'off'], ['lead:\n  chain: false\n', 'off']] as const)('%j se lit %s, et le tour l\'affiche', async (yaml, want) => {
+      const { root } = await parent();
+      writeFileSync(join(root, 'cadence.yaml'), yaml);
+      expect(readLeadChain(root)).toBe(want);
+      const t = await cad(root, 'lead', 'tour');
+      expect(t.code).toBe(0);
+      expect(t.out).toMatch(new RegExp(`^enchaînement : ${want} \\(lead\\.chain ; `, 'm'));
+      expect(t.out).toMatch(want === 'off' ? /attend la priorité/ : /lancées d'emblée/);
+    });
+
+    it('off : la ligne est absente de --json, et verdict UX reste la dernière ligne quand lead.ux est lead', async () => {
+      const { root } = await parent();
+      writeFileSync(join(root, 'cadence.yaml'), 'lead:\n  ux: lead\n  chain: off\n');
+      const t = await cad(root, 'lead', 'tour');
+      const lines = t.out.split('\n');
+      expect(lines.at(-1)).toMatch(/^verdict UX : lead /);
+      expect(lines.at(-2)).toMatch(/^enchaînement : off /);
+      const rows = JSON.parse((await cad(root, 'lead', 'tour', '--json')).out) as unknown[];
+      expect(rows).toHaveLength(2);
+    });
+
+    it.each(['lead:\n  chain: parfois\n', 'lead:\n  chain: [on]\n', 'lead:\n  chain: 1\n'])('une valeur invalide (%j) est refusée et signalée par le tour', async (yaml) => {
+      const { root } = await parent();
+      writeFileSync(join(root, 'cadence.yaml'), yaml);
+      expect(() => readLeadChain(root)).toThrow(/lead\.chain doit être « on » ou « off »/);
+      const t = await cad(root, 'lead', 'tour');
+      expect(t.code).toBe(0);
+      expect(t.out).toMatch(/cadence\.yaml · ✗ erreur : lead\.chain doit être « on » ou « off »/);
+      expect(t.out).not.toMatch(/^enchaînement : /m);
     });
   });
 });

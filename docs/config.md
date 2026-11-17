@@ -60,6 +60,27 @@ bounds:
 
 `bounds` is a list; an unknown key, a limit that is not a positive integer or a test path with `..` is refused, like any key of `cadence.yaml` (the gate validates `cadence.yaml` after a lot that changed it).
 
+## The lead settings (`lead:`)
+
+The `lead:` block is read from the `cadence.yaml` of the folder where the lead runs (the parent folder of the projects), never from a
+project's own file. `cadence lead tour` prints the settings it reads, so the lead never opens the file:
+
+```yaml
+lead:
+  chain: on                 # on | off — default on (L772)
+  ux: human                 # human | lead — default human (L197)
+  contextThreshold: 150000  # tokens of context from which the lead starts nothing new (L437)
+```
+
+| Key | Default | Effect | Tour line |
+|---|---|---|---|
+| `chain` | `on` | `on`: the three proposals of the tour are launched without waiting for an answer; no empty slot (as soon as a run, a review or a delivery hands back, the next drawable lot is launched); a question of a run that is reversible and sourced (code, doc, norm, decision already taken) is settled by the lead with `cadence run --reponse`, noted in the plan and relayed in one line; only the irreversible, a spending, a visual taste without a rule or a contradiction with the register of requests goes up to the human. `off`: the tour stops and waits for the priority, every question goes to the human. `true` and `false` are read as `on` and `off` | `enchaînement : on (…)` or `enchaînement : off (…)`, always |
+| `ux` | `human` | who records `raf ux` for a visible lot ([orchestrate](orchestrate.md)) | `verdict UX : lead …` when `lead`, last line |
+| `contextThreshold` | `150000` | an integer ≥ 1 read by `cadence session context` ([lead](lead.md)) | none |
+
+Any other value is refused with the key at fault (`cadence.yaml · ✗ erreur : lead.chain doit être « on » ou « off », pas "parfois"`
+in the tour; `cadence config set` refuses to write it). The skill `/lead` reads these lines and behaves accordingly ([lead](lead.md)).
+
 ## References: `cadence ref` and `cadence run`
 
 One key of `cadence.yaml`, `references`, serves both commands that read reference documents, in one form (L760):

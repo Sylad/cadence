@@ -9,7 +9,7 @@ import { readPerfConfig } from './perf-config.js';
 import type { Day } from './dates.js';
 import { parseDeliverConfig } from './deliver.js';
 import { commitPaths, dirtyPaths, gitRoot, restorePaths } from './git.js';
-import { findProjects, isProject, readDepth, readLeadContextThreshold, readLeadUx } from './lead.js';
+import { findProjects, isProject, readDepth, readLeadChain, readLeadContextThreshold, readLeadUx } from './lead.js';
 import { readEvalEntries } from './lot-evals.js';
 import { readMemoryIndexMax } from './memory-index.js';
 import { readPriority } from './orchestrate/continue.js';
@@ -44,6 +44,7 @@ export function validateConfig(file: string, root: string): void {
   readMigrateConfig(file);
   readMemoryIndexMax(file);
   readLeadUx(dirname(file));
+  readLeadChain(dirname(file));
   readLeadContextThreshold(dirname(file));
   readDepth(dirname(file));
   readPriority(dirname(file));

@@ -33,6 +33,14 @@ function hook(entree: object, env: Record<string, string | undefined>): { code: 
   const p = spawnSync('node', [HOOK], { input: typeof entree === 'string' ? entree : JSON.stringify(entree), encoding: 'utf8', env: { PATH: process.env.PATH, ...env } });
   return { code: p.status ?? -1, stdout: p.stdout, stderr: p.stderr };
 }
+/** Le hook joué comme `hook`, avec son temps CPU (utilisateur + système, relevé par `times` de bash, en ms) : ce que coûte la lecture, sans l'attente
+ * d'un processeur occupé par d'autres (L763 : porte rouge à 1415 ms d'horloge sous une charge de 36 pour 24 cœurs, le hook inchangé). */
+function hookCpu(entree: object, env: Record<string, string | undefined>): { code: number; cpu: number } {
+  const p = spawnSync('bash', ['-c', 'node "$1" > /dev/null; c=$?; times; exit $c', 'bash', HOOK], { input: JSON.stringify(entree), encoding: 'utf8', env: { PATH: process.env.PATH, ...env } });
+  const ms = (s: string) => { const m = /^(\d+)m([\d.]+)s$/.exec(s); if (!m) throw new Error(`times illisible : ${p.stdout}`); return (Number(m[1]) * 60 + Number(m[2])) * 1000; };
+  const [u, s] = p.stdout.trim().split('\n').at(-1)!.trim().split(/\s+/);
+  return { code: p.status ?? 1, cpu: ms(u) + ms(s) };
+}
 const env = (m: Monde, pieces: string[]) => ({ CADENCE_CLONE: m.clone, CADENCE_PIECES: JSON.stringify(pieces), CADENCE_BANC_RACINE: m.r, HOME: join(m.r, 'home') });
 const ecriture = (m: Monde, file_path = join(m.clone, 'src', 'a.ts'), tool_name = 'Write') =>
   ({ hook_event_name: 'PreToolUse', tool_name, tool_input: { file_path, content: 'x' }, transcript_path: m.t, cwd: m.clone });
@@ -148,17 +156,20 @@ describe('hook lecture obligatoire', () => {
   });
   it('rapide : transcript de 20 Mo lu en moins d\'une seconde au calme (pièce lue à la fin)', () => {
     const m = monde();
-    // L752 : témoin mesuré juste avant, même hook sur un transcript d'une ligne (démarrage de node, lecture des pièces) ; sous charge il ralentit
-    // comme le gros, et la borne suit : une seconde au calme, cinq témoins au plus sous charge. Une lecture quadratique la dépasse toujours.
+    // L752 : témoin mesuré juste avant, même hook sur un transcript d'une ligne (démarrage de node, lecture des pièces) ; la borne suit : une seconde,
+    // cinq témoins au plus. Une lecture quadratique la dépasse toujours. L763 : les deux en temps CPU (hookCpu), plus en temps d'horloge, qu'une
+    // machine chargée par d'autres runs gonflait sans que le témoin, mesuré à un autre instant, le suive.
     m.ecrire(lu({ file_path: m.doc }));
-    const t1 = performance.now(); permis(hook(ecriture(m), env(m, [m.doc]))); const temoin = performance.now() - t1;
+    permis(hook(ecriture(m), env(m, [m.doc])));
+    const temoin = hookCpu(ecriture(m), env(m, [m.doc])).cpu;
     const fd = openSync(m.t, 'w');
     const bruit = `${appel('Bash', { command: 'x'.repeat(2000) })}\n${lu({ file_path: join(m.clone, 'src', 'a.ts') }).join('\n')}\n${resultat('t0').replace('"x"', `"${'y'.repeat(5000)}"`)}\n`;
     for (let k = 0; k < 20 << 20; k += bruit.length) writeSync(fd, bruit);
     writeSync(fd, `${lu({ file_path: m.doc }).join('\n')}\n`); closeSync(fd);
-    const t0 = performance.now(); const r = hook(ecriture(m), env(m, [m.doc])); const ms = performance.now() - t0;
-    permis(r);
-    expect(ms).toBeLessThan(Math.max(1000, 5 * temoin));
+    permis(hook(ecriture(m), env(m, [m.doc])));
+    const r = hookCpu(ecriture(m), env(m, [m.doc]));
+    expect(r.code).toBe(0);
+    expect(r.cpu).toBeLessThan(Math.max(1000, 5 * temoin));
   });
 });
 

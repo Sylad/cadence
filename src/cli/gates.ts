@@ -11,6 +11,7 @@ import { isFixCommit, docsOkReason, staleDocCitations, touchesSource } from '../
 import { matchesHead, readCommits, stage, stagedFiles, syncIndexWithHead } from '../git.js';
 import { installHook, pendingCommitMessage, REFUSED } from '../hook.js';
 import { gateRefusal, pushRefusal, UNGATED_ENV } from '../push-guard.js';
+import { reviewRefusal, UNREVIEWED_ENV, type ReviewGuard } from '../push-review.js';
 import { citedRefs } from '../link.js';
 import { loadEntries } from '../news.js';
 import { Plan, RafError } from '../plan.js';
@@ -185,9 +186,19 @@ function postCommit(load: (() => Plan) | null, newsDir: string, root: string, to
  * `raf hook pre-push` (L405), appelé par le hook que la vague pose : refuse (code 3) un push qui emporte un commit d'un lot pas prêt de la vague vivante
  * du dépôt, ou dont un lot pas prêt a des commits illisibles (la garde de `deliver --sha`). Puis (L426), quand le projet déclare une porte, refuse un push dont
  * le sha de tête n'a pas de verdict vert de `cadence verify --gate` (`CADENCE_PUSH_UNGATED=1` passe outre, et le dit) ; un commit qui ne change que le plan reprend le verdict de son parent (L432). Sans vague qui tient le dépôt, ou avec un état de vague illisible
- * (avertissement), la première garde ne gêne jamais un push ; une config illisible laisse passer la seconde.
+ * (avertissement), la première garde ne gêne jamais un push ; une config illisible laisse passer la seconde. Enfin (L766), refuse un push qui emporte un commit de lot
+ * sans verdict de revue postérieur (`reviewRefusal`, `CADENCE_PUSH_UNREVIEWED=1` passe outre) ; une panne de cette garde laisse passer le push, en le disant.
  */
-function prePush(root: string, io: Io, remoteName: string | undefined, configPath: string, planFile: string): number {
+/** Ce que lit le hook pre-push : le dépôt, le distant reçu en argument, la config, le plan (relatif à la racine) et de quoi charger le plan pour la garde de revue (L766). */
+interface PrePushArgs {
+  root: string;
+  remoteName: string | undefined;
+  configPath: string;
+  planFile: string;
+  review: Omit<ReviewGuard, 'plan' | 'verdictCommand'> & { load: (() => Plan) | null };
+}
+
+function prePush(io: Io, { root, remoteName, configPath, planFile, review }: PrePushArgs): number {
   let input = '';
   try {
     input = io.stdin ? io.stdin() : readFileSync(0, 'utf8');
@@ -209,17 +220,29 @@ function prePush(root: string, io: Io, remoteName: string | undefined, configPat
     }
   }
   // La porte du projet (L426) : une config illisible ne gêne pas un push, comme un état de vague illisible.
-  let gate = false;
+  let config: ReturnType<typeof readOrchestrateConfig> | null = null;
   try {
-    const config = readOrchestrateConfig(configPath);
-    gate = Boolean(config.test || config.build);
+    config = readOrchestrateConfig(configPath);
   } catch {
-    return 0;
+    // Config illisible : ni porte ni clé de verdict.
   }
-  const refusal = gateRefusal(root, gate, input, planFile);
+  const gated = overridable(io, gateRefusal(root, Boolean(config?.test || config?.build), input, planFile), UNGATED_ENV);
+  if (gated) return gated;
+  if (!review.load) return 0;
+  let unreviewed: string | null = null;
+  try {
+    unreviewed = reviewRefusal({ ...review, plan: review.load(), verdictCommand: config?.verdict }, input, remoteName || undefined);
+  } catch (e) {
+    io.err(`raf: revue de code au push non vérifiée : ${(e as Error).message}`);
+  }
+  return overridable(io, unreviewed, UNREVIEWED_ENV);
+}
+
+/** Un refus du hook pre-push que la variable `env` (posée à 1) passe outre en le disant : 0 si rien n'est refusé ou si la variable est posée, REFUSED sinon. */
+function overridable(io: Io, refusal: string | null, env: string): number {
   if (!refusal) return 0;
-  if (io.env[UNGATED_ENV] === '1') {
-    io.err(`raf: ${refusal.replace(/^push refusé/, 'push passé outre')} — ${UNGATED_ENV}=1 est posée`);
+  if (io.env[env] === '1') {
+    io.err(`raf: ${refusal.replace(/^push refusé/, 'push passé outre')} — ${env}=1 est posée`);
     return 0;
   }
   io.err(`raf: ${refusal}`);
@@ -253,7 +276,11 @@ export function cmdHook(c: Ctx): number | Promise<number> {
     const config = readHookConfig(configPath);
     return docsFollow(config.docs, root, io) || preCommit(existsSync(planPath) ? loadPlan : null, config.autostart, root, today, io);
   }
-  if (rest[0] === 'pre-push') return prePush(root, io, rest[1], configPath, planFileIn(root, planPath));
+  if (rest[0] === 'pre-push') {
+    const planFile = planFileIn(root, planPath);
+    const loadAt = (path: string) => Plan.load(path, { ...c.planConfig?.settings, config: configPath });
+    return prePush(io, { root, remoteName: rest[1], configPath, planFile, review: { root, planFile, loadAt, load: existsSync(planPath) ? loadPlan : null } });
+  }
   throw new RafError('usage : raf hook install|pre-commit|post-commit|pre-push');
 }
 

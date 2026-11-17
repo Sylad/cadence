@@ -36,10 +36,11 @@ const FIELD = '\x1f';
 const RECORD = '\x1e';
 
 /** Commits reachable from HEAD, newest first. Empty when the repo has no commit yet. */
-export function readCommits(cwd: string, opts: { since?: string; range?: string } = {}): Commit[] {
+/** `range` : une plage (`a..b`, un sha) ou ses arguments de `git log` (`[sha, '--not', '--remotes=origin']`). */
+export function readCommits(cwd: string, opts: { since?: string; range?: string | string[] } = {}): Commit[] {
   const args = ['log', `--format=%H${FIELD}%cs${FIELD}%s${FIELD}%b${RECORD}`];
   if (opts.since) args.push(`--since=${opts.since}`);
-  if (opts.range) args.push(opts.range);
+  if (opts.range) args.push(...(Array.isArray(opts.range) ? opts.range : [opts.range]));
   let out: string;
   try {
     out = git(cwd, args);

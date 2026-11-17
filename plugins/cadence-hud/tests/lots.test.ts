@@ -1,4 +1,5 @@
-import { expect, test } from 'claude-code/testing'
+import { expect } from 'claude-code/testing'
+import { test } from './kit'
 
 import { buildPanel, flattenTree, foldKey, groupOf, isTask, lotState, lotTree, moreKey, openCount, openKey, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, planMove, priorityArgv, projectDetail, projectDir, projectProgress, projectsOf, readTime, refusalReason, waveLotsOf, estClos, foldWave } from '../hooks/lots'
 import type { LotsRow, TourLot } from '../types'

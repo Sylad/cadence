@@ -1,4 +1,5 @@
-import { expect, test } from 'claude-code/testing'
+import { expect } from 'claude-code/testing'
+import { test } from './kit'
 
 import { besoinArbre, buildPanel, horsVue } from '../hooks/lots'
 import { CEDENT, lignesDuBloc, partage } from '../hooks/partage'

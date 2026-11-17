@@ -1,5 +1,6 @@
-import { expect, mock, test } from 'claude-code/testing'
+import { expect, mock } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
+import { test } from './kit'
 
 import { bancDetail, bancLine, duree, enCoursLine, parseBanc, readBanc, readEnCours } from '../hooks/banc'
 import { BANC_READER } from '../hooks/collect'

@@ -1,4 +1,5 @@
-import { expect, test } from 'claude-code/testing'
+import { expect } from 'claude-code/testing'
+import { test } from './kit'
 
 import { ageLabel, buildDeliveries, deliveriesHeight, deliveriesOf, parseLastDeliveries } from '../hooks/deliveries'
 import { parseLotsBoard } from '../hooks/lots'

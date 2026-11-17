@@ -1,6 +1,7 @@
 import type { On } from 'claude-code'
-import { expect, mock, test } from 'claude-code/testing'
+import { expect, mock } from 'claude-code/testing'
 import type { Mounted, TestBody } from 'claude-code/testing'
+import { test } from './kit'
 
 import { BANC_READER, DELIVERIES, LAST_DELIVERIES, PLAN_STAMPS } from '../hooks/collect'
 import type { LotsRow, TourLot, Wave } from '../types'

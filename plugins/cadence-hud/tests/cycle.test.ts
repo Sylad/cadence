@@ -1,4 +1,5 @@
-import { expect, test } from 'claude-code/testing'
+import { expect } from 'claude-code/testing'
+import { test } from './kit'
 
 import { cycleOf, cycleSegments, cycleText, MAX_FIX } from '../hooks/cycle'
 import type { CycleInput } from '../hooks/cycle'

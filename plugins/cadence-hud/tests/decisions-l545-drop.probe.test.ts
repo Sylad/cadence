@@ -1,4 +1,5 @@
-import { expect, test } from 'claude-code/testing'
+import { expect } from 'claude-code/testing'
+import { test } from './kit'
 
 import { decisionsOf } from '../hooks/decisions'
 import type { Wave, WaveLot } from '../types'

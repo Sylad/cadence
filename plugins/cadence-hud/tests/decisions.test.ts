@@ -1,4 +1,5 @@
-import { expect, test } from 'claude-code/testing'
+import { expect } from 'claude-code/testing'
+import { test } from './kit'
 
 import { buildDecisions, decisionsOf, parseDeliveries, wrapCommand } from '../hooks/decisions'
 import type { FailedDelivery, LotsBoard, TourLot, Wave, WaveLot } from '../types'

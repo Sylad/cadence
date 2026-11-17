@@ -1,5 +1,6 @@
 import type { On } from 'claude-code'
-import { expect, mock, test } from 'claude-code/testing'
+import { expect, mock } from 'claude-code/testing'
+import { test } from './kit'
 
 import { parseCollected } from '../hooks/collect'
 import { register } from '../hooks/register'

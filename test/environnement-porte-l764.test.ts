@@ -106,6 +106,22 @@ describe('(b) Node du PATH contre .nvmrc et engines.node', () => {
     expect(environnementPerime(d, pathNode('v22.22.3')).map((x) => x.probleme)).toEqual(['le Node du PATH de la porte est v22.22.3, .nvmrc demande 24']);
   });
 
+  // Revue L764 r1 (M1) : warhammer40k (.nvmrc 22.23.5, engines >=22.12.0) refusait le Node 22.22.3 de Big-Blue, que ses engines acceptent.
+  it('.nvmrc précis et engines.node satisfait : .nvmrc n\'est jugé qu\'au majeur (cas warhammer40k)', () => {
+    const racine = projet(tempDir(), { nvmrc: '22.23.5' });
+    projet(join(racine, 'frontend'), { lock: {}, engines: '>=22.12.0' });
+    expect(environnementPerime(racine, process.env, 'v22.22.3')).toEqual([]);
+    expect(environnementPerime(racine, process.env, 'v24.1.0').map((x) => x.probleme)).toEqual(['le Node du PATH de la porte est v24.1.0, .nvmrc demande 22.23.5']);
+  });
+
+  it('.nvmrc précis sans engines.node : un minimum dans son majeur, pas une version exacte', () => {
+    const d = projet(join(tempDir(), 'p'), { nvmrc: '22.23.5' });
+    expect(environnementPerime(d, process.env, 'v22.23.6')).toEqual([]);
+    expect(environnementPerime(d, process.env, 'v22.24.0')).toEqual([]);
+    expect(environnementPerime(d, process.env, 'v22.22.3').map((x) => x.probleme)).toEqual(['le Node du PATH de la porte est v22.22.3, .nvmrc demande 22.23.5']);
+    expect(environnementPerime(d, process.env, 'v23.0.0')).toHaveLength(1);
+  });
+
   it('alias (lts/*) ou engines illisible : rien n\'est jugé ; aucune exigence : Node n\'est pas lu', () => {
     expect(environnementPerime(projet(join(tempDir(), 'p'), { nvmrc: 'lts/*', engines: 'lts' }), process.env, 'v10.0.0')).toEqual([]);
     expect(environnementPerime(projet(join(tempDir(), 'q'), {}), process.env, null)).toEqual([]);
@@ -145,13 +161,34 @@ describe('verify --gate : environnement périmé détecté avant de jouer', () =
     expect(r.text).not.toMatch(/✓|✗/);
   });
 
-  it('dans une copie jetable : lu dans la copie (dépendances copiées, lockfile au sha)', async () => {
-    const { repo, sha } = depotPerime('orchestrate:\n  test: "true"\nverify:\n  inPlace: false\n');
+  // Revue L764 r1 (M2) : la remise à niveau nommait la copie, retirée à la fin de la porte ; la copie reprend les node_modules de l'arbre principal.
+  it('dans une copie jetable : lu dans la copie, la remise à niveau nomme l\'arbre principal (la copie est retirée)', async () => {
+    const { repo } = depotPerime('orchestrate:\n  test: "true"\nverify:\n  inPlace: false\n');
+    writeFileSync(join(repo, '.nvmrc'), '24\n');
+    git(repo, 'add', '.nvmrc');
+    git(repo, 'commit', '-qm', 'nvmrc');
+    const r = await gate(repo, git(repo, 'rev-parse', 'HEAD'), pathNode('v22.22.3'));
+    expect(r.code).toBe(2);
+    expect(r.text).toContain('porte jouée dans une copie jetable');
+    expect(r.text).toContain(`remise à niveau : cd ${repo} && npm ci`);
+    expect(r.text).toContain(`remise à niveau : cd ${repo} && nvm install 24`);
+    expect(r.text).not.toMatch(/remise à niveau : .*cadence-verify-/);
+  });
+
+  it('copie jetable, arbre principal à un autre commit dont le lockfile diffère : aucune remise à niveau possible, CADENCE_PORTE_ENV=jouer dit', async () => {
+    const { repo, sha: avant } = depotPerime();
+    writeFileSync(join(repo, 'node_modules', '.package-lock.json'), lockfile({ tailwindcss: '4.1.0' })); // à jour pour HEAD
+    writeFileSync(join(repo, 'package-lock.json'), lockfile({ tailwindcss: '4.2.0' }));
+    git(repo, 'commit', '-qam', 'montée tailwind');
+    const sha = git(repo, 'rev-parse', 'HEAD');
+    git(repo, 'checkout', '-q', avant);
     const r = await gate(repo, sha, pathNode('v24.1.0'));
     expect(r.code).toBe(2);
     expect(r.text).toContain('porte jouée dans une copie jetable');
-    expect(r.text).toMatch(/remise à niveau : cd \S*cadence-verify-\S* && npm ci/);
-    expect(r.text).not.toContain('le Node du PATH');
+    expect(r.text).toContain('tailwindcss 4.1.0 installé, 4.2.0 au lockfile');
+    expect(r.text).toContain(`remise à niveau : aucune possible depuis l'arbre principal ${repo}`);
+    expect(r.text).toContain('CADENCE_PORTE_ENV=jouer');
+    expect(r.text).not.toMatch(/remise à niveau : .*cadence-verify-/);
   });
 
   it('CADENCE_PORTE_ENV=jouer : la porte joue quand même et dit qu\'un rouge peut venir de l\'environnement', async () => {

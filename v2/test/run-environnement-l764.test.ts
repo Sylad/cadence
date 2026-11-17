@@ -22,7 +22,13 @@ describe('cadence run : porte lue au commit du run (L764 c)', () => {
     const e = executerRun({ repo, demande: 'corrige la porte', exec: fauxClaude([changePorte('test -f cadence.yaml')], appels as never), out });
     expect(relire(e).etat).toBe('integre');
     expect(appels).toHaveLength(1); // aucune session de correction : la porte du run était verte
-    expect(l.join('\n')).toContain('porte lue au commit du run (cadence.yaml changé par le run) : test -f cadence.yaml — l\'arbre principal (main) aurait joué : test -f introuvable.txt');
+    const dit = 'porte lue au commit du run (cadence.yaml changé par le run) : test -f cadence.yaml — l\'arbre principal (main) aurait joué : test -f introuvable.txt';
+    expect(l.join('\n')).toContain(dit);
+    // Revue L764 r1 (M3) : comme un conflit résolu (L723), dans le détail de l'état integre et sous la ligne de fin, pas au seul journal ; m1 : dite une fois.
+    expect(relire(e).detail).toContain(dit);
+    const finRun = l.findIndex((x) => x.startsWith(`cadence run ${e.id} : integre`));
+    expect(l[finRun]).toContain(dit);
+    expect(l.join('\n').split('porte lue au commit du run').length - 1).toBe(2); // une fois au journal de la porte, une fois sous la ligne de fin
   });
 
   it('porte inchangée par le run : aucune ligne de plus', () => {
@@ -37,6 +43,7 @@ describe('cadence run : porte lue au commit du run (L764 c)', () => {
     const e = executerRun({ repo, demande: 'x', exec: fauxClaude([commite('a.txt'), changePorte('test -f a.txt')]), out });
     expect(relire(e).etat).toBe('integre');
     expect(relire(e).corrections?.map((c) => c.verte)).toEqual([true]);
+    expect(relire(e).detail).toContain('porte lue au commit du run (cadence.yaml changé par le run) : test -f a.txt — l\'arbre principal (main) aurait joué : test -f introuvable.txt');
   });
 });
 

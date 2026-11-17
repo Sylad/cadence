@@ -26,10 +26,11 @@ const TAIL_LINES = 10;
 /**
  * L764 : l'environnement où la porte va jouer (`dir`), lu avant de la jouer : node_modules en retard sur package-lock.json, Node du PATH hors de .nvmrc ou engines.node.
  * Périmé, la porte n'est pas jouée (code 2, pas un verdict) et la sortie dit la remise à niveau ; `CADENCE_PORTE_ENV=jouer` la joue quand même, avec ces lignes.
- * Rend true quand la porte ne doit pas jouer.
+ * Rend true quand la porte ne doit pas jouer. `repo` : l'arbre principal quand `dir` est une copie jetable (retirée à la fin) : les remises à niveau le nomment
+ * (revue L764 r1, M2), ou disent qu'aucune n'est possible quand son package-lock.json n'est pas celui du sha.
  */
-function stale(dir: string, short: string, env: Record<string, string | undefined>, out: (line: string) => void): boolean {
-  const problems = environnementPerime(dir, env);
+function stale(dir: string, short: string, env: Record<string, string | undefined>, out: (line: string) => void, repo = dir): boolean {
+  const problems = environnementPerime(dir, env, undefined, { arbre: repo });
   if (!problems.length) return false;
   const lines = lignesPerime(`verify --gate ${short}`, problems);
   if (ignorerPerime(env)) {
@@ -286,7 +287,7 @@ async function playGate(ctx: GateCtx): Promise<number> {
     out(`verify --gate ${short} : porte jouée dans une copie jetable ${dir} (${why}) ; dépendances copiées : ${copied.length ? copied.join(', ') : 'aucune'}`);
     // L722 : sans verify.inPlace: false ni vague vivante, `why` les nomme déjà ; sinon la ligne qui suit.
     if (why !== obstacle) sayDirty(repo, short, out);
-    if (stale(dir, short, env, out)) return 2;
+    if (stale(dir, short, env, out, repo)) return 2;
     out(replayReason);
     if (missing.length) out(`dépendances déclarées absentes de l'arbre principal, non copiées : ${missing.join(', ')}`);
     const done = await runSteps(steps, (cmd) => sh(cmd, dir, ctx.timeoutMs ?? GATE_TIMEOUT_MS, group, env), out, config, short);

@@ -43,7 +43,8 @@ export interface Etat extends EtatRapport { id: string; repo: string; branche: s
   modele_raison?: string; correction_revue?: boolean; corrections_avant?: number; revue?: Revue; passes?: Passe[];
   /** L745 (clore.ts) : la tête du worktree à la fin d'un run non intégré (archivée par --clore, lue par --liste quand la branche est retirée) ; `clos` : posé par
    * --clore, avec ses archives et ce qui est resté (worktree non propre, branche) ; `force` : un état clos avant la 5e passe, sans preuve d'intégration. */
-  tete?: string; clos?: { date: string; cible: string; tete: string; integre?: boolean; archives?: string[]; restes?: string[]; force?: true } }
+  tete?: string; /** Revue L764 r1 (M3) : la porte lue au commit du run quand elle diffère de celle de la cible, reprise au détail de l'état integre. */
+  porte_changee?: string; clos?: { date: string; cible: string; tete: string; integre?: boolean; archives?: string[]; restes?: string[]; force?: true } }
 /** `maintenant` et `attendre` : l'horloge et l'attente du quota (D-15), simulées par les tests ; `attendre: null` rend la main sans attendre la remise à zéro. */
 interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null }
 
@@ -117,7 +118,11 @@ function commandesDeCadenceYaml(repo: string): string[] {
  * jugé par elle. Quand elle diffère de celle de l'arbre principal, la sortie le dit (une porte affaiblie par le run se voit dans le journal et à la revue). */
 function commandesDuRun(e: Etat, out: (l: string) => void): string[] {
   const cmds = commandesDeCadenceYaml(e.worktree), principal = commandesDeCadenceYaml(e.repo);
-  if (cmds.join('\n') !== principal.join('\n')) out(`porte lue au commit du run (cadence.yaml changé par le run) : ${cmds.join(' puis ') || 'aucune commande'} — l'arbre principal (${e.cible}) aurait joué : ${principal.join(' puis ') || 'aucune commande'}`);
+  const dit = cmds.join('\n') === principal.join('\n') ? undefined
+    : `porte lue au commit du run (cadence.yaml changé par le run) : ${cmds.join(' puis ') || 'aucune commande'} — l'arbre principal (${e.cible}) aurait joué : ${principal.join(' puis ') || 'aucune commande'}`;
+  // Revue L764 r1 : dite une fois par changement (m1, pas à chaque essai ni rebase), gardée pour le détail de l'état integre (M3, comme un conflit résolu, L723).
+  if (dit && dit !== e.porte_changee) out(dit);
+  e.porte_changee = dit;
   return cmds;
 }
 /** L764 : l'environnement du worktree avant la porte (node_modules en retard sur package-lock.json, Node du PATH hors de .nvmrc ou engines.node) ; la sortie
@@ -312,7 +317,8 @@ function suite(e: Etat, o: Opts): Etat {
   }
   e.integre = git(e.repo, 'rev-parse', '--short', e.cible); e.etat = 'integre';
   // L723 : intégré, mais une fusion écrite par la session est à relire ; L724 : de même pour une correction après porte rouge
-  e.detail = [...(e.conflits ?? []).filter((c) => c.resolu).map((c) => conflitResolu(e, c)), ...(e.corrections ?? []).filter((c) => c.verte).map(correctionFaite)].join('\n');
+  e.detail = [...(e.porte_changee ? [`${e.porte_changee} — à relire : la porte qui a jugé le run est la sienne`] : []),
+    ...(e.conflits ?? []).filter((c) => c.resolu).map((c) => conflitResolu(e, c)), ...(e.corrections ?? []).filter((c) => c.verte).map(correctionFaite)].join('\n');
   const registre = registreOuvert(e.worktree);
   retirerRun(e);
   return fin(e, o, registre);

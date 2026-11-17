@@ -81,6 +81,16 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [2.0.15] - 2026-11-17
+
+### Added
+
+- `lead.chain` in the parent folder's `cadence.yaml` (L772, [docs/config.md](docs/config.md#the-lead-settings-lead)): the `/lead` skill chains by default. With `on` (the default) the three proposals of the tour are launched without waiting, every free slot gets the next drawable lot as soon as a run, a review or a delivery hands back, and a run's question that is reversible and sourced is settled by the lead (`cadence run --reponse`, a `raf note`, one line to the human); only the irreversible, a spending, a visual taste without a rule or a contradiction with the register of requests goes up to the human. `off` keeps the former behaviour: the tour stops and waits for the priority. `cadence lead tour` prints `enchaînement : on|off`, and `cadence config set` refuses another value.
+
+### Fixed
+
+- The pre-push review guard reads a commit's lots from its subject only (L771, [docs/deliver.md](docs/deliver.md)): the lots of the scope (`fix(L770): …`) when it cites some, otherwise the ids of the subject (`L770 : …`, `… (L769)`). Ids quoted in the body (« depuis L679 », « règle L586 », `probe-L485-bords`) no longer make the lot of an unrelated commit look unreviewed: on 17-11 they refused the push of 2.0.14 for `c384e01` and `71b787f`, reviewed under L770.
+
 ## [2.0.14] - 2026-11-17
 
 ### Added

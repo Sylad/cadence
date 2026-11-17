@@ -6,12 +6,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { argsClaude } from '../src/bench/bras.js';
 import { BRAS_COMPLET, BRAS_LEGER } from '../src/run/aiguillage.js';
 import { executerRun } from '../src/run/run.js';
-import { reglagesRun } from '../src/socle.js';
+import { HOOKS, PORTE_MS, reglagesRun } from '../src/socle.js';
 import { commite, depot, fauxClaude, git } from './run-outils.js';
 import { dossierTemp } from './temp.js';
 
 const PLUGINS = { 'superpowers@claude-plugins-official': true, 'feature-dev@claude-plugins-official': true, 'cadence@cadence': true,
   'playwright@claude-plugins-official': true, 'context7@claude-plugins-official': false };
+const PREMIER_PLAN = { hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: `node "${join(HOOKS, 'premier-plan.mjs')}"`, timeout: 10 }] }] },
+  env: { BASH_MAX_TIMEOUT_MS: String(PORTE_MS) } };
 const reglagesLus = (args: string[]) => JSON.parse(readFileSync(args[args.indexOf('--settings') + 1], 'utf8')) as Record<string, unknown>;
 
 describe('L705 : coupes du socle de cadence run', () => {
@@ -34,7 +36,7 @@ describe('L705 : coupes du socle de cadence run', () => {
     expect(vus).toHaveLength(2); // la reprise après une porte rouge aussi
     for (const r of vus) expect(r).toEqual({
       enabledPlugins: { 'superpowers@claude-plugins-official': false, 'feature-dev@claude-plugins-official': false, 'qodo@claude-plugins-official': false },
-      disableClaudeAiConnectors: true, autoMemoryEnabled: false });
+      disableClaudeAiConnectors: true, autoMemoryEnabled: false, ...PREMIER_PLAN }); // L763 : le refus de run_in_background (run-inactif-l763.test.ts)
   });
 
   it('mode complet : les coupes s\'ajoutent au hook de lecture du bras, qui reste', () => {
@@ -48,7 +50,7 @@ describe('L705 : coupes du socle de cadence run', () => {
 
   it('sans plugin activé, pas de enabledPlugins ; C3 et C4 restent', () => {
     writeFileSync(join(process.env.CLAUDE_CONFIG_DIR!, 'settings.json'), '{}');
-    expect(reglagesRun(dossierTemp('wt-'))).toEqual({ disableClaudeAiConnectors: true, autoMemoryEnabled: false });
+    expect(reglagesRun(dossierTemp('wt-'))).toEqual({ disableClaudeAiConnectors: true, autoMemoryEnabled: false, ...PREMIER_PLAN });
   });
 
   it('le banc garde ses réglages : argsClaude sans supplément ne passe aucun --settings en léger, le fichier du bras tel quel en complet', () => {

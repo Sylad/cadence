@@ -9,6 +9,7 @@ import { heureLocale, type Quota } from './quota.js';
 import { archives, clore, etatListe } from './clore.js';
 import { origineRapport } from '../rapport.js';
 import { causeListe, identite, veiller } from '../trace.js';
+import { noteBloquee, SEUIL_INACTIF_MIN } from '../inactif.js';
 
 /** D-15 : ce que --liste dit d'un run en quota ; D-18 : une reprise seule seulement si un processus vivant attend, sinon l'attente est arrêtée. */
 const quotaListe = (e: Etat, q: Quota, l = `limite ${q.limite === 'hebdo' ? 'hebdo' : 'Opus'}`, p = q.reprise ? occupantRun(e.fichier) : null) => (!q.reprise ? `${l}, heure de reprise illisible : cadence run --reponse`
@@ -16,7 +17,9 @@ const quotaListe = (e: Etat, q: Quota, l = `limite ${q.limite === 'hebdo' ? 'heb
 
 export const AIDE_RUN = `  cadence run "<demande>" [--piece chemin]… [--lot L12] [--demande-humaine | --registre D-n] [--taille retouche|fonction] [--complet] [--modele ${MODELES.join('|')}] [--sans-porte] [--fond]   une demande, une session (mode complet si références), porte, intégration
   cadence run --reponse <id> "<texte>"   reprend un run en attente, en quota ou rendu, dans la même session
-  cadence run --liste                    les runs du dépôt et leur état ; « interrompu » : en-cours, processus mort (L709) : --reponse reprend la même session ;
+  cadence run --liste [--inactif <min>]  les runs du dépôt et leur état ; « interrompu » : en-cours, processus mort (L709) : --reponse reprend la même session ;
+                                         « session bloquée ? » (L763, issue #63) : session vivante sans commande en cours ni écriture depuis <min> minutes
+                                         (${SEUIL_INACTIF_MIN} par défaut), avec la commande de reprise ;
                                          « integre a la main » : run fini sans intégration dont la tête de branche est un ancêtre de la cible (L745) ; sinon son état
                                          et une ligne « commits absents de la cible : N »
   cadence run --clore <id>               clôt un run fini, intégré ou non : archive la tête de sa branche et le HEAD de son worktree (refs/cadence/archive/), puis
@@ -40,11 +43,14 @@ export async function cmdRun(a: string[], io: Io, exec?: Executeur): Promise<num
   try {
     if (a.includes('--help') || a.includes('-h')) { out(`usage :\n${AIDE_RUN}`); return 0; } // issue #54 : « --help » lancé comme une demande, worktree et branche laissés
     if (a[0] === '--liste') {
+      const seuilMin = a.length === 1 ? SEUIL_INACTIF_MIN : a[1] === '--inactif' && a.length === 3 ? Number(a[2]) : NaN;
+      if (!(seuilMin > 0)) { io.err('usage : cadence run --liste [--inactif <minutes>]'); return 2; }
       const racine = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: io.cwd, encoding: 'utf8' }).trim(), d = join(dirname(racine), '.cadence-run');
       const etats = existsSync(d) ? readdirSync(d).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(d, f), 'utf8')) as Etat).filter((e) => e.repo === racine) : [];
       for (const e of etats) {
         const vu = etatVu(e), interrompu = vu === 'interrompu', l = etatListe(e);
-        const notes = [e.etat === 'quota' && e.quota ? quotaListe(e, e.quota) : '', e.rapport_tour ? origineRapport(e) : ''].filter(Boolean);
+        const notes = [e.etat === 'quota' && e.quota ? quotaListe(e, e.quota) : '', e.rapport_tour ? origineRapport(e) : '',
+          vu === 'en-cours' ? noteBloquee(e, occupantRun(e.fichier)?.pid, { seuilMin, env: io.env }) : ''].filter(Boolean);
         out(`${e.id}  ${l.etat}${interrompu ? ` (reprendre : cadence run --reponse ${e.id} "reprends")` : ''}  ${e.demande.split('\n')[0].slice(0, 80)}`
           + `${notes.map((n) => `  · ${n}`).join('')}${interrompu ? causeListe(e.journal) : ''}`);
         if (l.absents) out(`    commits absents de la cible : ${l.absents} — ${e.cible} ; clore en archivant son travail : cadence run --clore ${e.id}`);

@@ -67,7 +67,8 @@ describe('cadence run', () => {
     const e = executerRun({ repo, demande: 'Crée fait.txt', exec: fauxClaude([(c, a) => { r = JSON.parse(readFileSync(a[a.indexOf('--settings') + 1], 'utf8')); commite('fait.txt')(c); }], appels), out });
     expect(e).toMatchObject({ etat: 'integre', mode: 'leger' });
     expect(r).toMatchObject({ disableClaudeAiConnectors: true, autoMemoryEnabled: false });
-    expect(r.hooks).toBeUndefined();
+    expect(JSON.stringify(r.hooks)).not.toMatch(/lecture-obligatoire/); // L763 : seul le refus de run_in_background (premier-plan.mjs)
+    expect(JSON.stringify(r.hooks)).toMatch(/premier-plan\.mjs/);
     expect(l[0]).toMatch(/mode leger \(aucune référence dans la demande\)/);
   });
 

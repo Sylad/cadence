@@ -28,9 +28,27 @@ function pluginsActifs(worktree: string, env: NodeJS.ProcessEnv): string[] {
  * code.claude.com/docs/en/mcp « Disable claude.ai connectors » ; les serveurs des plugins restent) ; C4 `autoMemoryEnabled` à false (mémoire auto,
  * code.claude.com/docs/en/memory). Les autres réglages de l'utilisateur et du projet s'appliquent comme avant.
  */
-export function reglagesRun(worktree: string, env: NodeJS.ProcessEnv = process.env): Record<string, unknown> {
+export function reglagesRun(worktree: string, env: NodeJS.ProcessEnv = process.env, bras?: string): Record<string, unknown> {
   const coupes = pluginsActifs(worktree, env).filter((id) => !PLUGINS_GARDES.includes(id.split('@')[0]));
-  return { ...(coupes.length ? { enabledPlugins: Object.fromEntries(coupes.map((id) => [id, false])) } : {}), disableClaudeAiConnectors: true, autoMemoryEnabled: false };
+  return { ...(coupes.length ? { enabledPlugins: Object.fromEntries(coupes.map((id) => [id, false])) } : {}), disableClaudeAiConnectors: true, autoMemoryEnabled: false,
+    ...premierPlan(bras) };
+}
+
+/** Une commande de la porte (`orchestrate.test`, `orchestrate.build`) a 30 min au plus ; c'est aussi le plafond du timeout d'un Bash de la session (L763). */
+export const PORTE_MS = 30 * 60_000;
+/** Dossier des hooks (v2/hooks), depuis src/ comme depuis dist/. */
+export const HOOKS = join(import.meta.dirname, '..', 'hooks');
+
+/**
+ * L763 (issue #63) : une session claude -p n'est jamais réveillée par la fin d'une commande lancée en arrière-plan (deux runs bloqués le 17-11, 21 et
+ * 55 min). Le hook PreToolUse `premier-plan.mjs` refuse Bash avec run_in_background et dit de jouer au premier plan ; `BASH_MAX_TIMEOUT_MS` (variable de
+ * Claude Code, posée par la clé `env` des réglages) relève le plafond du timeout d'un Bash à celui d'une commande de la porte. Les hooks du bras (`bras` :
+ * son fichier de réglages, `{{HOOKS}}` remplacé comme le fait ecrireReglages) sont gardés : une clé du socle remplace celle du bras, elle ne s'y ajoute pas.
+ */
+function premierPlan(bras?: string): { hooks: Record<string, unknown[]>; env: Record<string, string> } {
+  const duBras = (bras ? (JSON.parse(readFileSync(bras, 'utf8').replaceAll('{{HOOKS}}', JSON.stringify(HOOKS).slice(1, -1))) as { hooks?: Record<string, unknown[]> }).hooks : undefined) ?? {};
+  const hook = { matcher: 'Bash', hooks: [{ type: 'command', command: `node "${join(HOOKS, 'premier-plan.mjs')}"`, timeout: 10 }] };
+  return { hooks: { ...duBras, PreToolUse: [...(duBras.PreToolUse ?? []), hook] }, env: { BASH_MAX_TIMEOUT_MS: String(PORTE_MS) } };
 }
 
 /** C1 : `run.worktreeOutside: true` dans le cadence.yaml du dépôt (une autre valeur que true ou false est refusée avant toute création) met le worktree sous

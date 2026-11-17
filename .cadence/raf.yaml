@@ -3851,16 +3851,20 @@ lots:
     finished: 2026-11-17
   - id: L771
     title: "pre-push (L766) : faux positif — la garde prend pour lots du commit tous les ids cités dans son CORPS (« depuis L679 », « règle L586 », « probe-L485-bords ») et refuse le push de la 2.0.14 (17-11 : c384e01 et 71b787f, relus sous L770) ; ne compter que le lot de la portée du sujet (fix(L770): …) ou un id en tête de sujet, comme le hook de commit"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-17
     started: 2026-11-17
+    review: { date: 2026-11-17, verdict: "conforme : la garde ne compte que les ids du sujet ; rejouée sur c384e01 et 71b787f, le push de la 2.0.14 n'est plus refusé ; 21 tests L771/L766, R2 R3 R5 rouges sans le correctif ; notes : un commit qui ne cite son lot que dans le corps passe la garde, tout id du sujet compte (pas seulement en tête)", commit: 4cfde1fbc22c2baa97b333073ab3dd3883d9646f }
+    finished: 2026-11-17
   - id: L772
     title: "Skill /lead : enchaîner par défaut — lead.chain (cadence.yaml, défaut on) : les propositions du tour sont lancées sans attendre de réponse, aucun créneau vide (lancer le lot tirable suivant dès qu'un run, une revue ou une livraison rend la main), une question de run réversible et sourcée tranchée par le lead (cadence run --reponse, noté au plan, relayé en une ligne) ; ne remontent à l'humain que l'irréversible, une dépense, un goût visuel sans règle, une contradiction avec le registre. Vécu 17-11 : le compte pro demandait « quel lot ensuite ? » à chaque fin de lot, la règle ne vivant que dans nos mémoires. Mesure : nombre de « quel lot ensuite ? » posés à l'humain sur une journée"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-17
     started: 2026-11-17
+    review: { date: 2026-11-17, verdict: "conforme : lead.chain (défaut on, off = ancien comportement), trois règles et quatre cas de remontée dans le skill, affiché par lead tour, valeur invalide refusée, docs/config.md et fragment ; rien de propre à notre dossier", commit: 64f1bb51fd30d72ea960ab8ee1ea78959d3a52a3 }
+    finished: 2026-11-17
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -10,7 +10,9 @@ type Projet = { test: Record<string, any> };
 const LOURDS = ['test/probe-L539-bords.test.ts', 'test/mise-en-service.test.ts'];
 // L630 : la famille des tests de signal de verify et verify-gate les rejoint.
 const SIGNAL = readdirSync(join(process.cwd(), 'test')).filter((f) => /^verify.*\.test\.ts$/.test(f)).concat('porte-deportee-creneau-l624.test.ts').map((f) => `test/${f}`);
-const TOUS = [...LOURDS, ...SIGNAL];
+// L769 : porte-mod (mod cadence-hud) les rejoint, plus de 5 s sous la charge d'une porte complète.
+const MOD = ['test/porte-mod.test.ts'];
+const TOUS = [...LOURDS, ...MOD, ...SIGNAL];
 
 async function projets(): Promise<Projet[]> {
   return (await import('../vitest.workspace.js')).default as unknown as Projet[];
@@ -22,7 +24,7 @@ describe('L583 — vitest.workspace.ts : deux projets, les lourds joués après 
     expect((await projets()).map(nom)).toEqual(['principal', 'lourds']);
   });
 
-  it('R2 — « lourds » joue exactement probe-L539-bords, mise-en-service et la famille verify* (L630)', async () => {
+  it('R2 — « lourds » joue exactement probe-L539-bords, mise-en-service, porte-mod (L769) et la famille verify* (L630)', async () => {
     const lourds = (await projets()).find((p) => nom(p) === 'lourds')!;
     expect([...lourds.test.include].sort()).toEqual([...TOUS].sort());
     expect(SIGNAL).toHaveLength(13);

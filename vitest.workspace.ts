@@ -22,7 +22,8 @@ const signalVerify = [
   'test/verify-target.test.ts',
   'test/verify.test.ts',
 ];
-const lourds = ['test/probe-L539-bords.test.ts', 'test/mise-en-service.test.ts', ...signalVerify];
+// L769 : porte-mod (mod cadence-hud, R5 lance tsc et claude plugin test) dépasse 5 s sous la charge d'une porte complète (porte rouge de L765 le 17-11).
+const lourds = ['test/probe-L539-bords.test.ts', 'test/mise-en-service.test.ts', 'test/porte-mod.test.ts', ...signalVerify];
 
 // Les projets reprennent le réglage de vitest.config.ts (tsconfigRaw L445, délais L150, setup, bornes de workers L350) sans l'étendre :
 // un projet qui étend rejoue le globalSetup, qui crée et détruit la racine temporaire de la suite, une fois par projet (le second voit le TMPDIR du premier et refuse de supprimer).

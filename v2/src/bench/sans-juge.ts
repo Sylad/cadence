@@ -1,6 +1,6 @@
 // L689 (D-3) : mesure des bancs micro et mécanique, sans juge IA ; seulement des commandes. Ni mutations ni relecture aveugle : ces bancs n'autorisent pas la publication.
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { basename, dirname, join, relative } from 'node:path';
 import type { Banc } from './banc.js';
 import { shell } from './preparer.js';
@@ -18,8 +18,42 @@ export function mesurerSansJuge(b: Banc, clone: string, delaiMs = 30 * 60_000, r
   if (tests.length === 0) return { suite_ok, caches_ok: null };
   try {
     for (const f of tests) { const c = join(clone, nomCache(f)); if (!existsSync(c)) { mkdirSync(dirname(c), { recursive: true }); copyFileSync(join(origine, f), c); poses.push(c); } }
-    return { suite_ok, caches_ok: shell('tests d\'origine', b.tests, clone, `${clone}.tests-origine${j}.log`, delaiMs) === 0 };
+    const caches_ok = shell('tests d\'origine', b.tests, clone, `${clone}.tests-origine${j}.log`, delaiMs) === 0;
+    const n = cachesReussis(lireJournal(`${clone}.tests-origine${j}.log`), lireJournal(`${clone}.tests-bras${j}.log`));
+    return { suite_ok, caches_ok, ...(n !== null && { caches_reussis: n }) };
   } finally { for (const p of poses) rmSync(p, { force: true }); }
+}
+
+const lireJournal = (f: string): string => (existsSync(f) ? readFileSync(f, 'utf8') : '');
+/** Couleurs ANSI d'une sortie de terminal (vitest et jest en écrivent même redirigés, selon l'environnement). */
+const SANS_ANSI = /\x1b\[[0-9;]*m/g;
+
+/**
+ * L777 : tests réussis par lanceur, lus dans les lignes de bilan d'un journal de suite : jest (`Tests:       3 failed, 546 passed, 549 total`),
+ * vitest (`      Tests  1 failed | 1366 passed (1368)`), pytest (`==== 1 failed, 30 passed in 2.31s ====`). Un lanceur cité plusieurs fois se somme ;
+ * null si aucune ligne de bilan n'est lisible (lanceur inconnu, suite tuée avant son bilan).
+ */
+export function testsReussis(journal: string): Record<string, number> | null {
+  const n: Record<string, number> = {};
+  const ajoute = (k: string, reste: string) => { n[k] = (n[k] ?? 0) + Number(/(\d+) passed/.exec(reste)?.[1] ?? 0); };
+  for (const brute of journal.replace(SANS_ANSI, '').split('\n')) {
+    const l = brute.trim(); let m: RegExpExecArray | null;
+    if ((m = /^Tests:\s+(.*\btotal\b.*)$/.exec(l))) ajoute('jest', m[1]);
+    else if ((m = /^Tests {2,}(.*\(\d+\))$/.exec(l))) ajoute('vitest', m[1]);
+    else if ((m = /^=+ (.*\b(?:passed|failed)\b.* in [\d.]+s.*?) =+$/.exec(l))) ajoute('pytest', m[1]);
+  }
+  return Object.keys(n).length ? n : null;
+}
+
+/**
+ * L777 : tests d'origine réussis par un bras = tests réussis avec les tests d'origine posés, moins ceux de la suite seule, lanceur par lanceur
+ * (jamais négatif : un lanceur que la suite avec les tests d'origine n'a pas atteint compte 0). null si l'un des deux journaux n'a aucun bilan lisible ;
+ * le verdict revient alors au compte par banc. Le compte n'a de sens qu'avec une suite du bras verte, que « suite du projet verte » exige déjà.
+ */
+export function cachesReussis(origine: string, bras: string): number | null {
+  const o = testsReussis(origine), b = testsReussis(bras);
+  if (!o || !b) return null;
+  return [...new Set([...Object.keys(o), ...Object.keys(b)])].reduce((s, k) => s + Math.max(0, (o[k] ?? 0) - (b[k] ?? 0)), 0);
 }
 
 /** L733 : chemins qui ne sont pas le travail d'un banc (plan, registre, docs, captures MCP, Markdown). */

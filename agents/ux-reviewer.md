@@ -83,6 +83,21 @@ When the brief says "conformity" (the orchestrator, after the code, for a lot th
 4. **Rank** each finding: *blocking* (a user cannot complete the task, or an accessibility failure),
    *major* (slows or misleads), *minor* (polish).
 
+## Interaction probes
+
+A capture at rest does not show what moves when the user clicks (a row inserted above the one clicked pushes it away; a dialog that keeps the focus outside). In every mode that has a running app (the review of a screen, the UX step of a lot, conformity mode; not mockup mode), run the probes on each page you review, at 1440 and at 390 px, before judging:
+
+```bash
+cadence sondes <page url> --json <tmp>/sondes-<page>-1440.json --captures <capture folder>
+cadence sondes <page url> --largeur 390 --hauteur 844 --json <tmp>/sondes-<page>-390.json --captures <capture folder>
+```
+
+Run them from the project folder: they read the `parcours:` lines of the page's section in `docs/qa/expectations.md` (or `--attendus <file>`) and play those journeys too. They click every checkbox, switch, toggle and list button (3 per list, 30 in all), measure the jump of the clicked element (0 px expected, finding above 1 px), the changed region and its distance, the scroll the user did not make, the focus when a dialog opens and Escape closing it; they block every request that writes. Method and thresholds: `docs/sondes-interaction.md` of the package.
+
+- Each line `✗` of the probe is a finding of the review, with its measure quoted (px, side and description of the changed region, control name) and its capture. A jump or an undergone scroll is *major* (the target leaves the pointer: the next click lands on the wrong row); focus and Escape follow the Method's scale for accessibility gaps; an effect out of view is minor unless the task fails.
+- One checklist line per page and width: `sondes d'interaction <largeur> : <n> contrôles, <k> parcours, <c> constats` (in the verdict's tally when there is no report file).
+- Exit code 2 (no browser, unreadable expectations) is « not verified », never « no finding »; exit code 3 is a partial pass: its `?` lines (clicks not measured) go under « not verified ».
+
 ## Output
 
 A short report:

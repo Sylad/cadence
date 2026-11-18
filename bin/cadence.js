@@ -14,6 +14,10 @@ if (tool === 'run') {
   // cadence 2 (09-11) : une demande, une session Opus, porte, intégration — le bras gagnant du banc (v2/src/run).
   const v2 = await import('../v2/dist/cli.js');
   process.exitCode = await v2.run(['run', ...args], io);
+} else if (tool === 'sondes') {
+  // Sondes d'interaction (L778) : un script sans dépendance, hors de la table des commandes du plan (ses options lui sont propres).
+  const sondes = await import('../scripts/sondes-interaction.mjs');
+  process.exitCode = await sondes.main(args, io);
 } else if (tool === 'raf') {
   process.exitCode = await run(args, io);
 } else if (['news', 'session', 'deliver', 'verify', 'eval', 'skills', 'orchestrate', 'lead', 'corrections', 'perf', 'cost', 'inspect', 'spec', 'ref', 'config', 'release', 'local', 'claude-hook'].includes(tool)) {

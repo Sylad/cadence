@@ -38,7 +38,8 @@ under `nonVerifie`. A defect seen only with it is ranked on the usual severity s
    must answer 2xx with a non-empty body). An optional `## *` section holds what every page must
    show, never show and call. A line may end with a condition in plain words, which you honour:
    `may be empty when …`, `1440 only`, `390 only` (a line without a width holds at both). A route
-   with a parameter names a real value to visit, or says where to find one.
+   with a parameter names a real value to visit, or says where to find one. A `parcours:` line is a
+   journey for the interaction probes (step 4, last item), not a text to find on the page.
 3. **No expectations file: do not guess silently.** Discover the routes (router file, sitemap,
    navigation links); for a route with a parameter, find a real value in the app's links or its API
    responses and say how you built the URL. Walk them as in step 4 and report what you saw: the
@@ -83,6 +84,13 @@ under `nonVerifie`. A defect seen only with it is ranked on the usual severity s
      ALONE after a quiet minute before concluding — if it reproduces, an ordinary visitor gets it;
      if not, it was your own pace and it is not a finding; the quiet minute is spent on `about:blank`, never on the app, whose polling would keep calling its backend;
    - the frontend source may be read to LOCATE a cause after a measurement, never as evidence.
+   - interactions: run `cadence sondes <page url> --json <tmp>/sondes-<page>-<width>.json` from the project folder, with
+     `--largeur 390 --hauteur 844` for the phone width (method and thresholds: `docs/sondes-interaction.md` of the package). It
+     clicks the toggles and list buttons of the page and plays the `parcours:` lines of its section; it blocks every request that
+     writes, so it keeps to step 5. Give one line of measures per page and width (`sondes : <n> contrôles, <k> parcours, <c> constats`).
+     A failed `parcours:` line (a jump, an undergone scroll, a dialog that keeps the focus out or ignores Escape) is a *defect* of
+     the expectations, ranked *major*; a finding of the generic sweep is usability, handed to `ux-reviewer` in one line with its
+     measure; exit code 2, and the `?` lines of a partial pass (exit code 3), go under « Not verified ».
 5. **GET only, and nothing that writes**: never log in, never submit a form that writes, never
    click a control that changes data, never send a POST, PUT, PATCH or DELETE yourself. If a PIN
    or a login wall is met, say so and stop there for those pages: they go under "not verified",

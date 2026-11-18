@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Sonde — dialogues</title>
+<style>body{font:14px sans-serif;margin:0;padding:16px} [role=dialog]{position:fixed;top:40px;left:40px;background:#eee;padding:16px;border:1px solid #333}</style></head>
+<body>
+<!-- Deux boutons de liste qui ouvrent un dialogue : le bon porte le focus dedans, se ferme par Échap et rend le focus ; le mauvais ne fait ni l'un ni l'autre. -->
+<ul>
+  <li><button id="bon" aria-haspopup="dialog">Détails bons</button></li>
+  <li><button id="mauvais" aria-haspopup="dialog">Détails mauvais</button></li>
+</ul>
+<dialog id="d-bon"><p>Dialogue bon</p><button id="fermer">Fermer</button></dialog>
+<div id="d-mauvais" role="dialog" hidden><p>Dialogue mauvais</p><button>Fermer</button></div>
+<script>
+  const bon = document.getElementById('bon');
+  bon.addEventListener('click', () => document.getElementById('d-bon').showModal());
+  document.getElementById('d-bon').addEventListener('close', () => bon.focus());
+  document.getElementById('fermer').addEventListener('click', () => document.getElementById('d-bon').close());
+  document.getElementById('mauvais').addEventListener('click', () => { document.getElementById('d-mauvais').hidden = false; });
+</script>
+</body></html>

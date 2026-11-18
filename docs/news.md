@@ -254,6 +254,10 @@ project says what each page must show, in `docs/qa/expectations.md` — one
 - `api:` — the calls the page depends on: each must answer 2xx with a non-empty body (a 200 with
   `[]`, `{}` or `null` is a failure, unless its line says `may be empty when …`).
 
+A fourth kind, `parcours:`, is a journey of the project played by the interaction probes (L778), e.g.
+`parcours: tick 3 neighbouring layers → cliquer label.layer-toggle input ×3`: each click is measured (jump of the clicked
+element, changed region, scroll undergone, dialog focus and Escape), see [interaction probes](sondes-interaction.md).
+
 An optional `## *` section holds what every page must show, never show and call. A line may end
 with a condition in plain words, which the agent honours: `may be empty when …`, `1440 only`,
 `390 only` (a line without a width holds at both). Content hidden on the phone by design is not a

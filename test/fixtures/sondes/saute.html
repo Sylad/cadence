@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Sonde — liste qui saute</title>
+<style>body{font:14px sans-serif;margin:0;padding:16px} .ligne{display:flex;gap:8px;padding:6px 0;height:24px}</style></head>
+<body>
+<!-- Le défaut D-6 réduit à l'os : cocher une ligne l'ajoute à « Actives », AU-DESSUS de la liste ; la ligne cliquée descend d'une ligne. -->
+<section><h2>Actives</h2><div id="actives"></div></section>
+<section><h2>Couches</h2>
+  <div id="couches">
+    <label class="ligne"><input type="checkbox" value="a"> Couche A</label>
+    <label class="ligne"><input type="checkbox" value="b"> Couche B</label>
+    <label class="ligne"><input type="checkbox" value="c"> Couche C</label>
+    <label class="ligne"><input type="checkbox" value="d"> Couche D</label>
+  </div>
+</section>
+<script>
+  for (const box of document.querySelectorAll('#couches input')) {
+    box.addEventListener('change', () => {
+      const actives = document.getElementById('actives');
+      const deja = actives.querySelector(`[data-v="${box.value}"]`);
+      if (box.checked && !deja) {
+        const div = document.createElement('div');
+        div.className = 'ligne'; div.dataset.v = box.value; div.textContent = 'Active : ' + box.value;
+        actives.appendChild(div);
+      } else if (!box.checked && deja) deja.remove();
+    });
+  }
+</script>
+</body></html>

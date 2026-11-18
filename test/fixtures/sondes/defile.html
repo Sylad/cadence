@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Sonde — défilement subi</title>
+<style>body{font:14px sans-serif;margin:0;padding:16px} #fil{height:120px;overflow:auto;border:1px solid #333} #fil p{height:40px;margin:0}</style></head>
+<body>
+<!-- Un fil qui défile tout seul une seconde après le chargement, sans aucun geste : la sonde « au repos » doit le voir. -->
+<div id="fil"><p>1</p><p>2</p><p>3</p><p>4</p><p>5</p><p>6</p><p>7</p><p>8</p></div>
+<script>setTimeout(() => { document.getElementById('fil').scrollTop = 160; }, 1000);</script>
+</body></html>

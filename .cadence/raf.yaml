@@ -3883,10 +3883,12 @@ lots:
     created: 2026-11-18
   - id: L775
     title: "Banc mécanique 2026-11-18-1008 ROUGE sur « aucune fuite » : le bras cadence-run du banc 7 a écrit c2.vite.log à côté de son clone (runs/…/7-ol-companion-L160/c2.vite.log). Établir qui est en faute (la session qui écrit hors de son clone, ou le détecteur qui compte un fichier écrit par le bras lui-même) et corriger la cause ; second banc rouge du 18-11 sans lien avec le changement mesuré (le premier : tests d'origine 0 contre 1)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-18
     started: 2026-11-18
+    review: { date: 2026-11-18, verdict: "conforme : 0 bloquant, 0 suite — le détecteur ignore un appel refusé par le hook du bras ; une vraie fuite (appel autorisé hors du clone) reste comptée, test dans les deux sens ; seuils du banc inchangés", commit: de48d19dc95a63c1a85f033f739aea730a65b85c }
+    finished: 2026-11-18
   - id: L776
     title: "cadence run : l'intégration est refusée (« main a avancé ») quand main n'a reçu pendant le run que des commits qui ne touchent que le fichier du plan (raf, ou plan tenu par un autre outil comme maritime docs/plan/taches.yaml) — rebaser ces commits sous le run au lieu de refuser ; vécu 2 fois le 17-11 et évité de justesse le 18-11 (le lead a dû remettre main en arrière)"
     status: todo

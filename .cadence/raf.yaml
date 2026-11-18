@@ -3896,10 +3896,12 @@ lots:
     created: 2026-11-18
   - id: L777
     title: "Critère « tests d'origine verts » du banc mécanique trop sensible (décision de Sylvain le 18-11) : il compare des bancs entiers verts/rouges sur 3 bancs où les deux bras échouent presque toujours, et un seul banc d'écart fait basculer la garde — 3 passages le 18-11 : 0/1, 1/0, 0/1 sans lien avec le changement. Compter les tests cachés réussis par bras avec une marge de bruit mesurée ; examiner aussi le test caché du banc 1 (trait de la barre latérale) raté 2 fois sur 3 par cadence-run"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-18
     started: 2026-11-18
+    review: { date: 2026-11-18, verdict: "conforme : seconde revue du 18-11 après 6e555c2 (tests d'origine sans marge, lanceurs comparables seulement)", commit: 6e555c2f72566733a80922f229acc39be504c455 }
+    finished: 2026-11-18
   - id: L778
     title: "Sondes d'interaction UX (D-14 du registre parent) : jeu de sondes Playwright génériques joué par le ux-reviewer — saut de l'élément cliqué après un clic (0 px attendu), distance action → retour, focus à l'ouverture d'un dialogue et Échap qui le ferme, défilement subi ; parcours propres à chaque projet déclarés dans docs/qa/expectations.md ; critère : retrouver seul le saut à l'ajout d'une couche d'AetherWX (D-6) avant sa correction"
     status: doing
@@ -3907,6 +3909,16 @@ lots:
     visible: true
     created: 2026-11-18
     started: 2026-11-18
+  - id: L779
+    title: "raf start mis en attente pendant un cadence run, comme raf note (issue #66 du compte pro, D-28) : la séquence documentée « raf start <lot> && cadence run » ne salit plus le plan quand un autre run tient le dépôt — ou cadence run --lot démarre lui-même un lot todo"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-18
+  - id: L780
+    title: "Parité porte ↔ CI : un préfixe d'environnement dont la valeur est une substitution $(…) avec guillemets imbriqués et pipes est sauté en entier, plus de faux écart (issue #65 du compte pro, D-28 ; voisin de #32)"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-18
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

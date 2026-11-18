@@ -1,0 +1,11 @@
+{
+  "id": "D-28",
+  "texte": "ouvre un lot pour #66 et #65",
+  "date": "2026-11-18",
+  "etat": "livrée",
+  "preuve": "Lots L779 (#66) et L780 (#65) ouverts au plan le 18-11 (raf add mis en attente pendant le run L778, appliqués à sa fin)",
+  "lots": [
+    "L779",
+    "L780"
+  ]
+}

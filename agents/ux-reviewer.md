@@ -92,11 +92,11 @@ cadence sondes <page url> --json <tmp>/sondes-<page>-1440.json --captures <captu
 cadence sondes <page url> --largeur 390 --hauteur 844 --json <tmp>/sondes-<page>-390.json --captures <capture folder>
 ```
 
-Run them from the project folder: they read the `parcours:` lines of the page's section in `docs/qa/expectations.md` (or `--attendus <file>`) and play those journeys too. They click every checkbox, switch, toggle and list button (3 per list, 30 in all), measure the jump of the clicked element (0 px expected, finding above 1 px), the changed region and its distance, the scroll the user did not make, the focus when a dialog opens and Escape closing it; they block every request that writes. Method and thresholds: `docs/sondes-interaction.md` of the package.
+Run them from the project folder: they read the `parcours:` lines of the page's section in `docs/qa/expectations.md` (or `--attendus <file>`) and play those journeys too. They click every checkbox, switch, toggle and list button (3 per list, 30 in all), measure the jump of the clicked element (0 px expected, finding above 1 px), the changed region and its distance, the scroll the user did not make, the focus when a dialog opens and Escape closing it; they cut every way the browser writes (HTTP, WebSocket, beacons…) and report each attempt. Method and thresholds: `docs/sondes-interaction.md` of the package.
 
 - Each line `✗` of the probe is a finding of the review, with its measure quoted (px, side and description of the changed region, control name) and its capture. A jump or an undergone scroll is *major* (the target leaves the pointer: the next click lands on the wrong row); focus and Escape follow the Method's scale for accessibility gaps; an effect out of view is minor unless the task fails.
 - One checklist line per page and width: `sondes d'interaction <largeur> : <n> contrôles, <k> parcours, <c> constats` (in the verdict's tally when there is no report file).
-- Exit code 2 (no browser, unreadable expectations) is « not verified », never « no finding »; exit code 3 is a partial pass: its `?` lines (clicks not measured) go under « not verified ».
+- Exit code 2 (no browser, unreadable expectations, pass broken) is « not verified », never « no finding »; exit code 3 is a partial pass: its `?` lines (clicks not measured, covered, or that tried to write) go under « not verified »; exit code 4 means no click was measured: the interactions of that page and width are « not verified », whatever the rest says. A `!` line is a write the probe blocked: name the control in the report.
 
 ## Output
 

@@ -4,7 +4,8 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { cheminsPlaywright, constatsClic, DEFAUTS, formater, lancerNavigateur, lireOptions, lireParcours, nonMesures, sonder, tousLesConstats, type Rapport } from '../scripts/sondes-interaction.mjs';
+import { cheminsPlaywright, codeSortie, constatsClic, DEFAUTS, formater, lancerNavigateur, lireOptions, lireParcours, main, nonMesures, sonder, tousLesConstats, type Rapport } from '../scripts/sondes-interaction.mjs';
+import { serveurSondes } from './sondes-serveur-l778.js';
 
 const page = (nom: string) => pathToFileURL(join(import.meta.dirname, 'fixtures', 'sondes', `${nom}.html`)).href;
 const RAPIDE = { ...DEFAUTS, charge: 200, repos: 1500, attente: 400 };
@@ -45,7 +46,8 @@ describe('L778 — constats d\'une mesure (sans navigateur)', () => {
 
 describe('L778 — une passe partielle ne se lit jamais « aucun constat »', () => {
   const r: Rapport = { url: 'u', largeur: 390, hauteur: 844, seuil: 1, date: 'd', repos: [], ecrituresBloquees: 0,
-    controles: [{ id: '1', nom: 'Couche A', role: 'bascule', liste: true, mesure: { nonMesure: 'clic impossible : Timeout' }, constats: [] }],
+    controles: [{ id: '1', nom: 'Couche A', role: 'bascule', liste: true, mesure: { nonMesure: 'clic impossible : Timeout' }, constats: [] },
+      { id: '2', nom: 'Couche B', role: 'bascule', liste: true, mesure: { sautMax: 0, sautFinal: 0, defilement: [], regions: null }, constats: [] }],
     parcours: [{ nom: 'p', pas: [{ etape: 'cliquer .x ×3', nonMesure: '1 élément(s) visible(s) pour 3 attendu(s)', constats: [] }] }] };
 
   it('nomme chaque clic non mesuré, et l\'en-tête dit la passe partielle', () => {
@@ -54,6 +56,42 @@ describe('L778 — une passe partielle ne se lit jamais « aucun constat »', ()
     expect(t).toContain('2 clic(s) non mesuré(s)');
     expect(t).toContain('passe partielle');
     expect(t).toContain('  ? « Couche A » — clic impossible : Timeout');
+    expect(codeSortie(r)).toBe(3);
+  });
+
+  it('revue r1 : sans aucun clic mesuré, ni « aucun constat » ni code 0 : « non mesurable », code 4', () => {
+    const vide: Rapport = { ...r, controles: [], parcours: [], couverts: [{ nom: 'Couche A', role: 'bascule', liste: true }] };
+    const t = formater(vide);
+    expect(t).not.toContain('aucun constat');
+    expect(t).toContain('aucun clic mesuré');
+    expect(t).toContain('non mesurable');
+    expect(nonMesures(vide)).toEqual(['« Couche A » — couvert par un autre élément à cette taille de vue : non mesurable']);
+    expect(codeSortie(vide)).toBe(4);
+    expect(codeSortie({ ...vide, couverts: [] })).toBe(4);
+  });
+
+  it('revue r1 : une écriture tentée par un clic est signalée et rend la passe partielle, même sans constat', () => {
+    const e = { voie: 'websocket', cible: 'ws://h/socket', detail: 'DELETE item 1', ou: '« 🗑 » (bouton de liste)' };
+    const w: Rapport = { ...r, parcours: [], ecrituresBloquees: 1, ecritures: [e],
+      controles: [{ id: '1', nom: '🗑', role: 'bouton', liste: true, mesure: { sautMax: 0, sautFinal: 0, defilement: [], regions: null, ecritures: [e] }, constats: [] }] };
+    const t = formater(w);
+    expect(t).toContain('1 écriture(s) tentée(s), bloquée(s)');
+    expect(t).toContain('  ! « 🗑 » (bouton de liste) : websocket ws://h/socket « DELETE item 1 »');
+    expect(nonMesures(w)[0]).toContain('a tenté d\'écrire');
+    expect(codeSortie(w)).toBe(3);
+  });
+
+  it('revue r1 : un bouton qui navigue est noté « navigue », ni constat ni non-mesuré', () => {
+    const n: Rapport = { ...r, parcours: [], controles: [
+      { id: '1', nom: 'Ouvrir', role: 'bouton', liste: true, mesure: { navigation: true, vers: 'file:///autre.html' }, constats: [] },
+      { id: '2', nom: 'Option', role: 'bascule', liste: false, mesure: { sautMax: 0, sautFinal: 0, defilement: [], regions: null }, constats: [] }] };
+    expect(formater(n)).toContain('1. « Ouvrir » (bouton) : navigue vers file:///autre.html (page rouverte)');
+    expect(codeSortie(n)).toBe(0);
+  });
+
+  it('revue r1 : un navigateur relancé en rendu logiciel (GPU sans image) le dit dans l\'en-tête', () => {
+    expect(formater({ ...r, rendu: 'logiciel' })).toContain('rendu logiciel (le GPU de la machine ne rendait aucune image) : WebGL coupé');
+    expect(formater({ ...r, rendu: 'gpu' })).not.toContain('rendu logiciel');
   });
 });
 
@@ -115,11 +153,80 @@ describe.skipIf(!lance)('L778 — sondes jouées sur des pages de test locales (
     const r = await sonder(nav(), page('couvert'), RAPIDE, parcours);
     expect(r.controles.map((c) => c.nom)).toEqual(['Découverte']);
     expect(nonMesures(r).some((m) => m.includes('pour 3 attendu(s)'))).toBe(true);
+    expect(nonMesures(r)).toContain('« Sous le voile » — couvert par un autre élément à cette taille de vue : non mesurable');
   });
 
   it('défilement subi au repos : le fil qui défile seul est vu ; la page stable n\'en a pas', async () => {
     const r = await sonder(nav(), page('defile'), RAPIDE, []);
     expect(r.repos).toEqual([{ cible: 'div#fil', dx: 0, dy: 160 }]);
     expect((await sonder(nav(), page('stable'), { ...RAPIDE, sansBalayage: true }, [])).repos).toEqual([]);
+  });
+});
+
+describe.skipIf(!lance)('L778 revue r1 — lecture seule, navigation, rien de mesuré, élément remplacé (navigateur réel)', () => {
+  const nav = () => lance!.navigateur;
+  const dossier = join(import.meta.dirname, 'fixtures', 'sondes');
+
+  it('aucune écriture n\'atteint le serveur (WebSocket, fetch, XHR, balise, formulaire POST, WebRTC) ; chaque tentative est comptée et signalée', async () => {
+    const srv = await serveurSondes(dossier);
+    try {
+      const r = await sonder(nav(), `${srv.url}/ecritures.html`, RAPIDE, []);
+      expect(srv.recu.connexions).toBeGreaterThan(0); // la page a bien ouvert sa socket : la lecture passe
+      expect(srv.recu.websocket).toEqual([]);
+      expect(srv.recu.http.filter((l) => !l.startsWith('GET '))).toEqual([]);
+      const voies = r.ecritures!.map((e) => e.voie);
+      expect(voies).toContain('websocket');
+      expect(voies).toContain('sendBeacon');
+      expect(voies).toContain('RTCPeerConnection');
+      expect(r.ecritures!.some((e) => e.voie === 'http' && e.detail.startsWith('POST'))).toBe(true);
+      expect(r.ecritures!.some((e) => e.voie === 'http' && e.detail.startsWith('PUT'))).toBe(true);
+      expect(r.ecritures!.find((e) => e.voie === 'websocket')).toMatchObject({ detail: 'DELETE item 1', ou: '« 🗑 » (bouton de liste)' });
+      expect(r.ecrituresBloquees).toBe(r.ecritures!.length);
+      const t = formater(r);
+      expect(t).not.toMatch(/^aucun constat$/m);
+      expect(t).toContain('a tenté d\'écrire');
+      expect(codeSortie(r)).toBe(3);
+    } finally {
+      await srv.fermer();
+    }
+  });
+
+  it('un bouton qui navigue par script : noté « navigue », page rouverte, la suite mesurée, code 0 et pas 1', async () => {
+    const r = await sonder(nav(), page('navigue'), RAPIDE, []);
+    const [ouvrir, voir, option] = r.controles;
+    expect(ouvrir!.mesure).toMatchObject({ navigation: true });
+    expect(ouvrir!.mesure.vers).toContain('autre.html');
+    expect(voir!.mesure).toMatchObject({ navigation: true });
+    expect(option!.mesure.sautMax).toBe(0);
+    expect(codeSortie(r)).toBe(0);
+    const lignes: string[] = [];
+    const code = await main([page('navigue'), '--charge', '200', '--repos', '300', '--attente', '400'], { cwd: dossier, env: process.env, out: (l) => lignes.push(l), err: (l) => lignes.push(l) });
+    expect(lignes.join('\n')).toContain('navigue vers');
+    expect(code).toBe(0);
+  });
+
+  it('tout est couvert : 0 clic mesuré, les couverts sont nommés, code 4', async () => {
+    const r = await sonder(nav(), page('tout-couvert'), RAPIDE, []);
+    expect(r.controles).toEqual([]);
+    expect(r.couverts!.map((c) => c.nom)).toEqual(['Couche A', 'Couche B']);
+    expect(formater(r)).not.toContain('aucun constat');
+    expect(codeSortie(r)).toBe(4);
+  });
+
+  it('un élément remplacé par le clic est suivi par son équivalent : le saut de la liste reconstruite est vu', async () => {
+    const r = await sonder(nav(), page('remplace'), RAPIDE, []);
+    const [c] = r.controles;
+    expect(c!.mesure.remplace).toBe(true);
+    expect(c!.constats.filter((k) => k.type === 'saut').length).toBe(2); // au clic et au retour : l'équivalent est remis
+    expect(c!.retour?.remplace).toBe(true);
+    expect(codeSortie(r)).toBe(1);
+  });
+
+  it('un élément remplacé sans équivalent unique est non mesurable, jamais un saut nul', async () => {
+    const r = await sonder(nav(), page('remplace-perdu'), RAPIDE, []);
+    const [c] = r.controles;
+    expect(c!.mesure.nonMesure).toMatch(/remplacé par le clic.*2 équivalent/);
+    expect(c!.constats).toEqual([]);
+    expect(codeSortie(r)).toBe(4);
   });
 });

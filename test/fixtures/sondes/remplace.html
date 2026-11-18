@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Sonde — liste reconstruite</title>
+<style>body{font:14px sans-serif;margin:0;padding:16px} .ligne{display:flex;gap:8px;padding:6px 0;height:24px}</style></head>
+<body>
+<!-- Le défaut D-6 dans un framework sans clé stable : chaque coche reconstruit toute la liste (innerHTML) et ajoute la ligne active au-dessus. -->
+<div id="actives"></div>
+<div id="couches"></div>
+<script>
+  const etat = { a: false };
+  function rendre() {
+    document.getElementById('actives').innerHTML = Object.keys(etat).filter((k) => etat[k]).map((k) => `<div class="ligne">Active : ${k}</div>`).join('');
+    document.getElementById('couches').innerHTML = Object.keys(etat).map((k) => `<label class="ligne"><input type="checkbox" value="${k}"${etat[k] ? ' checked' : ''}> Couche ${k}</label>`).join('');
+    for (const box of document.querySelectorAll('#couches input')) box.addEventListener('change', () => { etat[box.value] = box.checked; rendre(); });
+  }
+  rendre();
+</script>
+</body></html>

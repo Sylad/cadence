@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Sonde — boutons qui naviguent</title>
+<style>body{font:14px sans-serif;margin:0;padding:16px} li{padding:6px 0}</style></head>
+<body>
+<!-- Des « liens » faits en boutons : le premier navigue par script tout de suite, le second un peu plus tard ; la case reste mesurable. -->
+<ul>
+  <li>Fiche 1 <button onclick="location.href='autre.html'">Ouvrir</button></li>
+  <li>Fiche 2 <button onclick="setTimeout(() => location.assign('autre.html#tard'), 50)">Voir</button></li>
+</ul>
+<label><input type="checkbox"> Option</label>
+</body></html>

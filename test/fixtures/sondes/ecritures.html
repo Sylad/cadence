@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Sonde — écritures à bloquer</title>
+<style>body{font:14px sans-serif;margin:0;padding:16px} li{padding:6px 0}</style></head>
+<body>
+<!-- Une liste dont les boutons d'icône sans nom écrivent par toutes les voies du navigateur : la sonde les presse, rien ne doit atteindre le serveur. -->
+<ul id="items">
+  <li>Item 1 <button id="ws">🗑</button></li>
+  <li>Item 2 <button id="http">✎</button></li>
+  <li>Item 3 <button id="rtc">⇄</button></li>
+</ul>
+<form id="f" method="post" action="/ecrire"><input type="hidden" name="x" value="1"></form>
+<label><input type="checkbox" id="auto"> Envoi automatique</label>
+<script>
+  const ws = new WebSocket(location.origin.replace('http', 'ws') + '/socket');
+  document.getElementById('ws').addEventListener('click', () => ws.send('DELETE item 1'));
+  document.getElementById('http').addEventListener('click', () => {
+    navigator.sendBeacon('/balise', 'item 2');
+    fetch('/api/item/2', { method: 'POST', body: 'x' }).catch(() => {});
+    const x = new XMLHttpRequest(); x.open('PUT', '/api/item/2'); x.send('y');
+  });
+  document.getElementById('rtc').addEventListener('click', () => { try { new RTCPeerConnection(); } catch {} });
+  document.getElementById('auto').addEventListener('change', () => document.getElementById('f').submit());
+</script>
+</body></html>

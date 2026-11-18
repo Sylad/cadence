@@ -57,33 +57,48 @@ function sdCouvert(el) {
   return !(haut && (el.contains(haut) || haut.contains(el) || (label && label.contains(haut))));
 }
 
-/** Un contrôle que la sonde peut presser : visible, découvert, actif, sans risque ; rend sa ligne de liste (ou null) et la clé de sa liste. */
+/**
+ * Un contrôle que la sonde presserait : visible, actif, sans risque ; rend sa ligne de liste (ou null), la clé de sa liste, et s'il est couvert
+ * (revue r1 : un couvert n'est pas pressé mais il est rendu, pour que le rapport le compte comme non mesurable au lieu de l'oublier).
+ */
 function sdCandidat(el) {
-  if (!sdVisible(el) || el.disabled || el.getAttribute('aria-disabled') === 'true' || sdRisque(el) || sdCouvert(el)) return null;
+  if (!sdVisible(el) || el.disabled || el.getAttribute('aria-disabled') === 'true' || sdRisque(el)) return null;
   const ligne = sdLigne(el);
   const dialogue = el.matches('[aria-haspopup]') && el.getAttribute('aria-haspopup') !== 'false';
   if (!sdEstBascule(el) && !ligne && !dialogue) return null;
-  return { ligne, cle: ligne && ligne.parentElement ? ligne.parentElement : el.parentElement };
+  return { ligne, cle: ligne && ligne.parentElement ? ligne.parentElement : el.parentElement, couvert: sdCouvert(el) };
 }
 
 /**
  * Marque (data-sonde-id) les contrôles à sonder : toute bascule visible, tout bouton d'une liste ou qui ouvre un dialogue, jamais un contrôle risqué.
- * Au plus `parListe` par liste et `max` en tout, dans l'ordre du document. Rend [{ id, nom, role, liste }].
+ * Au plus `parListe` par liste et `max` en tout, dans l'ordre du document. Rend { controles: [{ id, nom, role, liste }], couverts: [{ nom, role, liste }] } :
+ * les couverts (au plus `max`) ne sont pas pressés, le rapport les compte comme non mesurables.
  */
 function sdMarquer(max, parListe) {
   const parListeVus = new Map();
   const out = [];
+  const couverts = [];
   for (const el of document.querySelectorAll(CONTROLES)) {
     if (out.length >= max) break;
     const c = sdCandidat(el);
-    const n = c ? parListeVus.get(c.cle) || 0 : parListe;
+    if (!c) continue;
+    if (c.couvert) {
+      if (couverts.length < max) couverts.push(sdFiche(el, c));
+      continue;
+    }
+    const n = parListeVus.get(c.cle) || 0;
     if (n >= parListe) continue;
     parListeVus.set(c.cle, n + 1);
     const id = String(out.length + 1);
     el.setAttribute('data-sonde-id', id);
-    out.push({ id, nom: sdNom(el), role: sdEstBascule(el) ? 'bascule' : 'bouton', liste: !!c.ligne });
+    out.push({ id, ...sdFiche(el, c) });
   }
-  return out;
+  return { controles: out, couverts };
+}
+
+/** Ce que le rapport dit d'un contrôle : son nom, bascule ou bouton, et s'il est dans une liste. */
+function sdFiche(el, c) {
+  return { nom: sdNom(el), role: sdEstBascule(el) ? 'bascule' : 'bouton', liste: !!c.ligne };
 }
 
 function sdDefilements() {
@@ -123,8 +138,20 @@ function sdAvant(id) {
   const changes = [];
   const obs = new MutationObserver((recs) => { for (const r of recs) changes.push(r); });
   obs.observe(document.body, { childList: true, subtree: true, characterData: true });
-  window.__sondeEtat = { el, top: el.getBoundingClientRect().top, defil: sdDefilements(), dialogues: sdDialogues(), etat: sdEtat(el), changes, obs, url: location.href };
+  window.__sondeEtat = { id, el, sig: sdSignature(el), top: el.getBoundingClientRect().top, defil: sdDefilements(), dialogues: sdDialogues(), etat: sdEtat(el), changes, obs, url: location.href };
   return '';
+}
+
+/** Ce qui reconnaît un contrôle quand le clic l'a remplacé par un nœud neuf (liste reconstruite sans clé stable) : balise, type, id, name, nom. */
+function sdSignature(el) {
+  return { tag: el.tagName, type: el.getAttribute('type') || '', id: el.id, name: el.getAttribute('name') || '', role: el.getAttribute('role') || '', nom: sdNom(el) };
+}
+
+/** L'équivalent unique d'un contrôle remplacé, ou le nombre d'équivalents trouvés quand il n'y en a pas exactement un. */
+function sdEquivalent(sig) {
+  const memes = [...document.getElementsByTagName(sig.tag)].filter((e) => sdVisible(e) && (e.getAttribute('type') || '') === sig.type && e.id === sig.id
+    && (e.getAttribute('name') || '') === sig.name && (e.getAttribute('role') || '') === sig.role && sdNom(e) === sig.nom);
+  return memes.length === 1 ? { el: memes[0], nombre: 1 } : { el: null, nombre: memes.length };
 }
 
 /** Les éléments touchés par les changements du DOM, hors de l'élément cliqué et de ses ancêtres (un nœud retiré compte par son parent). */
@@ -180,31 +207,53 @@ function sdDefilementSubi(avant) {
   return subis;
 }
 
-/** Après le clic : suit l'élément image par image pendant `ms`, puis rend le saut (max et final), le défilement subi, la région changée, le dialogue ouvert. */
+/**
+ * Après le clic : suit l'élément image par image pendant `ms`, puis rend le saut (max et final), le défilement subi, la région changée, le dialogue ouvert.
+ * Un élément remplacé par le clic (nœud détaché) est suivi par son équivalent unique (sdEquivalent), qui reçoit son data-sonde-id pour le second clic ;
+ * sans équivalent unique, le saut est non mesurable (revue r1), jamais nul. Sans état (document neuf après une navigation) : { etatPerdu: true }.
+ */
 async function sdApres(ms) {
   const s = window.__sondeEtat;
+  if (!s) return { etatPerdu: true };
+  let el = s.el;
   let max = 0;
+  const suivre = () => {
+    if (el.isConnected) return true;
+    const q = sdEquivalent(s.sig);
+    if (q.el) el = q.el;
+    return !!q.el;
+  };
   const fin = performance.now() + ms;
   while (performance.now() < fin) {
     await new Promise((r) => requestAnimationFrame(() => r()));
-    if (s.el.isConnected) {
-      const d = s.el.getBoundingClientRect().top - s.top;
+    if (suivre()) {
+      const d = el.getBoundingClientRect().top - s.top;
       if (Math.abs(d) > Math.abs(max)) max = d;
     }
   }
   s.obs.disconnect();
-  const connecte = s.el.isConnected;
+  const connecte = suivre();
+  const remplace = el !== s.el;
+  if (remplace && connecte) el.setAttribute('data-sonde-id', s.id);
   const neuf = sdDialogues().find((d) => !s.dialogues.includes(d));
-  if (neuf) window.__sondeDialogue = { d: neuf, declencheur: s.el };
-  return {
+  if (neuf) window.__sondeDialogue = { d: neuf, declencheur: el };
+  const commun = {
     connecte,
-    sautMax: connecte ? Math.round(max * 10) / 10 : null,
-    sautFinal: connecte ? Math.round((s.el.getBoundingClientRect().top - s.top) * 10) / 10 : null,
+    remplace,
     defilement: sdDefilementSubi(s.defil),
-    regions: connecte ? sdRegions(s.el, s.changes) : null,
-    etatChange: connecte && sdEtat(s.el) !== s.etat,
     navigation: location.href !== s.url,
     dialogue: neuf ? { nom: sdNom(neuf) || sdDecrire(neuf), focusDedans: neuf.contains(document.activeElement) } : null,
+  };
+  if (!connecte) {
+    return { ...commun, sautMax: null, sautFinal: null, regions: null, etatChange: false,
+      nonMesure: `élément remplacé par le clic, ${sdEquivalent(s.sig).nombre} équivalent(s) visible(s) au lieu d'un : saut non mesurable` };
+  }
+  return {
+    ...commun,
+    sautMax: Math.round(max * 10) / 10,
+    sautFinal: Math.round((el.getBoundingClientRect().top - s.top) * 10) / 10,
+    regions: sdRegions(el, s.changes),
+    etatChange: sdEtat(el) !== s.etat,
   };
 }
 
@@ -237,8 +286,8 @@ function sdMarquerSelecteur(sel, n, prefixe) {
   return ids;
 }
 
-const FONCTIONS = [sdVisible, sdEstBascule, sdNom, sdLigne, sdRisque, sdCouvert, sdCandidat, sdMarquer, sdDefilements, sdDecrire, sdDialogues, sdEtat, sdAvant, sdTouches, sdRegion, sdRegions,
-  sdDefilementSubi, sdApres, sdApresEchap, sdRepos, sdMarquerSelecteur];
+const FONCTIONS = [sdVisible, sdEstBascule, sdNom, sdLigne, sdRisque, sdCouvert, sdCandidat, sdMarquer, sdFiche, sdDefilements, sdDecrire, sdDialogues, sdEtat, sdAvant, sdSignature,
+  sdEquivalent, sdTouches, sdRegion, sdRegions, sdDefilementSubi, sdApres, sdApresEchap, sdRepos, sdMarquerSelecteur];
 
 /** Le script d'initialisation : les constantes et les fonctions ci-dessus, exposées sous window.__sondes. */
 export const SCRIPT_SONDES = `(() => {
@@ -246,4 +295,22 @@ const CONTROLES = ${JSON.stringify(CONTROLES)};
 const RISQUE = ${RISQUE.toString()};
 ${FONCTIONS.map((f) => f.toString()).join('\n')}
 window.__sondes = { ${FONCTIONS.map((f) => f.name).join(', ')} };
+})();`;
+
+/**
+ * Lecture seule, dans la page (revue r1) : les voies d'écriture que le routage réseau de Playwright ne voit pas ou ne coupe pas seul. `sendBeacon`
+ * rend false, `RTCPeerConnection` et `WebTransport` lèvent ; chaque tentative est notée par la liaison `__sondesEcriture` (voie, détail).
+ * HTTP non GET et messages WebSocket sont coupés au niveau du contexte (scripts/sondes-interaction.mjs, sonder).
+ */
+export const SCRIPT_LECTURE_SEULE = `(() => {
+const noter = (voie, detail) => { try { window.__sondesEcriture && window.__sondesEcriture(voie, String(detail).slice(0, 80)); } catch (e) { /* rien */ } };
+if (navigator.sendBeacon) {
+  const balise = function sendBeacon(url, data) { noter('sendBeacon', 'POST ' + url + (data === undefined ? '' : ' « ' + String(data) + ' »')); return false; };
+  try { Object.defineProperty(Navigator.prototype, 'sendBeacon', { configurable: true, writable: true, value: balise }); } catch (e) { /* rien */ }
+}
+for (const nom of ['RTCPeerConnection', 'webkitRTCPeerConnection', 'WebTransport']) {
+  if (!(nom in window)) continue;
+  const bloque = function () { noter(nom, (arguments[0] && typeof arguments[0] === 'string') ? arguments[0] : ''); throw new DOMException(nom + ' bloqué : sondes en lecture seule', 'SecurityError'); };
+  try { Object.defineProperty(window, nom, { configurable: true, writable: true, value: bloque }); } catch (e) { /* rien */ }
+}
 })();`;

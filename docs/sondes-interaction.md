@@ -15,20 +15,44 @@ cadence sondes <url> [--largeur 1440] [--hauteur 900] [--seuil 1] [--max 30] [--
   [--repos 3000] [--attendus docs/qa/expectations.md] [--route /path] [--sans-balayage] [--json file] [--captures folder]
 ```
 
-Exit code 0 when every click was measured and none gave a finding, 1 with findings, 3 without a finding but with clicks that could not be
-measured (a partial pass: the control vanished, the click was refused, a journey found fewer elements than it asks for), 2 on a usage
-error, an unreadable expectations file, or no browser. The text report gives the findings first, then the clicks not measured (`?`), then
-one line of measures per control clicked; `--json` writes every measure, `--captures` one screenshot per finding. A partial pass never
-reads as « no finding »: what was not measured is not verified.
+| Code | Meaning |
+|---|---|
+| 0 | every click measured, no finding |
+| 1 | findings, and only then |
+| 3 | no finding, but a partial pass: clicks not measured (`?`), see below |
+| 4 | not measurable: no click measured at all (every control covered, none on the page, all refused) |
+| 2 | not verified: usage error, unreadable expectations, no browser, or a pass broken by an error |
+
+A click is « not measured » when the control vanished or was refused, was covered by another element at this viewport size, was replaced
+by the click with no single equivalent to follow, when a journey found fewer elements than it asks for, or when the click tried to write
+(blocked, so the app did not get its answer: its real effect is not verified). The text report gives the findings first (`✗`), then the
+clicks not measured (`?`), then the writes blocked (`!`, with the control that sent them), then one line of measures per control;
+`--json` writes every measure, `--captures` one screenshot per finding. A partial pass never reads as « no finding », and a pass with no
+click measured reads « aucun clic mesuré : non mesurable »: what was not measured is not verified.
 
 Playwright is not a dependency of the package. The command takes it from the machine, in the order the `qa-reviewer` uses:
 `CADENCE_PLAYWRIGHT`, the `node_modules` of the current folder, the package of a running Playwright MCP server, the newest npx cache; it
 launches the bundled Chromium, else the installed Chrome (`channel: 'chrome'`). It never installs anything: without a browser it says so
-(code 2) and the pass is « not verified ». Its temporary folders (profile, artefacts) live in a folder of its own, removed at the end.
+(code 2) and the pass is « not verified ». A browser that renders no animation frame (a stuck GPU, seen on 18-11 under WSL: no click can
+complete) is relaunched with software rendering (`--use-gl=disabled`); the report header says so, and WebGL is then off: what a WebGL
+map draws is not probed. Its temporary folders (profile, artefacts) live in a folder of its own, removed at the end.
 
-**Read only.** Every request that writes (`POST`, `PUT`, `PATCH`, `DELETE`) is blocked and counted. The sweep never presses a link, a
-submit or reset button, a button of a `POST` form, or a control whose name says it deletes, sends, saves, publishes, pays, signs in or out,
-downloads, exports or prints. A toggle it flips is flipped back (the second click is measured too); a navigation is undone.
+**Read only.** Every way the browser can write is cut, and every attempt is counted and reported with the control that made it:
+
+- HTTP other than `GET`, `HEAD`, `OPTIONS` (fetch, XHR, a `POST` form) is aborted; a form navigation gets an empty 204, so the page stays;
+- WebSocket: the connection opens and the page receives, but no message from the page reaches the server;
+- service workers are refused (they could serve requests outside the routing); `navigator.sendBeacon` returns false; `RTCPeerConnection`
+  and `WebTransport` throw. `EventSource` only reads (a `GET`), so it passes.
+
+A `GET` that writes on the server side (`?delete=1`) passes: nothing in the request says so. The context is anonymous (no session), which
+most apps refuse to write for anyway. The sweep never presses a link, a submit or reset button, a button of a `POST` form, or a control
+whose name says it deletes, sends, saves, publishes, pays, signs in or out, downloads, exports or prints; an icon button with no name is
+pressed, and what it tries to write is blocked and reported. The `cliquer` steps of a journey press what their selector names, without
+this filter: the project declares them. A checkbox, switch or pressed button it flips is flipped back (the second click is measured too);
+a radio button cannot be unticked by a click and stays where the probe put it, in a context thrown away at the end.
+
+A control that navigates (`location.href = …` in a button) is reported « navigates to <url> (page reopened) »: its jump has no meaning,
+it is neither a finding nor a click not measured, and the page is reopened in a fresh tab before the next control.
 
 ## What is measured
 
@@ -38,10 +62,13 @@ The page is opened, left to settle (`--charge`, 5 s), then:
    gesture. Any change is a finding: the page scrolls by itself.
 2. **The sweep**: every visible checkbox, radio, switch or pressed button, every button of a list (a `li`, `treeitem`, `row`, `option`, or
    an element repeated among its siblings, which catches lists built from `div`s and `label`s), every button with `aria-haspopup`. A control
-   covered by another element at its centre (a folded panel, the map of a phone layout) is left out: the user cannot click it either. At most
+   covered by another element at its centre (a folded panel, the map of a phone layout) is not pressed (the user cannot click it either) and
+is reported as not measurable at this viewport size. At most
    `--par-liste` per list (3) and `--max` in all (30), in document order. For each one:
    - **jump**: the top of the clicked element, before the click and then at every animation frame for `--attente` ms (1 s); the largest
-     shift and the final one are kept;
+     shift and the final one are kept. When the click replaces the element by a new node (a list rebuilt without a stable key), the
+     probe follows its single equivalent (same tag, type, id, name, role and accessible name); with none or several, the click is not
+     measured, never a jump of 0;
    - **changed region**: a `MutationObserver` records what the click added or changed in the DOM, outside the element and its ancestors;
      the report gives the nearest changed region (side and distance in px, edge to edge) and the nearest one **above** the element, which
      is what pushes it down;
@@ -89,5 +116,7 @@ fresh page. `--sans-balayage` runs the journeys alone.
 ## Tests
 
 `test/sondes-interaction-l778.test.ts` plays the probes in a real browser on local pages (`test/fixtures/sondes/`): a list whose rows jump
-when ticked (the D-6 case reduced to the bone) and the same list that does not jump, a good and a bad dialog, a box that scrolls by itself.
+when ticked (the D-6 case reduced to the bone) and the same list that does not jump, a good and a bad dialog, a box that scrolls by itself,
+icon buttons that write by every way (a local HTTP and WebSocket server, `test/sondes-serveur-l778.ts`, proves it receives nothing),
+buttons that navigate by script, a page where every control is covered, a list rebuilt by the click.
 The browser part is skipped, and says so, on a machine with no loadable Playwright.

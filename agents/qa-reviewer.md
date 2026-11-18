@@ -86,8 +86,8 @@ under `nonVerifie`. A defect seen only with it is ranked on the usual severity s
    - the frontend source may be read to LOCATE a cause after a measurement, never as evidence.
    - interactions: run `cadence sondes <page url> --json <tmp>/sondes-<page>-<width>.json` from the project folder, with
      `--largeur 390 --hauteur 844` for the phone width (method and thresholds: `docs/sondes-interaction.md` of the package). It
-     clicks the toggles and list buttons of the page and plays the `parcours:` lines of its section; it blocks every request that
-     writes, so it keeps to step 5. Give one line of measures per page and width (`sondes : <n> contrôles, <k> parcours, <c> constats`).
+     clicks the toggles and list buttons of the page and plays the `parcours:` lines of its section; it cuts every way the browser
+     writes (HTTP, WebSocket, beacons…) and reports each attempt, so it keeps to step 5. Code 3 or 4 (partial, nothing measured) is « not verified ». Give one line of measures per page and width (`sondes : <n> contrôles, <k> parcours, <c> constats`).
      A failed `parcours:` line (a jump, an undergone scroll, a dialog that keeps the focus out or ignores Escape) is a *defect* of
      the expectations, ranked *major*; a finding of the generic sweep is usability, handed to `ux-reviewer` in one line with its
      measure; exit code 2, and the `?` lines of a partial pass (exit code 3), go under « Not verified ».

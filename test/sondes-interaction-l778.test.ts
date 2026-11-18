@@ -4,7 +4,7 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { cheminsPlaywright, codeSortie, constatsClic, DEFAUTS, formater, lancerNavigateur, lireOptions, lireParcours, main, nonMesures, sonder, tousLesConstats, type Rapport } from '../scripts/sondes-interaction.mjs';
+import { cheminsPlaywright, codeSortie, essaisDeLancement, constatsClic, DEFAUTS, formater, lancerNavigateur, lireOptions, lireParcours, main, nonMesures, sonder, tousLesConstats, type Rapport } from '../scripts/sondes-interaction.mjs';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { gardeDe } from '../scripts/sondes-garde.mjs';
@@ -108,6 +108,18 @@ describe('L778 — options et recherche de Playwright', () => {
   it('cherche dans l\'ordre : CADENCE_PLAYWRIGHT, node_modules du dépôt, serveur MCP en cours, cache npx', () => {
     expect(cheminsPlaywright({ CADENCE_PLAYWRIGHT: '/pw' }, '/depot', ['node /x/node_modules/.bin/playwright-mcp'], ['/npx/a'])).toEqual(
       ['/pw', '/depot/node_modules/playwright', '/x/node_modules/playwright', '/npx/a']);
+  });
+
+  it('chaque chemin une fois : plusieurs processus du même serveur MCP, ou le cache qu\'il utilise, ne le font pas essayer deux fois', () => {
+    const mcp = 'node /x/node_modules/.bin/playwright-mcp';
+    expect(cheminsPlaywright({}, '/depot', [mcp, mcp, mcp], ['/x/node_modules/playwright', '/npx/a'])).toEqual(
+      ['/depot/node_modules/playwright', '/x/node_modules/playwright', '/npx/a']);
+  });
+
+  it('le Chromium de chaque paquet d\'abord, puis le Chrome installé une seule fois (le même pour tous les paquets)', () => {
+    expect(essaisDeLancement([{ chemin: 'a' }, { chemin: 'b' }, { chemin: 'c' }]).map((e) => `${e.chemin}:${e.opts.channel ?? 'chromium'}`))
+      .toEqual(['a:chromium', 'b:chromium', 'c:chromium', 'a:chrome']);
+    expect(essaisDeLancement([])).toEqual([]);
   });
 });
 

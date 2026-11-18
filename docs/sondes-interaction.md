@@ -32,7 +32,8 @@ click measured reads « aucun clic mesuré : non mesurable »: what was not meas
 
 Playwright is not a dependency of the package. The command takes it from the machine, in the order the `qa-reviewer` uses:
 `CADENCE_PLAYWRIGHT`, the `node_modules` of the current folder, the package of a running Playwright MCP server, the newest npx cache; it
-launches the bundled Chromium, else the installed Chrome (`channel: 'chrome'`). It never installs anything: without a browser it says so
+launches the bundled Chromium of each package (each path once), else the installed Chrome (`channel: 'chrome'`), tried once: it is the
+same for every package. It never installs anything: without a browser it says so
 (code 2) and the pass is « not verified ». A browser that renders no animation frame (a stuck GPU, seen on 18-11 under WSL: no click can
 complete) is relaunched with software rendering (`--use-gl=disabled`); the report header says so, and WebGL is then off: what a WebGL
 map draws is not probed. Its temporary folders (profile, artefacts) live in a folder of its own, removed at the end.

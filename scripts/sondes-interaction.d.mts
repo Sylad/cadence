@@ -30,6 +30,7 @@ export interface Navigateur { navigateur: unknown; chemin: string; rendu: 'gpu' 
 export const DEFAUTS: Readonly<Options>;
 export function lireParcours(texte: string, route: string): Parcours[];
 export function cheminsPlaywright(env: Record<string, string | undefined>, cwd: string, processus: string[], caches: string[]): string[];
+export function essaisDeLancement<M extends { chemin: string }>(modules: M[]): Array<M & { opts: { channel?: 'chrome' } }>;
 export function lancerNavigateur(env: Record<string, string | undefined>, cwd: string): Promise<Navigateur | null>;
 export function constatsClic(m: Mesure | null | undefined, seuil: number): Constat[];
 export function sonder(navigateur: unknown, url: string, o: Options, parcours: Parcours[]): Promise<Rapport>;

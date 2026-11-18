@@ -46,7 +46,10 @@ export function lireParcours(texte, route) {
   return out;
 }
 
-/** Où chercher Playwright, dans l'ordre : CADENCE_PLAYWRIGHT, le node_modules du dépôt, le serveur MCP Playwright en cours, le cache npx le plus récent. */
+/**
+ * Où chercher Playwright, dans l'ordre : CADENCE_PLAYWRIGHT, le node_modules du dépôt, le serveur MCP Playwright en cours, le cache npx le plus récent.
+ * Chaque chemin une fois (plusieurs processus du même serveur MCP le citaient chacun).
+ */
 export function cheminsPlaywright(env, cwd, processus, caches) {
   const out = [];
   if (env.CADENCE_PLAYWRIGHT) out.push(env.CADENCE_PLAYWRIGHT);
@@ -55,7 +58,7 @@ export function cheminsPlaywright(env, cwd, processus, caches) {
     const m = /(\S+)\/node_modules\/\.bin\/playwright-mcp/.exec(ligne);
     if (m) out.push(join(m[1], 'node_modules', 'playwright'));
   }
-  return [...out, ...caches];
+  return [...new Set([...out, ...caches])];
 }
 
 function cachesNpx(home) {
@@ -94,19 +97,23 @@ function chargerPlaywright(chemin) {
   try { return { chemin, pw: createRequire(join(resolve(chemin), 'package.json'))(resolve(chemin)) }; } catch { return null; }
 }
 
-/** Chromium du paquet, sinon Chrome installé, lancé avec `args` et gardé seulement s'il affiche des images ; null sinon. */
-async function lancerQuiAffiche(pw, args) {
-  for (const opts of [{}, { channel: 'chrome' }]) {
-    const navigateur = await pw.chromium.launch({ headless: true, ...opts, args }).catch(() => null);
-    if (!navigateur) continue;
-    if (await afficheDesImages(navigateur).catch(() => false)) return navigateur;
-    await navigateur.close().catch(() => {});
-  }
+/**
+ * Les essais d'un rendu, dans l'ordre : le Chromium de chaque paquet, puis le Chrome installé UNE fois (c'est le même pour tous les paquets : chaque
+ * essai qui ne rend aucune image coûte 2 s, et cinq paquets le relançaient en vain avant d'atteindre un Chromium, vécu le 18-11 : 16 s de lancement).
+ */
+export const essaisDeLancement = (modules) => [...modules.map((m) => ({ ...m, opts: {} })), ...modules.slice(0, 1).map((m) => ({ ...m, opts: { channel: 'chrome' } }))];
+
+/** Le navigateur lancé avec `opts` et `args`, gardé seulement s'il affiche des images ; null sinon. */
+async function lancerQuiAffiche(pw, opts, args) {
+  const navigateur = await pw.chromium.launch({ headless: true, ...opts, args }).catch(() => null);
+  if (!navigateur) return null;
+  if (await afficheDesImages(navigateur).catch(() => false)) return navigateur;
+  await navigateur.close().catch(() => {});
   return null;
 }
 
 /**
- * Charge Playwright puis lance Chromium (celui du paquet, sinon Chrome installé) ; null quand rien ne se lance. Un navigateur qui ne rend aucune image
+ * Charge Playwright puis lance Chromium (celui d'un paquet, sinon Chrome installé : essaisDeLancement) ; null quand rien ne se lance. Un navigateur qui ne rend aucune image
  * (GPU de la machine bloqué, vécu le 18-11 sous WSL) est refermé et relancé en rendu logiciel ; `rendu` le dit, le rapport aussi (WebGL y est coupé).
  * Le navigateur prend ses dossiers temporaires (profil, artefacts) dans un dossier à lui, retiré par `fermer()` : une passe ne laisse rien dans le
  * dossier temporaire de la machine. La garde de lecture seule y est armée (armerGarde) ; si elle ne s'arme pas, `gardeErreur` le dit.
@@ -118,8 +125,8 @@ export async function lancerNavigateur(env, cwd) {
   try {
     const modules = cheminsPlaywright(env, cwd, processus(), cachesNpx(env.HOME || '')).map(chargerPlaywright).filter(Boolean);
     for (const { rendu, args } of LANCEMENTS) {
-      for (const { chemin, pw } of modules) {
-        const navigateur = await lancerQuiAffiche(pw, args);
+      for (const { chemin, pw, opts } of essaisDeLancement(modules)) {
+        const navigateur = await lancerQuiAffiche(pw, opts, args);
         if (!navigateur) continue;
         // Sans garde, `sonder` refuse de jouer (lecture seule non garantie) : l'erreur est gardée pour le dire.
         const garde = await armerGarde(navigateur, tmp).catch((e) => ({ erreur: premiereLigne(e) }));

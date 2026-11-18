@@ -336,7 +336,6 @@ function retirerRun(e: Etat): void {
 
 function fin(e: Etat, o: Opts, registre = registreOuvert(e.worktree)): Etat {
   if (e.etat !== 'integre' && existsSync(e.worktree)) e.tete = essaiGit(e.worktree, 'rev-parse', 'HEAD').stdout.trim() || e.tete;
-  sauver(e);
   rendre(e, o);
   const duree = Math.round((Date.now() - Date.parse(e.debut)) / 1000);
   const ou = e.integre ? ` (${e.cible} = ${e.integre})` : '', rapport = e.rapport_tour ? ` · ${origineRapport(e)}` : '';
@@ -344,6 +343,7 @@ function fin(e: Etat, o: Opts, registre = registreOuvert(e.worktree)): Etat {
   if (e.passes?.length) o.out(lignePasses(e.passes)); // L726 : quel modèle a joué chaque passe, et pourquoi
   for (const r of registre) o.out(`registre : ${r}`);
   if (e.etat !== 'integre') o.out(`worktree gardé : ${e.worktree} (état : ${e.fichier})`);
+  sauver(e); // L773 : l'état final après les lignes de fin : qui le voit (--liste, le lead) lit un journal --fond complet
   return e;
 }
 

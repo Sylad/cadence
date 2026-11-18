@@ -5,13 +5,19 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { cheminsPlaywright, codeSortie, essaisDeLancement, constatsClic, DEFAUTS, formater, lancerNavigateur, lireOptions, lireParcours, main, nonMesures, sonder, tousLesConstats, type Rapport } from '../scripts/sondes-interaction.mjs';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { gardeDe } from '../scripts/sondes-garde.mjs';
 import { serveurSondes } from './sondes-serveur-l778.js';
+import { entreeDuLot } from './changelog-section.js';
+import { sousTempDir } from './sondes-tmp-l778.js';
 import { ENTETES_LARGE, essaiLarge, essaiMinimal, essaiPrudent } from './sondes-essais-r3-l778.js';
 
 const page = (nom: string) => pathToFileURL(join(import.meta.dirname, 'fixtures', 'sondes', `${nom}.html`)).href;
+/** Le dépôt, et le nom sous lequel les tests de texte lisent l'entrée du CHANGELOG de L778 : le fragment avant la publication, la section de CHANGELOG.md après (entreeDuLot). */
+const RACINE = join(import.meta.dirname, '..');
+const CHANGELOG_L778 = 'changelog (L778)';
 const RAPIDE = { ...DEFAUTS, charge: 200, repos: 1500, attente: 400 };
 
 describe('L778 — parcours lus dans docs/qa/expectations.md', () => {
@@ -124,7 +130,7 @@ describe('L778 — options et recherche de Playwright', () => {
   });
 });
 
-const lance = await lancerNavigateur(process.env, process.cwd());
+const { rendu: lance } = await sousTempDir(() => lancerNavigateur(process.env, process.cwd()));
 afterAll(async () => { await lance?.fermer(); });
 
 describe.skipIf(!lance)('L778 — sondes jouées sur des pages de test locales (navigateur réel)', () => {
@@ -268,15 +274,15 @@ describe('L778 revue r2 — le rapport ne dit que ce que la lecture seule couvre
   });
 
   it('la doc, le changelog et les agents n\'affirment pas une coupure totale et nomment ce qui n\'est pas couvert', () => {
-    const lire = (f: string) => readFileSync(join(import.meta.dirname, '..', f), 'utf8');
-    for (const f of ['docs/sondes-interaction.md', 'changelog.d/L778.md', 'agents/qa-reviewer.md', 'agents/ux-reviewer.md', 'scripts/sondes-interaction.mjs']) {
+    const lire = (f: string) => (f === CHANGELOG_L778 ? entreeDuLot(RACINE, 'L778') : readFileSync(join(RACINE, f), 'utf8'));
+    for (const f of ['docs/sondes-interaction.md', CHANGELOG_L778, 'agents/qa-reviewer.md', 'agents/ux-reviewer.md', 'scripts/sondes-interaction.mjs']) {
       const t = lire(f);
       expect(t, f).not.toMatch(/rien n'a atteint le serveur|every way the browser (can )?writes?|cut every way|every way the browser writes is cut/i);
     }
     const doc = lire('docs/sondes-interaction.md');
     expect(doc).toContain('SharedWorker');
     expect(doc).toMatch(/not covered/i);
-    for (const f of ['changelog.d/L778.md', 'agents/qa-reviewer.md', 'agents/ux-reviewer.md']) expect(lire(f), f).toMatch(/GET that writes|not covered/i);
+    for (const f of [CHANGELOG_L778, 'agents/qa-reviewer.md', 'agents/ux-reviewer.md']) expect(lire(f), f).toMatch(/GET that writes|not covered/i);
   });
 });
 
@@ -311,13 +317,18 @@ describe.skipIf(!lance)('L778 revue r2 — workers dédiés, partagés, module e
 
   it('sans garde (navigateur lancé sans port de débogage), rien n\'est sondé', async () => {
     const pw = createRequire(join(lance!.chemin, 'package.json'))(lance!.chemin);
-    const nu = await pw.chromium.launch({ headless: true });
+    // Correctif de publication : Chromium lancé hors de lancerNavigateur prend ses dossiers (artefacts, profil) dans un tempDir(), jamais dans la racine temporaire de la suite.
+    const playwrightDans = (d: string) => readdirSync(d).filter((n) => n.startsWith('playwright')).sort();
+    const avant = playwrightDans(tmpdir());
+    const { rendu: nu, dossier } = await sousTempDir((): Promise<{ close(): Promise<void> }> => pw.chromium.launch({ headless: true }));
     try {
+      expect(playwrightDans(dossier).length, 'les dossiers de Playwright sont sous le tempDir() du test').toBeGreaterThan(0);
       expect(gardeDe(nu)).toBeUndefined();
       await expect(sonder(nu, page('stable'), RAPIDE, [])).rejects.toThrow(/garde de lecture seule absente/);
     } finally {
       await nu.close();
     }
+    expect(playwrightDans(tmpdir()), 'rien de Playwright ajouté au dossier temporaire de la suite').toEqual(avant);
   });
 });
 
@@ -358,8 +369,8 @@ describe('L778 revue r3 — fonctions retirées de la page : le rapport les nomm
   });
 
   it('la doc, le changelog et les agents ne promettent plus « every worker » ni « paused at its start » pour un SharedWorker, et nomment WebTransport réel', () => {
-    const lire = (f: string) => readFileSync(join(import.meta.dirname, '..', f), 'utf8');
-    for (const f of ['docs/sondes-interaction.md', 'changelog.d/L778.md', 'agents/qa-reviewer.md', 'agents/ux-reviewer.md']) {
+    const lire = (f: string) => (f === CHANGELOG_L778 ? entreeDuLot(RACINE, 'L778') : readFileSync(join(RACINE, f), 'utf8'));
+    for (const f of ['docs/sondes-interaction.md', CHANGELOG_L778, 'agents/qa-reviewer.md', 'agents/ux-reviewer.md']) {
       const t = lire(f).replace(/\s+/g, ' ');
       expect(t, f).not.toMatch(/every worker|no message reaches the server|shared, module and blob workers\)/i);
       expect(t, f).toMatch(/SharedWorker/);

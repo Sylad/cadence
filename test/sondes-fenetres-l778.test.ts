@@ -8,6 +8,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { codeSortie, DEFAUTS, formater, lancerNavigateur, sonder, type Rapport } from '../scripts/sondes-interaction.mjs';
 import { serveurSondes } from './sondes-serveur-l778.js';
+import { entreeDuLot } from './changelog-section.js';
+import { sousTempDir } from './sondes-tmp-l778.js';
 
 /** Les variantes de l'essai r4 (pages5.mjs), plus trois voies voisines : document.open à trois arguments, deux popups avec page, popup refermé par l'app. */
 const V: Record<string, string> = {
@@ -40,7 +42,7 @@ document.getElementById('b1').addEventListener('click', () => { ${V[v]} });
   '/shared.js': `const ws = new WebSocket(location.origin.replace('http', 'ws') + '/socket?shared'); ws.onopen = () => ws.send('SHARED DELETE');`,
 });
 
-const lance = await lancerNavigateur(process.env, process.cwd());
+const { rendu: lance } = await sousTempDir(() => lancerNavigateur(process.env, process.cwd()));
 afterAll(async () => { await lance?.fermer(); });
 
 const BASE: Rapport = { url: 'u', largeur: 390, hauteur: 844, seuil: 1, date: 'd', repos: [], ecrituresBloquees: 0, parcours: [],
@@ -68,9 +70,10 @@ describe('L778 revue r4 — une fenêtre non gardée est un constat, code non nu
   });
 
   it('la doc et le changelog ne disent plus « every popup » : fermé par défaut, constat sinon ; la raison de close() est sous « Not covered »', () => {
-    const lire = (f: string) => readFileSync(join(import.meta.dirname, '..', f), 'utf8').replace(/\s+/g, ' ');
-    for (const f of ['docs/sondes-interaction.md', 'changelog.d/L778.md']) {
-      const t = lire(f);
+    const racine = join(import.meta.dirname, '..');
+    const textes = { 'docs/sondes-interaction.md': readFileSync(join(racine, 'docs/sondes-interaction.md'), 'utf8'), 'changelog (L778)': entreeDuLot(racine, 'L778') };
+    for (const [f, brut] of Object.entries(textes)) {
+      const t = brut.replace(/\s+/g, ' ');
       expect(t, f).not.toMatch(/every (iframe and every )?popup|every iframe and popup/i);
       expect(t, f).toContain('fenêtre non gardée');
       expect(t, f).toMatch(/closed by default/i);

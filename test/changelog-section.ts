@@ -1,4 +1,6 @@
-import { changelogWithFragments } from '../src/changelog-fragments.js';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { changelogWithFragments, FRAGMENTS_DIR } from '../src/changelog-fragments.js';
 
 /**
  * Le CHANGELOG du dépôt tel que la prochaine release le publierait (L679) : les fragments de `changelog.d/` assemblés sous `[Unreleased]`.
@@ -21,4 +23,22 @@ export function readsUnreleasedOnly(source: string): boolean {
   const code = source.split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
   const readsRepoLog = /\bread\w*\(\s*(?:join\((?:root|__dirname|import\.meta\.dirname)\b[^)]*,\s*)?['"](?:\.\.\/)?CHANGELOG\.md['"]\s*\)/.test(code);
   return readsRepoLog && /(?:startsWith|indexOf|includes|split)\(\s*['"]## \[Unreleased\]/.test(code);
+}
+
+/**
+ * Le texte du CHANGELOG qu'un lot a écrit, sous ses deux formes (L778, correctif de publication : 2.0.16 refusée, ENOENT sur `changelog.d/L778.md`
+ * dans le clone du commit de version) : avant la publication, son fragment `changelog.d/<lot>.md` ; après, les entrées qui citent le lot dans la
+ * section de `CHANGELOG.md` où `cadence release` a assemblé le fragment avant de le retirer. Seules les entrées du lot sont rendues, jamais
+ * celles des autres lots de la même version : un test peut y affirmer ce que le texte ne dit pas. Un test qui lit l'entrée d'un lot passe par ici,
+ * jamais par `changelog.d/<lot>.md` directement.
+ */
+export function entreeDuLot(root: string, lot: string): string {
+  const fragment = join(root, FRAGMENTS_DIR, `${lot}.md`);
+  if (existsSync(fragment)) return readFileSync(fragment, 'utf8');
+  const cite = new RegExp(`\\b${lot}\\b`);
+  const section = changelogSectionOf(readFileSync(join(root, 'CHANGELOG.md'), 'utf8'), cite);
+  // Une entrée : une puce en début de ligne et ses lignes de suite, jusqu'à la puce, la rubrique ou la section suivante.
+  const entrees = section.split(/\n(?=- |#{2,3} )/).filter((e) => e.startsWith('- ') && cite.test(e)).map((e) => e.trimEnd());
+  if (!entrees.length) throw new Error(`entrée du lot ${lot} introuvable : ni ${FRAGMENTS_DIR}/${lot}.md, ni entrée qui cite ${lot} dans une section de CHANGELOG.md`);
+  return `${entrees.join('\n')}\n`;
 }

@@ -61,7 +61,7 @@ export function purger(racine: string, dossier: string, o: { dryRun: boolean; ou
     if (!raison) candidats.push({ e, fichiers: annexes(e) });
     else if (raison !== 'pas fini' && raison !== 'récent') o.out(`gardé ${e.id} : ${raison}`);
   }
-  // Un journal --fond est retiré avec le dernier run qui le cite (plusieurs runs peuvent écrire dans le même journal : --reponse --fond).
+  // Un journal --fond est retiré avec le dernier run qui le cite (depuis L773, un journal par run, fond-<id>.log ; un journal d'avant, nommé à la seconde, a pu servir à deux runs).
   const purges = new Set(candidats.map((c) => c.e.fichier));
   const cites = new Set(tous.filter((x) => !purges.has(x.fichier)).map((x) => x.journal).filter(Boolean));
   for (const c of candidats) {

@@ -4,7 +4,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import type { Io } from '../cli.js';
 import type { Executeur } from '../bench/bras.js';
 import { MODELES, modeleRun } from './aiguillage.js';
-import { etatVu, executerRun, fichierRun, occupantRun, repondreRun, type Etat } from './run.js';
+import { etatVu, executerRun, nouvelIdRun, fichierRun, occupantRun, repondreRun, type Etat } from './run.js';
 import { heureLocale, type Quota } from './quota.js';
 import { archives, clore, etatListe } from './clore.js';
 import { purger, PURGE_JOURS_DEFAUT } from './purger.js';
@@ -98,13 +98,14 @@ export async function cmdRun(a: string[], io: Io, exec?: Executeur): Promise<num
     try { modele = modeleRun(choix, io.env.CADENCE_RUN_MODELE); } catch (e) { io.err((e as Error).message); return 2; }
     if (a.includes('--fond')) { // relancé détaché, sans --fond : vécu au pro le 10-11, une session de lot morte avec celle qui l'avait lancée
       const racine = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: io.cwd, encoding: 'utf8' }).trim(), d = join(dirname(racine), '.cadence-run'); mkdirSync(d, { recursive: true });
-      const journal = join(d, `fond-${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}.log`), fd = openSync(journal, 'a');
-      spawn(process.execPath, [...process.execArgv, process.argv[1], 'run', '--veilleur', ...a.filter((x) => x !== '--fond')], { cwd: io.cwd, detached: true, stdio: ['ignore', fd, fd], env: { ...process.env, CADENCE_RUN_JOURNAL: journal } }).unref(); // L711 : un veilleur lance le run
-      out(`cadence run lancé en arrière-plan ; journal : ${journal} ; état : cadence run --liste`);
+      // L773 (issue #64) : deux runs de la même seconde mêlaient leurs lignes dans fond-<heure>.log ; le journal porte l'id du run, choisi ici ('wx' : jamais partagé)
+      const id = nouvelIdRun(), journal = join(d, `fond-${id}.log`), fd = openSync(journal, 'wx');
+      spawn(process.execPath, [...process.execArgv, process.argv[1], 'run', '--veilleur', ...a.filter((x) => x !== '--fond')], { cwd: io.cwd, detached: true, stdio: ['ignore', fd, fd], env: { ...process.env, CADENCE_RUN_JOURNAL: journal, CADENCE_RUN_ID: id } }).unref(); // L711 : un veilleur lance le run
+      out(`cadence run ${id} lancé en arrière-plan ; journal : ${journal} ; état : cadence run --liste`);
       return 0;
     }
     if (io.env.CADENCE_RUN_JOURNAL) out(identite()); // L711 : au lancement d'un run --fond, de quoi savoir au prochain arrêt inexpliqué où il vivait
     const modeleRaison = choix !== undefined ? '--modele' : io.env.CADENCE_RUN_MODELE ? 'CADENCE_RUN_MODELE' : undefined;
-    return executerRun({ repo: io.cwd, demande: mots.join(' '), pieces, taille, complet, lot, registre: registres[0], modele: modeleRaison ? modele : undefined, modeleRaison, exec, out, sansPorte, journal: io.env.CADENCE_RUN_JOURNAL || undefined }).etat === 'integre' ? 0 : 1;
+    return executerRun({ id: io.env.CADENCE_RUN_JOURNAL ? io.env.CADENCE_RUN_ID || undefined : undefined, repo: io.cwd, demande: mots.join(' '), pieces, taille, complet, lot, registre: registres[0], modele: modeleRaison ? modele : undefined, modeleRaison, exec, out, sansPorte, journal: io.env.CADENCE_RUN_JOURNAL || undefined }).etat === 'integre' ? 0 : 1;
   } catch (e) { io.err(String((e as Error).message ?? e)); return 1; }
 }

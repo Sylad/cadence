@@ -74,6 +74,7 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // conflit résolu, L723), dite une fois par changement et non à chaque essai, sans ligne tassée.
   // L767 : run 1027 (+104) : cadence run --purger [--dry-run] (purger.ts : les fichiers des runs intégrés ou clos depuis run.purgeAfterDays jours, jamais un
   // run qui se reprend ni un worktree gardé) et --liste / --clore d'un run qui se reprend dont la tête est déjà sur la cible, sans ligne tassée.
+  // L773 (issue #64) : run 1032 (+5) : un journal par run --fond, nommé d'après l'id du run (nouvelIdRun, ID_RUN, id passé par le lanceur), sans ligne tassée.
   it('les totaux sont ceux de R29 : noyau 3000, mesure 2303 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742, L752, L756, L762)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
     expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2303]);

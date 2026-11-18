@@ -149,7 +149,7 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false, sujet?: string
   const exec = o.exec ?? creerExecuteur('claude', 4 * 3600_000);
   // L699 : le modèle est celui du lancement, gardé dans l'état (une reprise par --reponse ne le change pas) ; un état d'avant L699 n'en a pas : opus.
   // orchestrate.prodAccess (comme les vagues de la v1) : sans lui, ni kubectl, ni helm, ni KUBECONFIG ; avec lui, la session joue le banc du projet
-  const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !LIEN_HOTE.test(k) && k !== 'CADENCE_RUN_JOURNAL')), CADENCE_CLONE: e.worktree, CADENCE_PIECES: JSON.stringify(e.pieces), CADENCE_BANC_RACINE: dossierRuns(e.repo), ...(e.acces_cluster ? {} : { KUBECONFIG: '/dev/null' }) };
+  const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !LIEN_HOTE.test(k) && k !== 'CADENCE_RUN_JOURNAL' && k !== 'CADENCE_RUN_ID')), CADENCE_CLONE: e.worktree, CADENCE_PIECES: JSON.stringify(e.pieces), CADENCE_BANC_RACINE: dossierRuns(e.repo), ...(e.acces_cluster ? {} : { KUBECONFIG: '/dev/null' }) };
   const interdits = e.acces_cluster ? OUTILS_INTERDITS.filter((x) => !/kubectl|helm/.test(x)) : OUTILS_INTERDITS;
   e.passes = [...(e.passes ?? []), { quoi: quoiPasse(e, neuve, sujet), modele: e.modele ?? 'opus', raison: e.modele_raison ?? (e.modele ? 'choisi au lancement' : 'par défaut') }]; // L726
   sauver(e);
@@ -347,8 +347,11 @@ function fin(e: Etat, o: Opts, registre = registreOuvert(e.worktree)): Etat {
   return e;
 }
 
-/** `modeleRaison` : d'où vient `modele` (--modele, CADENCE_RUN_MODELE) ; sans `modele`, opus « par défaut ». */
-export function executerRun(a: { repo: string; demande: string; pieces?: string[]; taille?: string; complet?: boolean; lot?: string; registre?: string; modele?: string; modeleRaison?: string; exec?: Executeur;
+/** L773 (issue #64) : heure à la seconde et pid du créateur (deux processus vivants n'ont pas le même pid) ; un lanceur --fond le choisit pour nommer le journal. */
+export const nouvelIdRun = (pid = process.pid, quand = new Date()) => `${quand.toISOString().slice(0, 19).replace(/[-:T]/g, '')}-${pid}`;
+export const ID_RUN = /^\d{14}-\d+$/;
+/** `modeleRaison` : d'où vient `modele` (--modele, CADENCE_RUN_MODELE) ; sans `modele`, opus « par défaut ». `id` : celui que le lanceur --fond a choisi. */
+export function executerRun(a: { id?: string; repo: string; demande: string; pieces?: string[]; taille?: string; complet?: boolean; lot?: string; registre?: string; modele?: string; modeleRaison?: string; exec?: Executeur;
   out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null; journal?: string }): Etat {
   const choisi = modeleRun(a.modele); // avant le worktree : un modèle inconnu ne crée rien, une entrée --registre absente non plus
   const repo = git(a.repo, 'rev-parse', '--show-toplevel'), cible = git(repo, 'rev-parse', '--abbrev-ref', 'HEAD');
@@ -356,7 +359,8 @@ export function executerRun(a: { repo: string; demande: string; pieces?: string[
   if (a.registre && a.registre !== 'humaine') entreeCommitee(repo, a.registre);
   // L722 : D-1.json modifié à la main pendant un run (13-11) a fait refuser l'intégration ; ce qui n'est pas commité au départ est nommé (lu avant le worktree).
   const sales = fichiersNonCommites(repo) ?? [];
-  const id = `${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}-${process.pid}`;
+  const id = a.id ?? nouvelIdRun();
+  if (!ID_RUN.test(id)) throw new Error(`cadence run : id de run mal formé : ${id}`);
   const runs = dossierRuns(repo), worktree = cheminWorktree(repo, runs, `${basename(repo)}-${id}`); // L705 (C1) : hors du dépôt avec run.worktreeOutside ; état, verrou, journal dans runs
   // L726 : Opus par défaut, Fable à la 3e passe de correction du lot ou après deux revues non conformes (runs précédents du lot, revue du plan au lancement)
   const depart = modeleDeDepart({ modele: choisi, raison: a.modele ? a.modeleRaison ?? '--modele' : 'par défaut' }, a.lot,

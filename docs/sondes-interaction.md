@@ -21,7 +21,7 @@ cadence sondes <url> [--largeur 1440] [--hauteur 900] [--seuil 1] [--max 30] [--
 | 1 | findings, and only then |
 | 3 | no finding, but a partial pass: clicks not measured (`?`), or a page error on a removed function, see below |
 | 4 | not measurable: no click measured at all (every control covered, none on the page, all refused) |
-| 2 | not verified: usage error, unreadable expectations, no browser, the read-only guard not armed, a target not guarded (see Read only), or a pass broken by an error |
+| 2 | not verified: usage error, unreadable expectations, no browser, the read-only guard not armed, a window or a target not guarded (see Read only), or a pass broken by an error |
 
 A click is « not measured » when the control vanished or was refused, was covered by another element at this viewport size, was replaced
 by the click with no single equivalent to follow, when a journey found fewer elements than it asks for, or when the click tried to write
@@ -55,7 +55,7 @@ the pass, and Playwright's WebSocket routing):
 
 *Removed from the page* (third review, r3). Closing each writing API one by one did not converge: a `SharedWorker` started before the
 guard reached it and still wrote through its WebSocket, and `WebSocketStream` passed in the page. So what the guard cannot close for sure
-is taken away: an init script that runs **before any script of the page**, in the page, every iframe and every popup, makes `SharedWorker`,
+is taken away: an init script that runs **before any script of the page**, in the page and in each iframe, makes `SharedWorker`,
 `WebSocketStream` and `WebTransport` `undefined` (as in a browser that does not have them; the page can neither delete nor redefine the
 property) and makes `navigator.serviceWorker.register` return a rejected promise. A page that tests for them takes its fallback. A page
 that calls one without testing throws (`SharedWorker is not a constructor`) and its script stops there: the probe keeps that error
@@ -66,18 +66,34 @@ one, the report says so:
   fonction coupée pendant la sonde : SharedWorker (demandée 2 fois par la page ou un iframe ; un test de présence compte) — ce qui en dépend dans l'app n'est pas sondé
 ```
 
+*Closed by default* (fourth review, r4). That init script did not reach every window: the second popup a page opens in the same task
+(`window.open(''); const p = window.open('')`) did not have it when `window.open` returned, and `new p.WebSocket(url)` wrote to the
+server with « no finding », code 0. The probe no longer assumes a window is guarded, it asks for a proof. The init script sets a marker
+on the window it runs in, with whether a script of the document already existed. A page, popup or iframe counts as guarded only where
+the probe reads that marker:
+
+- `window.open` (and `document.open` with three arguments, which opens a window) is guarded in every window that has the script: a
+  window that comes back without the marker is **closed before the page gets it** and the call returns `null`, as with a blocked popup;
+- the probe reads the marker of every page of the context and of every iframe, at each new document, and again at the end of the pass;
+  a window without it, one that got it after a script, one that closed or was detached before it could be read, is not proven.
+
+Each such window is a finding, `✗ fenêtre non gardée : …`, the summary line reads « passe non vérifiée », and the exit code is 2. What
+is guaranteed is this and no more: a popup is either proven guarded or closed and reported; a first popup read in the same task was
+measured guarded, a second one is closed. What the app does with a popup that was closed is not probed.
+
 A feature test (`typeof WebTransport`) counts as asking: the probe cannot tell it from a use. What the app does with the removed function
 (a socket kept in a `SharedWorker`, an offline cache) is not probed, and a reviewer reads that line before trusting « no finding ».
 
 The report says what the read-only covered for the pass (`lecture seule : …`, the number of dedicated workers it guarded, the functions
 removed, and what is not covered) and counts the writes « cut in the browser before they left it »; it never says the server received
-nothing, which it cannot measure. The pass is « not verified » (code 2, `✗ cible non gardée`) when a worker could not be attached, when a
-`SharedWorker` or a service worker starts although the page cannot create one, or when a function could not be removed; without the
-debugging port the probe refuses to run (code 2).
+nothing, which it cannot measure. The pass is « not verified » (code 2) when a window is not proven guarded (`✗ fenêtre non gardée`,
+above), and (`✗ cible non gardée`) when a worker could not be attached, when a `SharedWorker` or a service worker starts although the
+page cannot create one, or when a function could not be removed or guarded; without the debugging port the probe refuses to run (code 2).
 
 **Not covered:** a `GET` that writes; a real `WebTransport` session (no HTTP/3 server in the tests: only the absence of the constructor in
-the page and its throwing in a dedicated worker are verified); a browser other than Chromium (the guard speaks its protocol); while the
-pass runs, the debugging port is open to local processes of the machine.
+the page and its throwing in a dedicated worker are verified); a WebSocket close reason (`ws.close(1000, reason)` is relayed
+with the closing: up to 123 bytes reach the server, measured in r4; messages are not forwarded); a browser other than Chromium (the
+guard speaks its protocol); while the pass runs, the debugging port is open to local processes of the machine.
 
 A `GET` that writes on the server side (`?delete=1`) passes: nothing in the request says so. The context is anonymous (no session), which
 most apps refuse to write for anyway. The sweep never presses a link, a submit or reset button, a button of a `POST` form, or a control
@@ -156,6 +172,8 @@ icon buttons that write through the page and through dedicated workers (classic,
 HTTP and WebSocket server, `test/sondes-serveur-l778.ts`, records what it receives, and receives no write;
 the two trials of the third review (`test/sondes-essais-r3-l778.ts`: a `SharedWorker` that keeps `send`, `WebSocketStream` in the page,
 four kinds of iframe, a popup, a burst of workers writing at their first line, a service worker, `<a ping>`, forms, a CSP report): no
-write received, the `SharedWorker` never loaded;
+write received, the `SharedWorker` never loaded; the trial of the fourth review (`test/sondes-fenetres-l778.test.ts`: two popups opened in
+the same task, the second used at once through `WebSocket`, `WebSocketStream`, `document.write`, `document.open`, an iframe): no message
+received, « fenêtre non gardée », code 2;
 buttons that navigate by script, a page where every control is covered, a list rebuilt by the click.
 The browser part is skipped, and says so, on a machine with no loadable Playwright.

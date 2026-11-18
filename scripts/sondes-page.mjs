@@ -302,8 +302,16 @@ export const FONCTIONS_RETIREES = ['SharedWorker', 'WebSocketStream', 'WebTransp
 /** L'enregistrement d'un service worker, refusé dans la page : le nom que le rapport lui donne. */
 export const ENREGISTREMENT_SW = 'navigator.serviceWorker.register';
 
+/** Le marqueur que le script d'initialisation pose sur la fenêtre où il tourne : `{ tot }`, vrai quand aucun script du document n'existait encore. */
+export const MARQUE_GARDE = '__sondesGarde';
+
 /**
  * Lecture seule, dans la page et dans chaque iframe ou popup, AVANT tout script de la page (script d'initialisation du contexte).
+ * - Revue r4 : FERMÉ PAR DÉFAUT. Le second popup ouvert dans la même tâche ne recevait pas ce script (le premier, oui) et ce qu'on y lisait tout
+ *   de suite écrivait sur le serveur. Le script pose donc un marqueur sur la fenêtre où il tourne (MARQUE_GARDE), et garde `window.open` (et
+ *   `document.open` à trois arguments, qui ouvre une fenêtre) : une fenêtre rendue sans marqueur est FERMÉE avant que la page ne la reçoive,
+ *   l'appel rend `null` (comme un popup bloqué) et la liaison `__sondesCoupee('fenetre', …)` le dit : « fenêtre non gardée », passe non vérifiée.
+ *   La sonde vérifie de son côté le marqueur de chaque page, popup et iframe (surveillerFenetres de scripts/sondes-garde.mjs).
  * - Revue r1 : `sendBeacon` rend false, `RTCPeerConnection` lève ; chaque tentative est notée par la liaison `__sondesEcriture` (voie, détail).
  * - Revue r3 : fermer chaque API d'écriture une à une ne convergeait pas (un SharedWorker gardait `send`, WebSocketStream passait dans la page).
  *   Les constructeurs que la garde ne sait pas fermer à coup sûr sont RETIRÉS : `SharedWorker`, `WebSocketStream`, `WebTransport` valent
@@ -318,6 +326,29 @@ export const SCRIPT_LECTURE_SEULE = `(() => {
 const noter = (voie, detail) => { try { window.__sondesEcriture && window.__sondesEcriture(voie, String(detail).slice(0, 80)); } catch (e) { /* rien */ } };
 let muet = false;
 const dire = (quoi, nom) => { if (muet) return; try { window.__sondesCoupee && window.__sondesCoupee(quoi, nom, location.href); } catch (e) { /* rien */ } };
+const MARQUE = ${JSON.stringify(MARQUE_GARDE)};
+// Le marqueur de la fenêtre : posé ici, à la première ligne du script. tot : aucun script du document n'existait quand il a tourné.
+// Sur window et non sur document : le document initial d'un popup est remplacé (la fenêtre est gardée, avec ce que ce script y pose), mesuré le 18-11.
+try { if (!window[MARQUE]) Object.defineProperty(window, MARQUE, { configurable: false, writable: false, value: Object.freeze({ tot: document.scripts.length === 0 }) }); } catch (e) { /* sans marqueur : la sonde le dira */ }
+if (!(typeof window.open === 'function' && window.open[MARQUE])) {
+  // Une fenêtre que la page ouvre et lit dans la même tâche n'est rendue que si elle porte déjà le marqueur ; sinon elle est fermée.
+  const gardee = (w) => { try { return !!w[MARQUE]; } catch (e) { return null; /* autre origine : l'ouvreur ne peut rien y lire */ } };
+  const verifier = (w, url) => {
+    if (!w || gardee(w) !== false) return w;
+    try { w.close(); } catch (e) { /* rien */ }
+    dire('fenetre', String(url === undefined || url === '' ? 'about:blank' : url).slice(0, 120));
+    return null;
+  };
+  const ouvrirNatif = window.open;
+  const ouvrir = function open() { return verifier(ouvrirNatif.apply(this == null ? window : this, arguments), arguments[0]); };
+  try { Object.defineProperty(ouvrir, MARQUE, { value: true }); } catch (e) { /* rien */ }
+  try { Object.defineProperty(window, 'open', { configurable: false, enumerable: true, get() { return ouvrir; }, set() { /* gardé */ } }); } catch (e) { /* vu ci-dessous */ }
+  if (window.open !== ouvrir) dire('reste', 'window.open');
+  const ecrireNatif = Document.prototype.open;
+  const ecrire = function open() { const r = ecrireNatif.apply(this, arguments); return arguments.length > 2 ? verifier(r, arguments[0]) : r; };
+  try { Object.defineProperty(Document.prototype, 'open', { configurable: false, enumerable: true, get() { return ecrire; }, set() { /* gardé */ } }); } catch (e) { /* vu ci-dessous */ }
+  if (document.open !== ecrire) dire('reste', 'document.open');
+}
 for (const nom of ${JSON.stringify(FONCTIONS_RETIREES)}) {
   try { Object.defineProperty(window, nom, { configurable: false, enumerable: false, get() { dire('coupee', nom); return undefined; }, set() { /* retiré */ } }); } catch (e) { /* vu ci-dessous */ }
 }

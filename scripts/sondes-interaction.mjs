@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { ARG_DEBOGAGE, armerGarde, couperLesEcritures, gardeDe, lectureSeule } from './sondes-garde.mjs';
+import { ARG_DEBOGAGE, armerGarde, couperLesEcritures, gardeDe, lectureSeule, surveillerFenetres } from './sondes-garde.mjs';
 import { SCRIPT_SONDES } from './sondes-page.mjs';
 
 /** Les seuils par défaut, documentés dans docs/sondes-interaction.md#thresholds. */
@@ -340,12 +340,14 @@ export async function sonder(navigateur, url, o, parcours) {
   const coupees = [];
   const restes = [];
   const erreursCoupees = [];
+  const fenetres = [];
   garde.ouvrirPasse(ecritures);
   const contexte = await navigateur.newContext({ viewport: { width: o.largeur, height: o.hauteur }, serviceWorkers: 'block' });
   let bilanGarde;
   try {
-    await couperLesEcritures(contexte, ecritures, coupees, restes, erreursCoupees);
+    await couperLesEcritures(contexte, ecritures, { coupees, restes, erreurs: erreursCoupees, fenetres });
     await contexte.addInitScript({ content: SCRIPT_SONDES });
+    const surveillance = surveillerFenetres(contexte, fenetres);
     const s = { contexte, page: null, url, o, ecritures, navigations: 0 };
     await ouvrir(s);
     const repos = await s.page.evaluate((ms) => window.__sondes.sdRepos(ms), o.repos);
@@ -353,9 +355,10 @@ export async function sonder(navigateur, url, o, parcours) {
     const parcoursMesures = await jouerParcours(s, parcours);
     await s.page.waitForTimeout(150); // une note de la garde partie à la fin est encore comptée
     for (const e of ecritures) e.ou ??= 'hors de tout clic (chargement, minuterie)';
+    await surveillance.bilan();
     bilanGarde = garde.fermerPasse();
     return { url, largeur: o.largeur, hauteur: o.hauteur, seuil: o.seuil, date: new Date().toISOString(), rendu: o.rendu, repos, controles, couverts, parcours: parcoursMesures,
-      ecrituresBloquees: ecritures.length, ecritures, workers: bilanGarde.workers, nonGardes: [...bilanGarde.echecs, ...restes], coupees, erreursCoupees };
+      ecrituresBloquees: ecritures.length, ecritures, workers: bilanGarde.workers, nonGardes: [...bilanGarde.echecs, ...restes], fenetres, coupees, erreursCoupees };
   } finally {
     if (!bilanGarde) garde.fermerPasse();
     await contexte.close();
@@ -415,11 +418,11 @@ export function clicsMesures(r) {
 }
 
 /**
- * Le code de sortie : 2 quand une cible n'a pas pu être gardée (worker, SharedWorker ou service worker démarré, fonction non retirée : lecture seule non garantie : non vérifié), 1 avec constats, 4 non mesurable (aucun clic mesuré : rien n'est vérifié), 3 passe partielle (des clics non mesurés,
+ * Le code de sortie : 2 quand une fenêtre (page, popup, iframe) n'a pas prouvé le script d'initialisation (revue r4) ou qu'une cible n'a pas pu être gardée (worker, SharedWorker ou service worker démarré, fonction non retirée : lecture seule non garantie : non vérifié), 1 avec constats, 4 non mesurable (aucun clic mesuré : rien n'est vérifié), 3 passe partielle (des clics non mesurés,
  * couverts ou qui ont tenté d'écrire, ou une erreur de la page sur une fonction coupée : revue r3), 0 tout mesuré sans constat. Les autres codes 2 (usage, navigateur, erreur de la passe) sont rendus par main.
  */
 export function codeSortie(r) {
-  if (r.nonGardes?.length) return 2;
+  if (r.nonGardes?.length || r.fenetres?.length) return 2;
   if (tousLesConstats(r).length) return 1;
   if (!clicsMesures(r)) return 4;
   return nonMesures(r).length || r.erreursCoupees?.length ? 3 : 0;
@@ -431,6 +434,12 @@ function bilan(constats, manques, mesures, erreurs = 0) {
   if (!mesures) return 'aucun clic mesuré : non mesurable, rien n\'est vérifié';
   if (manques) return 'aucun constat sur ce qui a été mesuré (passe partielle, voir les non-mesurés)';
   return `aucun constat${erreurs ? ' sur ce qui a été mesuré (passe partielle : la page a levé une erreur sur une fonction coupée, voir « lecture seule »)' : ''}`;
+}
+
+/** Revue r4 : une fenêtre ou une cible non gardée se lit en tête de la ligne de bilan, jamais « aucun constat » seul. */
+function nonVerifiee(r) {
+  const n = (r.nonGardes ?? []).length + (r.fenetres ?? []).length;
+  return n ? `passe non vérifiée : ${n} fenêtre(s) ou cible(s) non gardée(s), voir « lecture seule » — ` : '';
 }
 
 /** Les deux lignes d'en-tête : page, taille, seuil, date (et rendu logiciel), puis les comptes. */
@@ -447,7 +456,7 @@ export function formater(r) {
   const manques = nonMesures(r);
   const ecritures = r.ecritures ?? [];
   const mesures = clicsMesures(r);
-  const lignes = [...entete(r, manques.length, mesures), bilan(constats.length, manques.length, mesures, r.erreursCoupees?.length ?? 0)];
+  const lignes = [...entete(r, manques.length, mesures), nonVerifiee(r) + bilan(constats.length, manques.length, mesures, r.erreursCoupees?.length ?? 0)];
   for (const k of constats) lignes.push(`  ✗ ${k.ou} : ${k.texte}`);
   if (manques.length) lignes.push(`non mesuré(s) : ${manques.length}`, ...manques.map((m) => `  ? ${m}`));
   lignes.push(...lectureSeule(r));

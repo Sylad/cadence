@@ -20,7 +20,7 @@ export interface Rapport {
   url: string; largeur: number; hauteur: number; seuil: number; date: string; rendu?: 'gpu' | 'logiciel';
   repos: Array<{ cible: string; dx: number; dy: number }>; controles: Controle[]; parcours: Array<{ nom: string; pas: Pas[] }>; ecrituresBloquees: number;
   couverts?: Array<{ nom: string; role: 'bascule' | 'bouton'; liste: boolean }>; ecritures?: Ecriture[];
-  workers?: Array<{ type: string; url: string }>; nonGardes?: string[]; coupees?: Array<{ nom: string; fois: number }>; erreursCoupees?: string[];
+  workers?: Array<{ type: string; url: string }>; nonGardes?: string[]; fenetres?: string[]; coupees?: Array<{ nom: string; fois: number }>; erreursCoupees?: string[];
 }
 export type Etape = { type: 'cliquer'; sel: string; n: number } | { type: 'attendre'; ms: number } | { type: 'touche'; touche: string };
 export interface Parcours { nom: string; etapes: Etape[] }

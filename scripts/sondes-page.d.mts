@@ -3,3 +3,4 @@ export const SCRIPT_SONDES: string;
 export const SCRIPT_LECTURE_SEULE: string;
 export const FONCTIONS_RETIREES: string[];
 export const ENREGISTREMENT_SW: string;
+export const MARQUE_GARDE: string;

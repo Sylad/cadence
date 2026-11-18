@@ -301,6 +301,7 @@ describe.skipIf(!lance)('L778 revue r2 — workers dédiés, partagés, module e
       expect(de('c')).toEqual(expect.arrayContaining(['websocket CAPTURE DELETE', 'WebTransport bloqué']));
       expect(r.workers!.map((w) => w.type)).toEqual(['worker', 'worker', 'worker', 'worker']);
       expect(r.nonGardes).toEqual([]);
+      expect(r.fenetres).toEqual([]); // revue r4 : chaque page, popup et iframe de l'essai a prouvé le script d'initialisation
       for (const c of r.controles) expect(nonMesures(r).some((m) => m.startsWith(`« ${c.nom} » — le clic a tenté d'écrire`)), c.nom).toBe(c.nom !== 'y');
       expect(codeSortie(r)).toBe(3);
     } finally {
@@ -393,6 +394,7 @@ describe.skipIf(!lance)('L778 revue r3 — les deux essais du relecteur rejoués
       expect(codeSortie(r)).toBe(3);
       expect(r.workers).toEqual([]);
       expect(r.nonGardes).toEqual([]);
+      expect(r.fenetres).toEqual([]); // revue r4 : chaque page, popup et iframe de l'essai a prouvé le script d'initialisation
     } finally {
       await srv.fermer();
     }
@@ -413,6 +415,7 @@ describe.skipIf(!lance)('L778 revue r3 — les deux essais du relecteur rejoués
       expect(r.controles.map((c) => c.mesure.sautMax)).toEqual([0, 0, 0]); // les trois boutons sont pressés et mesurés
       expect(r.erreursCoupees).toEqual([]); // elle teste avant de s'en servir : rien ne lève
       expect(r.nonGardes).toEqual([]);
+      expect(r.fenetres).toEqual([]); // revue r4 : chaque page, popup et iframe de l'essai a prouvé le script d'initialisation
     } finally {
       await srv.fermer();
     }
@@ -438,6 +441,7 @@ describe.skipIf(!lance)('L778 revue r3 — les deux essais du relecteur rejoués
       expect(r.workers!.every((w) => w.type === 'worker')).toBe(true);
       expect(r.workers!.length).toBeGreaterThanOrEqual(30);
       expect(r.nonGardes).toEqual([]);
+      expect(r.fenetres).toEqual([]); // revue r4 : chaque page, popup et iframe de l'essai a prouvé le script d'initialisation
       const voies = new Set(r.ecritures!.map((e) => e.voie));
       for (const v of ['http', 'websocket', 'sendBeacon', 'WebSocketStream', 'WebTransport']) expect(voies, v).toContain(v);
     } finally {

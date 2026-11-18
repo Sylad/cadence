@@ -15,7 +15,7 @@
 // les lignes « lecture seule » du rapport (lectureSeule). Méthode et limites : docs/sondes-interaction.md (Read only).
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { ENREGISTREMENT_SW, FONCTIONS_RETIREES, SCRIPT_LECTURE_SEULE } from './sondes-page.mjs';
+import { ENREGISTREMENT_SW, FONCTIONS_RETIREES, MARQUE_GARDE, SCRIPT_LECTURE_SEULE } from './sondes-page.mjs';
 
 /** L'argument de lancement de Chromium qui ouvre le port de débogage (port choisi par le système, écrit dans DevToolsActivePort du profil). */
 export const ARG_DEBOGAGE = '--remote-debugging-port=0';
@@ -225,11 +225,12 @@ export async function armerGarde(navigateur, dossier) {
  *   dans un Worker dédié, `send`, WebSocketStream et WebTransport sont coupés avant sa première ligne (garde) ;
  * - SharedWorker, WebSocketStream, WebTransport retirés et enregistrement d'un service worker refusé, dans la page et chaque iframe, avant tout
  *   script (SCRIPT_LECTURE_SEULE) ; chaque demande de la page est comptée dans `coupees` ({ nom, fois }), une fonction restée en place dans `restes` ;
+ * - fermé par défaut (revue r4) : une fenêtre que la page ouvre sans le marqueur du script d'initialisation est fermée et notée dans `fenetres` ;
  * - sendBeacon rend false, RTCPeerConnection lève (SCRIPT_LECTURE_SEULE) ; service workers refusés au contexte aussi ;
  * - une erreur non rattrapée de la page qui nomme un constructeur retiré est gardée dans `erreurs` : la passe est partielle.
  * Un GET qui écrit côté serveur passe : la sonde ne peut pas le reconnaître (docs/sondes-interaction.md).
  */
-export async function couperLesEcritures(contexte, ecritures, coupees = [], restes = [], erreurs = []) {
+export async function couperLesEcritures(contexte, ecritures, { coupees = [], restes = [], erreurs = [], fenetres = [] } = {}) {
   if (typeof contexte.routeWebSocket !== 'function') {
     throw new Error('ce Playwright ne sait pas intercepter les WebSocket (routeWebSocket, version 1.48 ou plus) : lecture seule non garantie, rien n\'est sondé');
   }
@@ -239,6 +240,10 @@ export async function couperLesEcritures(contexte, ecritures, coupees = [], rest
   });
   await contexte.exposeFunction('__sondesEcriture', (voie, detail) => { ecritures.push({ voie, cible: '', detail }); });
   await contexte.exposeFunction('__sondesCoupee', (quoi, nom, ou) => {
+    if (quoi === 'fenetre') {
+      return void fenetres.push(`${ou} a ouvert une fenêtre (${nom}) où le script d'initialisation n'avait pas tourné au retour de window.open ; `
+        + 'elle a été fermée avant tout usage, window.open a rendu null (ce que l\'app en fait n\'est pas sondé)');
+    }
     if (quoi === 'reste') return void restes.push(`${nom} dans ${ou} : fonction non retirée, la page peut encore écrire par elle`);
     const deja = coupees.find((c) => c.nom === nom);
     if (deja) deja.fois += 1; else coupees.push({ nom: String(nom), fois: 1 });
@@ -252,6 +257,67 @@ export async function couperLesEcritures(contexte, ecritures, coupees = [], rest
   await contexte.addInitScript({ content: SCRIPT_LECTURE_SEULE });
 }
 
+const LIRE_MARQUE = `(() => { const g = window[${JSON.stringify(MARQUE_GARDE)}]; return g ? { tot: g.tot === true } : null; })()`;
+const DELAI_MARQUE = 2000;
+
+/**
+ * Fermé par défaut (revue r4) : la sonde ne tient pour gardées que les fenêtres où elle LIT le marqueur du script d'initialisation, posé avant
+ * tout script du document (`tot`). Chaque page du contexte (celle de la sonde, un popup), chaque iframe, à chaque document neuf, est vérifiée ;
+ * ce qui n'a pas le marqueur, l'a reçu après un script, ou s'est fermé ou détaché avant d'avoir pu être lu, entre dans `fenetres` : le rapport
+ * dit « fenêtre non gardée » et la passe est non vérifiée (code 2). `bilan()` relit, à la fin de la passe, tout ce qui vit encore.
+ */
+export function surveillerFenetres(contexte, fenetres) {
+  const etats = new Map(); // frame → 'ok' | 'non'
+  const encours = new Map(); // frame → promesse de la vérification en cours
+  let fini = false;
+  const dire = (texte) => { if (!fini && !fenetres.includes(texte)) fenetres.push(texte); };
+  const adresse = (frame) => { const u = frame.url(); return u && u !== ':' ? u : 'about:blank (jamais chargée)'; };
+  const lire = async (frame) => {
+    let minuterie;
+    try {
+      const g = await Promise.race([frame.evaluate(LIRE_MARQUE), new Promise((_, ko) => { minuterie = setTimeout(() => ko(new Error('délai')), DELAI_MARQUE); })]);
+      if (g?.tot) return void etats.set(frame, 'ok');
+      etats.set(frame, 'non');
+      dire(`${adresse(frame)} : ${g ? "le script d'initialisation y a tourné après un script du document" : "le script d'initialisation n'y a pas tourné (marqueur absent)"}`);
+    } catch { /* document remplacé, fermé ou muet : vu au document suivant, à la fermeture ou au bilan */ } finally {
+      clearTimeout(minuterie);
+    }
+  };
+  const verifier = (frame) => {
+    const p = (encours.get(frame) ?? Promise.resolve()).then(() => lire(frame));
+    encours.set(frame, p);
+    return p;
+  };
+  // Un document neuf remet la preuve à zéro : c'est lui qu'il faut lire.
+  const neuf = (frame) => { etats.delete(frame); void verifier(frame); };
+  const parti = async (frame, quoi) => {
+    await encours.get(frame);
+    if (!etats.has(frame)) dire(`${adresse(frame)} : ${quoi} avant que la sonde ait pu y lire le marqueur du script d'initialisation`);
+  };
+  const suivre = (page) => {
+    page.on('frameattached', neuf);
+    page.on('framenavigated', neuf);
+    page.on('framedetached', (f) => void parti(f, 'iframe retirée'));
+    page.on('close', () => void parti(page.mainFrame(), 'fenêtre fermée'));
+    for (const f of page.frames()) void verifier(f);
+  };
+  contexte.on('page', suivre);
+  for (const page of contexte.pages()) suivre(page);
+  return {
+    /** Relit tout ce qui vit encore ; ce qui reste sans preuve est dit. À appeler avant de fermer le contexte. */
+    async bilan() {
+      await Promise.all([...encours.values()]);
+      for (const page of contexte.pages()) {
+        for (const f of page.frames()) {
+          if (etats.get(f) !== 'ok' && !etats.has(f)) await verifier(f);
+          if (!etats.has(f) && !page.isClosed() && !f.isDetached()) dire(`${adresse(f)} : la sonde n'a pas pu y lire le marqueur du script d'initialisation`);
+        }
+      }
+      fini = true;
+    },
+  };
+}
+
 /**
  * Ce que la lecture seule a couvert pendant la passe, et ce qu'elle ne couvre pas : le rapport n'affirme rien au-delà de ce qui est mesuré (revues
  * r2 et r3). Chaque fonction retirée que la page a demandée a sa ligne « fonction coupée pendant la sonde ». Une cible non gardée (worker qu'on
@@ -263,7 +329,11 @@ export function lectureSeule(r) {
     + `de la page et des iframes non transmis (routage Playwright) ; dans un Worker dédié, send des WebSocket, WebSocketStream et WebTransport coupés avant `
     + `sa première ligne ; retirés de la page et de chaque iframe avant tout script : ${[...FONCTIONS_RETIREES, ENREGISTREMENT_SW].join(', ')} ; sendBeacon `
     + `rend false, RTCPeerConnection lève ; Worker(s) dédié(s) gardé(s) : ${dedies || 'aucun'} — non couvert : un GET qui écrit côté serveur ; WebTransport `
-    + `réel (aucun serveur HTTP/3 à l'essai : seule l'absence du constructeur est vérifiée)`];
+    + `réel (aucun serveur HTTP/3 à l'essai : seule l'absence du constructeur est vérifiée) ; la raison d'une fermeture WebSocket (close(code, raison), 123 octets au plus) atteint le serveur`,
+  `  fenêtres : fermé par défaut — une page, un popup ou un iframe n'est tenu pour gardé que si la sonde y lit le marqueur du script d'initialisation, `
+    + `posé avant tout script du document ; une fenêtre que la page ouvre sans ce marqueur au retour de window.open est fermée avant tout usage ; `
+    + `fenêtre(s) non gardée(s) : ${(r.fenetres ?? []).length || 'aucune'}`];
+  for (const e of r.fenetres ?? []) lignes.push(`  ✗ fenêtre non gardée : ${e} — passe non vérifiée`);
   for (const c of r.coupees ?? []) {
     lignes.push(`  fonction coupée pendant la sonde : ${c.nom} (demandée ${c.fois} fois par la page ou un iframe ; un test de présence compte) — ce qui en dépend dans l'app n'est pas sondé`);
   }

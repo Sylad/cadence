@@ -3904,12 +3904,14 @@ lots:
     finished: 2026-11-18
   - id: L778
     title: "Sondes d'interaction UX (D-14 du registre parent) : jeu de sondes Playwright génériques joué par le ux-reviewer — saut de l'élément cliqué après un clic (0 px attendu), distance action → retour, focus à l'ouverture d'un dialogue et Échap qui le ferme, défilement subi ; parcours propres à chaque projet déclarés dans docs/qa/expectations.md ; critère : retrouver seul le saut à l'ajout d'une couche d'AetherWX (D-6) avant sa correction"
-    status: doing
+    status: done
     estimate: 0.5
     visible: true
     created: 2026-11-18
     started: 2026-11-18
-    review: { date: 2026-11-18, verdict: "non conforme (r4) : second popup ouvert dans la même tâche sans script d'initialisation → WebSocket/WebSocketStream reçus par le serveur, rapport « aucun constat », code 0 ; doc sondes-interaction.md:58 et changelog.d/L778.md:3 disent « every popup ». Rapport scratchpad/revues/cadence-L778-r4.md", commit: 59e8b12a099c392f9ef4e226dea47ac2c9ad2353 }
+    review: { date: 2026-11-18, verdict: "conforme (r5, Fable) : scénarios r4 fermés (0 message, code 2), marqueur gelé non forgeable, aucun faux positif mesuré ; 109 tests ciblés verts. Mineur m1 reporté au lot suivant (page hostile qui remplace Function.prototype.apply). Rapport scratchpad/revues/cadence-L778-r5.md", commit: 297a415a55bc26377a43c6d10fb235ba083a3591 }
+    ux: { date: 2026-11-18, verdict: "conforme : sortie des sondes lisible — « ✗ fenêtre non gardée » par cas, bilan « passe non vérifiée », code 2 ; doc et agents disent la garantie mesurée (relu par r5)" }
+    finished: 2026-11-18
   - id: L779
     title: "raf start mis en attente pendant un cadence run, comme raf note (issue #66 du compte pro, D-28) : la séquence documentée « raf start <lot> && cadence run » ne salit plus le plan quand un autre run tient le dépôt — ou cadence run --lot démarre lui-même un lot todo"
     status: todo
@@ -3927,6 +3929,11 @@ lots:
     created: 2026-11-18
   - id: L782
     title: "cadence run : la bascule sur Fable « après deux revues non conformes » (L726) ne s'est pas faite pour L778 — r1 et r2 non conformes, la correction du 18-11 13 h 38 a tourné sur Opus ; le plan ne garde qu'un champ review (le dernier verdict), l'historique des revues n'est donc pas compté. Test qui échoue sur ce cas."
+    status: todo
+    estimate: 1
+    created: 2026-11-18
+  - id: L783
+    title: "Sondes : une page hostile qui remplace Function.prototype.apply récupère l'open natif, ouvre un second popup non gardé et y écrit (code 0 — essais exp5 h1, h2 de la revue r5 de L778) ; appeler le natif par un Reflect.apply gardé en constante dans le script d'initialisation, test h1 — après 2.0.16"
     status: todo
     estimate: 1
     created: 2026-11-18

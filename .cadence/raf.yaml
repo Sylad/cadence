@@ -3868,6 +3868,11 @@ lots:
     started: 2026-11-17
     review: { date: 2026-11-17, verdict: "conforme : lead.chain (défaut on, off = ancien comportement), trois règles et quatre cas de remontée dans le skill, affiché par lead tour, valeur invalide refusée, docs/config.md et fragment ; rien de propre à notre dossier", commit: 64f1bb51fd30d72ea960ab8ee1ea78959d3a52a3 }
     finished: 2026-11-17
+  - id: L773
+    title: "Issue #64 (compte pro) : deux cadence run --fond lancés dans la même seconde partagent un même journal fond-<horodatage>.log et entremêlent leurs lignes — un journal par run, nommé d'après l'id du run (fond-<id>.log), test à l'appui"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-18
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

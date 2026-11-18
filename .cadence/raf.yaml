@@ -3909,7 +3909,7 @@ lots:
     visible: true
     created: 2026-11-18
     started: 2026-11-18
-    review: { date: 2026-11-18, verdict: "conforme (r5, Fable) : scénarios r4 fermés (0 message, code 2), marqueur gelé non forgeable, aucun faux positif mesuré ; 109 tests ciblés verts. Mineur m1 reporté au lot suivant (page hostile qui remplace Function.prototype.apply). Rapport scratchpad/revues/cadence-L778-r5.md", commit: 297a415a55bc26377a43c6d10fb235ba083a3591 }
+    review: { date: 2026-11-18, verdict: "conforme (lead, correctif de publication c4eb103a) : tests seulement — entrée du lot lue fragment ou section publiée (entreeDuLot), Chromium sous tempDir() ; porte complète verte sur le commit de version 94a4e95", commit: c4eb103a26d3d0915a13af85c90202cafde98b68 }
     ux: { date: 2026-11-18, verdict: "conforme : sortie des sondes lisible — « ✗ fenêtre non gardée » par cas, bilan « passe non vérifiée », code 2 ; doc et agents disent la garantie mesurée (relu par r5)" }
     finished: 2026-11-18
   - id: L779

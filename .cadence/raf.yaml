@@ -3900,6 +3900,12 @@ lots:
     estimate: 0.5
     created: 2026-11-18
     started: 2026-11-18
+  - id: L778
+    title: "Sondes d'interaction UX (D-14 du registre parent) : jeu de sondes Playwright génériques joué par le ux-reviewer — saut de l'élément cliqué après un clic (0 px attendu), distance action → retour, focus à l'ouverture d'un dialogue et Échap qui le ferme, défilement subi ; parcours propres à chaque projet déclarés dans docs/qa/expectations.md ; critère : retrouver seul le saut à l'ajout d'une couche d'AetherWX (D-6) avant sa correction"
+    status: todo
+    estimate: 0.5
+    visible: true
+    created: 2026-11-18
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

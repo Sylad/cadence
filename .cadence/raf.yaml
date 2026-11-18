@@ -3909,6 +3909,7 @@ lots:
     visible: true
     created: 2026-11-18
     started: 2026-11-18
+    review: { date: 2026-11-18, verdict: "non conforme (r3, Fable) : B1 SharedWorker écrit encore par WebSocket (send natif gardé), B2 WebSocketStream de la page et des iframes non coupé ; M1 rapport, doc, changelog et agents affirment plus que le mesuré", commit: 5fbbc3c24218a88cb1ae9c1607d020a2ac70d6c4 }
   - id: L779
     title: "raf start mis en attente pendant un cadence run, comme raf note (issue #66 du compte pro, D-28) : la séquence documentée « raf start <lot> && cadence run » ne salit plus le plan quand un autre run tient le dépôt — ou cadence run --lot démarre lui-même un lot todo"
     status: todo
@@ -3918,6 +3919,11 @@ lots:
     title: "Parité porte ↔ CI : un préfixe d'environnement dont la valeur est une substitution $(…) avec guillemets imbriqués et pipes est sauté en entier, plus de faux écart (issue #65 du compte pro, D-28 ; voisin de #32)"
     status: todo
     estimate: 0.25
+    created: 2026-11-18
+  - id: L781
+    title: "cadence run : les commandes de projet qui appellent cadence (npm run news → cadence news build, puis npm run plan) ne peuvent pas tourner dans la session du run ; 3 lots le 18-11 (finance L172, L173 ; warhammer L71 fait à la main) rendus avec nouveautes-data non régénéré, le lead rejoue à chaque fois — les jouer à l'intégration du run (ou autoriser cadence news build dans la session), avec un test"
+    status: todo
+    estimate: 0.5
     created: 2026-11-18
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

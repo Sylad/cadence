@@ -3870,10 +3870,17 @@ lots:
     finished: 2026-11-17
   - id: L773
     title: "Issue #64 (compte pro) : deux cadence run --fond lancés dans la même seconde partagent un même journal fond-<horodatage>.log et entremêlent leurs lignes — un journal par run, nommé d'après l'id du run (fond-<id>.log), test à l'appui"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-18
     started: 2026-11-18
+    review: { date: 2026-11-18, verdict: "conforme : 0 bloquant, 0 suite (revue de code ; 5 fichiers de tests ciblés, 99 verts, tsc v2 sans erreur ; porte rejouée par le lead verte à d2d1e51 — le nouveau test run-fond-journal-l773 rouge sous charge, vert seul)", commit: d2d1e5196860b075f30cb33eb74338115f3d9674 }
+    finished: 2026-11-18
+  - id: L774
+    title: "Deux cadence run du même dépôt qui s'intègrent dans la même seconde : l'un est refusé (refus-integration, « modifications non commitées dans l'arbre principal » désignant son propre fichier), 4 fois sur 8 essais pendant L773 — sérialiser l'intégration ; et le test run-fond-journal-l773 rouge sous charge à rendre stable"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-18
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -130,3 +130,36 @@ describe('R32 : contournement du hook (réglages de Claude Code)', () => {
     expect(contournements([appel('Write', { file_path: `${clone}/.claude/notes.md` }), appel('Bash', { command: 'ls .claude' })])).toEqual([]);
   });
 });
+
+describe('L775 : un appel refusé par le hook du bras n\'a rien lu ni écrit', () => {
+  // Banc 2026-11-18-1008, banc 7 (ol-companion L160), bras cadence-run : `npx vite … > ../../c2.vite.log` refusé par
+  // lecture-obligatoire.mjs (« elle écrit dans le dossier du banc »), fichier jamais créé, compté en fuite certaine.
+  const run = `${H}/bench-cadence/runs/2026-11-18-1008-52a5b3e8651a/7-ol-companion-L160`;
+  const cl = `${run}/c2`;
+  const rr = reglesDuBras(H, `${H}/bench-cadence`, '7-ol-companion-L160', cl);
+  const app = (id: string, name: string, input: object, cwd = `${cl}/frontend`) =>
+    JSON.stringify({ type: 'assistant', cwd, message: { content: [{ type: 'tool_use', id, name, input }] } });
+  const res = (id: string, content: unknown, is_error = true) => JSON.stringify({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, is_error, content }] } });
+  const vite = { command: `cd ${cl}/frontend; (npx vite --port 5199 --strictPort > ../../c2.vite.log 2>&1 & echo $! > /tmp/s/vite.pid)` };
+  const refus = 'PreToolUse:Bash hook error: Commande refusée : elle écrit dans le dossier du banc, hors de ton dépôt.';
+
+  it('la commande vite refusée par le hook : aucune fuite', () => {
+    expect(chercherFuites([app('t1', 'Bash', vite), res('t1', refus)], rr, H, cl)).toEqual({ certaines: [], a_verifier: [] });
+  });
+  it('résultat en blocs de texte : même lecture', () => {
+    expect(chercherFuites([app('t1', 'Bash', vite), res('t1', [{ type: 'text', text: refus }])], rr, H, cl).certaines).toEqual([]);
+  });
+  it('la même commande exécutée (sans résultat, réussie, ou en erreur par son code de sortie) : fuite certaine', () => {
+    const f = [`${run}/c2.vite.log`];
+    expect(chercherFuites([app('t1', 'Bash', vite)], rr, H, cl).certaines).toEqual(f);
+    expect(chercherFuites([app('t1', 'Bash', vite), res('t1', '4242', false)], rr, H, cl).certaines).toEqual(f);
+    expect(chercherFuites([app('t1', 'Bash', vite), res('t1', 'Exit code 1\nhook error ailleurs')], rr, H, cl).certaines).toEqual(f);
+  });
+  it('le refus d\'un autre appel n\'efface pas celui-ci', () => {
+    expect(chercherFuites([app('t1', 'Bash', vite), res('t2', refus)], rr, H, cl).certaines).toEqual([`${run}/c2.vite.log`]);
+  });
+  it('une tentative de contournement refusée reste comptée (R32)', () => {
+    const l = [app('t1', 'Write', { file_path: `${H}/.claude/settings.json`, content: '{}' }), res('t1', 'PreToolUse:Write hook error: Écriture refusée')];
+    expect(chercherFuites(l, rr, H, cl).certaines.filter((c) => c.startsWith('contournement'))).toHaveLength(1);
+  });
+});

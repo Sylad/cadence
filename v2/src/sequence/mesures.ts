@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, lstatSync, readdirSync, rmSync, rmdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, isAbsolute, join, relative, resolve } from 'node:path';
+import { refusParHook } from '../bench/fuites.js';
 import { cheminOutil, dansClone, ECRITURES, ecritureBash, evenements, lectures, type Appel } from '../../hooks/lecture.mjs';
 
 export class CloneModifie extends Error {}
@@ -122,7 +123,8 @@ export function lectureReferences(lignes: string[], pieces: string[], clone?: st
   const avant: Appel[] = [], tous: Appel[] = [], ok = new Set<string | undefined>(), erreurs = new Set<string | undefined>(), refus = new Set<string | undefined>();
   const ev = lignes.map(evenements);
   // Sans effet sur le disque (S7) : un outil d'écriture en erreur, ou un appel refusé par un hook PreToolUse (Bash en erreur par son code de sortie a pu écrire).
-  ev.forEach((e, i) => { for (const r of e.resultats) if (r.erreur) { erreurs.add(r.id); if (/PreToolUse:\w+ hook error/.test(lignes[i])) refus.add(r.id); } });
+  for (const e of ev) for (const r of e.resultats) if (r.erreur) erreurs.add(r.id);
+  for (const id of refusParHook(lignes)) refus.add(id);
   let ecrit = false;
   for (const e of ev) {
     for (const r of e.resultats) if (!r.erreur) ok.add(r.id);

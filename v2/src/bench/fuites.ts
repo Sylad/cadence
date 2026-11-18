@@ -37,8 +37,28 @@ function resoudre(tok: string, cwd: string, home: string, rel: boolean, cd = fal
   return rel && (cd || t.includes('/') || t === '..' || /^c\d+/.test(t)) ? resolve(cwd, t) : null;
 }
 
+/** L775 : ids des appels qu'un hook PreToolUse a refusés (tool_result en erreur « PreToolUse:<outil> hook error ») : l'outil n'a pas tourné.
+ * Un Bash en erreur par son code de sortie a tourné et n'en fait pas partie. */
+export function refusParHook(lignes: string[]): Set<string> {
+  const ids = new Set<string>();
+  for (const l of lignes) {
+    if (!l.includes('hook error')) continue;
+    let d: { message?: { content?: unknown } };
+    try { d = JSON.parse(l); } catch { continue; }
+    const c = d.message?.content;
+    for (const x of Array.isArray(c) ? c : []) {
+      const t = x as { type?: string; tool_use_id?: unknown; is_error?: boolean; content?: unknown };
+      if (t.type === 'tool_result' && t.is_error === true && typeof t.tool_use_id === 'string' && [...textes(t.content)].some((s) => /^PreToolUse:\w+ hook error/.test(s))) ids.add(t.tool_use_id);
+    }
+  }
+  return ids;
+}
+
 export function chercherFuites(lignes: string[], r: Regles, home: string, cwd = ''): Fuites {
   const vus = { certaines: new Set<string>(), a_verifier: new Set<string>() };
+  // L775 : un appel refusé par le hook du bras n'a rien lu ni écrit (banc du 18-11 : `npx vite > ../../c2.vite.log` refusé, fichier jamais créé,
+  // compté en fuite). Seule la tentative de contournement (R32) reste comptée.
+  const refuses = refusParHook(lignes);
   const juger = (p: string | null) => {
     if (!p) return;
     const g = p.search(/[*?[]/); // glob : préfixe littéral ; en cas de doute (composant pouvant désigner un clone voisin), certaine
@@ -52,12 +72,13 @@ export function chercherFuites(lignes: string[], r: Regles, home: string, cwd = 
   };
   const depart = cwd || r.autorises[0];
   for (const l of lignes) {
-    let d: { type?: string; cwd?: string; message?: { content?: { type: string; name?: string; input?: unknown }[] } };
+    let d: { type?: string; cwd?: string; message?: { content?: { type: string; id?: string; name?: string; input?: unknown }[] } };
     try { d = JSON.parse(l); } catch { continue; }
     if (d.type !== 'assistant') continue;
     for (const c of d.message?.content ?? []) {
       if (c.type !== 'tool_use') continue;
       if (contournement(c.name ?? '', c.input, home)) vus.certaines.add(`contournement : ${c.name} ${JSON.stringify(c.input).slice(0, 160)}`); // R32
+      if (c.id && refuses.has(c.id)) continue;
       if (c.name === 'Bash' && typeof d.cwd === 'string' && isAbsolute(d.cwd)) juger(resolve(d.cwd));
       const cmd = (c.input as { command?: unknown } | undefined)?.command;
       const sources: [string, boolean][] = [...[...textes(c.input)].map((t): [string, boolean] => [t, false]),

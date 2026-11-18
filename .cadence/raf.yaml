@@ -3883,9 +3883,10 @@ lots:
     created: 2026-11-18
   - id: L775
     title: "Banc mécanique 2026-11-18-1008 ROUGE sur « aucune fuite » : le bras cadence-run du banc 7 a écrit c2.vite.log à côté de son clone (runs/…/7-ol-companion-L160/c2.vite.log). Établir qui est en faute (la session qui écrit hors de son clone, ou le détecteur qui compte un fichier écrit par le bras lui-même) et corriger la cause ; second banc rouge du 18-11 sans lien avec le changement mesuré (le premier : tests d'origine 0 contre 1)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-18
+    started: 2026-11-18
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

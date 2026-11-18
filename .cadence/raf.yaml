@@ -3909,7 +3909,7 @@ lots:
     visible: true
     created: 2026-11-18
     started: 2026-11-18
-    review: { date: 2026-11-18, verdict: "non conforme (r3, Fable) : B1 SharedWorker écrit encore par WebSocket (send natif gardé), B2 WebSocketStream de la page et des iframes non coupé ; M1 rapport, doc, changelog et agents affirment plus que le mesuré", commit: 5fbbc3c24218a88cb1ae9c1607d020a2ac70d6c4 }
+    review: { date: 2026-11-18, verdict: "non conforme (r4) : second popup ouvert dans la même tâche sans script d'initialisation → WebSocket/WebSocketStream reçus par le serveur, rapport « aucun constat », code 0 ; doc sondes-interaction.md:58 et changelog.d/L778.md:3 disent « every popup ». Rapport scratchpad/revues/cadence-L778-r4.md", commit: 59e8b12a099c392f9ef4e226dea47ac2c9ad2353 }
   - id: L779
     title: "raf start mis en attente pendant un cadence run, comme raf note (issue #66 du compte pro, D-28) : la séquence documentée « raf start <lot> && cadence run » ne salit plus le plan quand un autre run tient le dépôt — ou cadence run --lot démarre lui-même un lot todo"
     status: todo

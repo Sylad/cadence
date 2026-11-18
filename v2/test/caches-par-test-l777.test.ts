@@ -3,11 +3,12 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Banc } from '../src/bench/banc.js';
 import { cachesReussis, mesurerSansJuge, testsReussis } from '../src/bench/sans-juge.js';
-import { BARRE_SPEC, MARGE_CACHES, rapport, verdictSansJuge, type MesureSansJuge, type ResultatBanc } from '../src/bench/verdict.js';
+import { BARRE_SPEC, rapport, verdictSansJuge, type MesureSansJuge, type ResultatBanc } from '../src/bench/verdict.js';
 import { dossierTemp } from './temp.js';
 
-// L777 (décision de Sylvain du 18-11) : « tests d'origine verts » compte les tests d'origine réussis par bras, plus des bancs entiers verts,
-// avec une marge de bruit mesurée sur des paires de bras identiques ; un candidat nettement pire que A reste ROUGE.
+// L777 (décision de Sylvain du 18-11) : « tests d'origine verts » compte les tests d'origine réussis par bras, plus des bancs entiers verts ;
+// un candidat nettement pire que A reste ROUGE. Revue r1 : la marge de 11 % (MARGE_CACHES) est retirée, elle n'était pas mesurée sur des bras identiques
+// (empreinte_bras différente aux bancs 3 et 7) : candidat ≥ A test par test ; un lanceur ne compte que s'il a un bilan dans les deux journaux.
 
 /** Bilans recopiés des journaux du 18-11 (banc 1, ol-companion L239 : jest pour le backend, puis vitest pour le frontend). */
 const JEST = 'Test Suites: 46 passed, 46 total\nTests:       506 passed, 506 total\nSnapshots:   0 total';
@@ -25,12 +26,23 @@ describe('tests réussis lus dans le bilan d\'une suite (L777)', () => {
   });
   it('tests d\'origine réussis : suite avec les tests d\'origine moins suite seule, lanceur par lanceur', () => {
     // banc 1, 18-11 à 11:31 : c1 (cadence-run) rate 1 des 33 tests d'origine, c2 (A) les passe tous
-    expect(cachesReussis(`${JEST}\n${VITEST_ORIGINE_ROUGE}`, `${JEST}\n${VITEST_BRAS}`)).toBe(32);
-    expect(cachesReussis(`${JEST}\n${VITEST_ORIGINE_VERT}`, `${JEST}\n${VITEST_BRAS}`)).toBe(33);
-    // banc 3 : le backend rouge arrête la chaîne `&&`, vitest ne tourne pas avec les tests d'origine ; ce lanceur compte 0, jamais négatif
-    expect(cachesReussis('Tests:       3 failed, 546 passed, 549 total', `Tests:       514 passed, 514 total\n${VITEST_BRAS}`)).toBe(32);
-    expect(cachesReussis('aucun bilan', JEST)).toBeNull();
-    expect(cachesReussis(JEST, '')).toBeNull();
+    expect(cachesReussis(`${JEST}\n${VITEST_ORIGINE_ROUGE}`, `${JEST}\n${VITEST_BRAS}`)).toEqual({ par_lanceur: { jest: 0, vitest: 32 }, hors_compte: [] });
+    expect(cachesReussis(`${JEST}\n${VITEST_ORIGINE_VERT}`, `${JEST}\n${VITEST_BRAS}`)).toEqual({ par_lanceur: { jest: 0, vitest: 33 }, hors_compte: [] });
+    expect(cachesReussis('aucun bilan', 'rien')).toBeNull();
+  });
+  it('revue r1 : un lanceur absent d\'un des deux journaux (chaîne && arrêtée ailleurs) ou rouge dans la suite seule ne compte pas', () => {
+    const JEST_ROUGE = 'Tests:       3 failed, 503 passed, 506 total';
+    // suite seule arrêtée au backend rouge, vitest pas lancé ; suite avec les tests d'origine verte : comptait 1368 (toute la suite frontend)
+    expect(cachesReussis(`${JEST}\n${VITEST_ORIGINE_VERT}`, JEST_ROUGE)).toEqual({ par_lanceur: {},
+      hors_compte: ['jest : 3 rouge(s) dans la suite seule', 'vitest : absent de la suite seule'] });
+    // backend rouge dans la suite avec les tests d'origine, suite seule verte : comptait 0 (les 33 tests d'origine frontend effacés)
+    expect(cachesReussis(JEST_ROUGE, `${JEST}\n${VITEST_BRAS}`)).toEqual({ par_lanceur: { jest: 0 }, hors_compte: ['vitest : absent de la suite avec les tests d\'origine'] });
+    // suite seule rouge sous charge (15-11 16:04, 28 findBy expirés) : la différence aurait compté 61 tests d'origine sur 33
+    expect(cachesReussis(`${JEST}\n${VITEST_ORIGINE_VERT}`, `${JEST}\n      Tests  28 failed | 1307 passed (1335)`)).toEqual({ par_lanceur: { jest: 0 },
+      hors_compte: ['vitest : 28 rouge(s) dans la suite seule'] });
+    // banc 3 : le backend rouge arrête la chaîne dans la suite avec les tests d'origine ; seul jest compte, vitest est nommé hors compte
+    expect(cachesReussis('Tests:       3 failed, 546 passed, 549 total', `Tests:       514 passed, 514 total\n${VITEST_BRAS}`))
+      .toEqual({ par_lanceur: { jest: 32 }, hors_compte: ['vitest : absent de la suite avec les tests d\'origine'] });
   });
   it('la mesure sans juge relève le compte dans resultat.json, et l\'omet sans bilan lisible', () => {
     const r = dossierTemp('caches-l777-'), clone = join(r, 'c1'), secrets = join(r, 'secrets');
@@ -39,43 +51,54 @@ describe('tests réussis lus dans le bilan d\'une suite (L777)', () => {
     const banc = (tests: string): Banc => ({ id: '1-a', dir: r, secrets, projet: 'p', source: r, base: 'x', install: 'true', tests, visible: false, taille: 'fonction', frais: false, reponses: false });
     // un faux lanceur : chaque fichier de test passe, sauf c.cache-banc.test.sh qui échoue
     const lanceur = 'p=$(ls t/*.test.sh | grep -vc c.cache-banc); f=$(ls t/*.test.sh | grep -c c.cache-banc); echo "Tests:       $f failed, $p passed, $((p+f)) total"; test $f -eq 0';
-    expect(mesurerSansJuge(banc(lanceur), clone)).toEqual({ suite_ok: true, caches_ok: false, caches_reussis: 1 });
+    expect(mesurerSansJuge(banc(lanceur), clone)).toEqual({ suite_ok: true, caches_ok: false, caches_reussis: { jest: 1 } });
     expect(mesurerSansJuge(banc('true'), clone)).toEqual({ suite_ok: true, caches_ok: true });
   });
 });
 
 const m = (bras: string) => ({ bras, banc: 'x', debut: '', fin: '', duree_s: 100, tokens: 0, cout_usd: 0, questions: 0, questions_texte: [], sessions: [], echec: null });
-/** Un banc mesuré sans juge ; `a` et `c` : tests d'origine réussis par A et par cadence-run (null : relevé sans compte) ; `ok` : banc entier vert. */
-const banc = (id: string, a: [number | null, boolean], c: [number | null, boolean]): ResultatBanc => {
-  const sj = ([n, ok]: [number | null, boolean]): MesureSansJuge => ({ suite_ok: true, caches_ok: ok, ...(n !== null && { caches_reussis: n }) });
+/** Un banc mesuré sans juge ; `a` et `c` : tests d'origine réussis par A et par cadence-run (null : relevé sans compte ; nombre : un seul lanceur, vitest) ; `ok` : banc entier vert. */
+type Compte = number | Record<string, number> | null;
+const banc = (id: string, a: [Compte, boolean], c: [Compte, boolean]): ResultatBanc => {
+  const sj = ([n, ok]: [Compte, boolean]): MesureSansJuge => ({ suite_ok: true, caches_ok: ok, ...(n !== null && { caches_reussis: typeof n === 'number' ? { vitest: n } : n }) });
   return { banc: id, taille: 'fonction', visible: false, reponses: false, frais: false, mesures: { A: m('A'), 'cadence-run': m('cadence-run') }, jugement: null,
     fuites: { A: [], 'cadence-run': [] }, sans_juge: { A: sj(a), 'cadence-run': sj(c) } };
 };
 const caches = (...rs: ResultatBanc[]) => verdictSansJuge(rs, 'A', 'cadence-run', BARRE_SPEC).criteres.find((x) => x.nom === 'tests d\'origine verts')!;
 const vert = (...rs: ResultatBanc[]) => verdictSansJuge(rs, 'A', 'cadence-run', BARRE_SPEC).vert;
 
-describe('critère « tests d\'origine verts » : tests réussis par bras, marge de bruit mesurée (L777)', () => {
-  it('la marge est celle mesurée : 11 % de la référence', () => expect(MARGE_CACHES).toBe(0.11));
-  it('les trois passages du 18-11, rouges au compte par banc, sont verts au compte par test : leur écart est celui de deux bras identiques', () => {
-    // 18-11 09:07 : banc 1 32 contre 33, banc 3 32 contre 31, banc 7 16 contre 24 ; au compte par banc, 0 contre 1 : ROUGE
-    const p0907 = [banc('1-ol-companion-L239', [33, true], [32, false]), banc('3-ol-companion-L241', [31, false], [32, false]), banc('7-ol-companion-L160', [24, false], [16, false])];
-    expect(caches(...p0907)).toMatchObject({ valeur: '80 contre 88 tests réussis (1-ol-companion-L239 : 32 contre 33 · 3-ol-companion-L241 : 32 contre 31 · 7-ol-companion-L160 : 16 contre 24)',
-      seuil: '≥ A − 10 (marge de bruit 11 % de A, L777)', ok: true, bloquant: true });
-    expect(vert(...p0907)).toBe(true);
-    const p1131 = [banc('1-ol-companion-L239', [33, true], [32, false]), banc('3-ol-companion-L241', [32, false], [32, false]), banc('7-ol-companion-L160', [16, false], [19, false])];
-    expect(caches(...p1131)).toMatchObject({ valeur: expect.stringMatching(/^83 contre 81 tests réussis/), ok: true });
+describe('critère « tests d\'origine verts » : tests réussis par bras, sans marge (L777, revue r1)', () => {
+  it('les trois passages du 18-11 recalculés au compte final : 09:07 et 10:08 ROUGES, 11:31 vert', () => {
+    // comptes relus dans ~/bench-cadence/runs/<passage>/<banc>/c1|c2.tests-origine[.rejeu].log et .tests-bras[.rejeu].log (cachesReussis, jest + vitest ;
+    // au banc 3, vitest est hors compte pour les deux bras : la chaîne && s'arrête au backend rouge)
+    const p = (b1: [number, number], b3: [number, number], b7: [number, number]) => [banc('1-ol-companion-L239', [b1[0], b1[0] === 33], [b1[1], b1[1] === 33]),
+      banc('3-ol-companion-L241', [{ jest: b3[0] }, false], [{ jest: b3[1] }, false]), banc('7-ol-companion-L160', [b7[0], false], [b7[1], false])];
+    expect(caches(...p([33, 32], [31, 32], [24, 16]))).toMatchObject({ valeur: '80 contre 88 tests réussis (1-ol-companion-L239 : 32 contre 33 · 3-ol-companion-L241 : 32 contre 31 · 7-ol-companion-L160 : 16 contre 24)',
+      seuil: '≥ A (test par test, sans marge, L777)', ok: false, bloquant: true }); // 09:07
+    expect(caches(...p([32, 33], [31, 31], [21, 18]))).toMatchObject({ valeur: expect.stringMatching(/^82 contre 84 tests réussis/), ok: false }); // 10:08
+    expect(caches(...p([33, 32], [32, 32], [16, 19]))).toMatchObject({ valeur: expect.stringMatching(/^83 contre 81 tests réussis/), ok: true }); // 11:31
+    expect(vert(...p([33, 32], [31, 32], [24, 16]))).toBe(false);
   });
-  it('un candidat nettement pire que A reste ROUGE : un banc entier perdu, ou juste au-delà de la marge', () => {
-    const perdu = [banc('1-a', [33, true], [0, false]), banc('3-b', [31, false], [31, false]), banc('7-c', [24, false], [24, false])]; // 55 contre 88
-    expect(caches(...perdu)).toMatchObject({ ok: false, bloquant: true });
-    expect(vert(...perdu)).toBe(false);
-    // 88 pour A : marge ⌈9,68⌉ = 10 ; 78 passe, 77 est rouge
-    const borne = (n: number) => caches(banc('1-a', [33, true], [33, true]), banc('3-b', [31, false], [31, false]), banc('7-c', [24, false], [n - 64, false]));
-    expect(borne(78)).toMatchObject({ ok: true }); expect(borne(77)).toMatchObject({ ok: false, seuil: '≥ A − 10 (marge de bruit 11 % de A, L777)' });
+  it('un candidat nettement pire que A reste ROUGE : un banc entier perdu, dix tests de moins, ou un seul', () => {
+    const avec = (n1: number, n7: number) => [banc('1-a', [33, true], [n1, n1 === 33]), banc('3-b', [31, false], [31, false]), banc('7-c', [24, false], [n7, false])];
+    expect(caches(...avec(0, 24))).toMatchObject({ valeur: expect.stringMatching(/^55 contre 88 /), ok: false, bloquant: true });
+    expect(vert(...avec(0, 24))).toBe(false);
+    expect(caches(...avec(33, 14))).toMatchObject({ valeur: expect.stringMatching(/^78 contre 88 /), ok: false }); // l'ancienne marge de 11 % le laissait vert
+    expect(caches(...avec(33, 23))).toMatchObject({ ok: false });
+    expect(caches(...avec(33, 24))).toMatchObject({ ok: true });
+  });
+  it('revue r1 : un lanceur compté pour un seul bras rend le banc non mesurable ; un lanceur hors compte des deux bras est nommé', () => {
+    const x = caches(banc('1-a', [{ jest: 0, vitest: 33 }, true], [{ jest: 0 }, false]), banc('3-b', [31, false], [31, false]));
+    expect(x).toMatchObject({ valeur: '0 contre 1 bancs sur 2 (compte par test non mesurable : 1-a : vitest compté pour A seulement)', seuil: '≥ A', ok: false });
+    const b3 = banc('3-b', [{ jest: 31 }, false], [{ jest: 32 }, false]);
+    for (const b of ['A', 'cadence-run']) b3.sans_juge![b].caches_hors_compte = ['vitest : absent de la suite avec les tests d\'origine'];
+    expect(caches(b3)).toMatchObject({ valeur: '32 contre 31 tests réussis (3-b : 32 contre 31) ; hors compte : 3-b/A : vitest : absent de la suite avec les tests d\'origine ; '
+      + '3-b/cadence-run : vitest : absent de la suite avec les tests d\'origine', ok: true });
+    expect(caches(banc('1-a', [{}, false], [{}, false]))).toMatchObject({ valeur: expect.stringContaining('1-a : aucun lanceur comptable'), ok: true });
   });
   it('sans compte relevé pour un bras (passage d\'avant L777), le critère revient au compte par banc et le dit', () => {
     const x = caches(banc('1-a', [33, true], [null, false]), banc('3-b', [31, false], [31, false]));
-    expect(x).toMatchObject({ valeur: '0 contre 1 bancs sur 2 (compte par banc : tests réussis non relevés)', seuil: '≥ A', ok: false });
+    expect(x).toMatchObject({ valeur: '0 contre 1 bancs sur 2 (compte par test non mesurable : 1-a : compte non relevé (cadence-run))', seuil: '≥ A', ok: false });
   });
   it('un banc sans tests d\'origine ne compte pas ; aucun : « aucun banc avec tests d\'origine », vert', () => {
     const sans = banc('2-b', [null, true], [null, true]); sans.sans_juge = { A: { suite_ok: true, caches_ok: null }, 'cadence-run': { suite_ok: true, caches_ok: null } };

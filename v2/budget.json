@@ -1,4 +1,4 @@
 {
   "noyau": { "total": 3000, "modules": { "plan": 350, "accueil": 200, "run": 1032, "porte": 250, "deliver": 450, "hooks": 215 } },
-  "mesure": { "total": 2389, "modules": { "bench": 1672, "sequence": 717 } }
+  "mesure": { "total": 2410, "modules": { "bench": 1693, "sequence": 717 } }
 }

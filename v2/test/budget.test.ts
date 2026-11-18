@@ -78,10 +78,12 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // L775 : bench 1609 (+21), sequence 717 (+2), mesure 2326 : le détecteur de fuites ignore les appels refusés par le hook du bras (refusParHook, partagé
   // avec lectureReferences), sans ligne tassée.
   // L777 : bench 1672 (+63), mesure 2389 : « tests d'origine verts » compte les tests d'origine réussis par bras (testsReussis, cachesReussis, lus dans les
-  // bilans jest, vitest et pytest) avec une marge de bruit mesurée sur des paires de bras identiques (MARGE_CACHES, critereCaches), sans ligne tassée.
-  it('les totaux sont ceux de R29 : noyau 3000, mesure 2389 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742, L752, L756, L762, L775, L777)', () => {
+  // bilans jest, vitest et pytest) avec une marge de bruit (MARGE_CACHES, retirée en revue r1 : elle ne venait pas de bras identiques), sans ligne tassée.
+  // L777 (revue r1) : bench 1693 (+21), mesure 2410 : marge retirée, candidat ≥ A test par test ; un lanceur ne compte que s'il a un bilan dans les deux
+  // journaux et aucun rouge dans la suite seule (cachesReussis), sinon le banc est non mesurable, sans ligne tassée.
+  it('les totaux sont ceux de R29 : noyau 3000, mesure 2410 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742, L752, L756, L762, L775, L777)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
-    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2389]);
+    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2410]);
   });
   for (const [nom, g] of Object.entries(budget)) {
     it(`groupe ${nom} : la somme des budgets ne dépasse pas ${g.total}`, () =>

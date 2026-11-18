@@ -20,7 +20,7 @@ export function mesurerSansJuge(b: Banc, clone: string, delaiMs = 30 * 60_000, r
     for (const f of tests) { const c = join(clone, nomCache(f)); if (!existsSync(c)) { mkdirSync(dirname(c), { recursive: true }); copyFileSync(join(origine, f), c); poses.push(c); } }
     const caches_ok = shell('tests d\'origine', b.tests, clone, `${clone}.tests-origine${j}.log`, delaiMs) === 0;
     const n = cachesReussis(lireJournal(`${clone}.tests-origine${j}.log`), lireJournal(`${clone}.tests-bras${j}.log`));
-    return { suite_ok, caches_ok, ...(n !== null && { caches_reussis: n }) };
+    return { suite_ok, caches_ok, ...(n && { caches_reussis: n.par_lanceur, ...(n.hors_compte.length > 0 && { caches_hors_compte: n.hors_compte }) }) };
   } finally { for (const p of poses) rmSync(p, { force: true }); }
 }
 
@@ -28,14 +28,17 @@ const lireJournal = (f: string): string => (existsSync(f) ? readFileSync(f, 'utf
 /** Couleurs ANSI d'une sortie de terminal (vitest et jest en écrivent même redirigés, selon l'environnement). */
 const SANS_ANSI = /\x1b\[[0-9;]*m/g;
 
+/** L777 : bilan d'un lanceur dans un journal de suite : tests réussis et ratés. */
+type Bilans = Record<string, { reussis: number; rates: number }>;
 /**
- * L777 : tests réussis par lanceur, lus dans les lignes de bilan d'un journal de suite : jest (`Tests:       3 failed, 546 passed, 549 total`),
+ * L777 : bilans par lanceur, lus dans les lignes de bilan d'un journal de suite : jest (`Tests:       3 failed, 546 passed, 549 total`),
  * vitest (`      Tests  1 failed | 1366 passed (1368)`), pytest (`==== 1 failed, 30 passed in 2.31s ====`). Un lanceur cité plusieurs fois se somme ;
  * null si aucune ligne de bilan n'est lisible (lanceur inconnu, suite tuée avant son bilan).
  */
-export function testsReussis(journal: string): Record<string, number> | null {
-  const n: Record<string, number> = {};
-  const ajoute = (k: string, reste: string) => { n[k] = (n[k] ?? 0) + Number(/(\d+) passed/.exec(reste)?.[1] ?? 0); };
+function bilans(journal: string): Bilans | null {
+  const n: Bilans = {};
+  const nb = (re: RegExp, t: string) => Number(re.exec(t)?.[1] ?? 0);
+  const ajoute = (k: string, t: string) => { const x = (n[k] ??= { reussis: 0, rates: 0 }); x.reussis += nb(/(\d+) passed/, t); x.rates += nb(/(\d+) failed/, t); };
   for (const brute of journal.replace(SANS_ANSI, '').split('\n')) {
     const l = brute.trim(); let m: RegExpExecArray | null;
     if ((m = /^Tests:\s+(.*\btotal\b.*)$/.exec(l))) ajoute('jest', m[1]);
@@ -44,16 +47,29 @@ export function testsReussis(journal: string): Record<string, number> | null {
   }
   return Object.keys(n).length ? n : null;
 }
+/** L777 : tests réussis par lanceur (`bilans`) ; null sans bilan lisible. */
+export function testsReussis(journal: string): Record<string, number> | null {
+  const b = bilans(journal);
+  return b && Object.fromEntries(Object.entries(b).map(([k, x]) => [k, x.reussis]));
+}
 
+/** L777 (revue r1) : tests d'origine réussis d'un bras, par lanceur comparable, et les lanceurs laissés hors du compte, avec leur raison. */
+export interface CompteCaches { par_lanceur: Record<string, number>; hors_compte: string[] }
 /**
- * L777 : tests d'origine réussis par un bras = tests réussis avec les tests d'origine posés, moins ceux de la suite seule, lanceur par lanceur
- * (jamais négatif : un lanceur que la suite avec les tests d'origine n'a pas atteint compte 0). null si l'un des deux journaux n'a aucun bilan lisible ;
- * le verdict revient alors au compte par banc. Le compte n'a de sens qu'avec une suite du bras verte, que « suite du projet verte » exige déjà.
+ * L777 : tests d'origine réussis par un bras = tests réussis avec les tests d'origine posés, moins ceux de la suite seule, lanceur par lanceur.
+ * Revue r1 : un lanceur ne compte que s'il a un bilan dans les DEUX journaux et aucun test raté dans la suite seule. Les bancs enchaînent leurs suites
+ * par `&&` : une suite arrêtée avant un lanceur dans un seul des deux journaux comptait toute la suite de ce lanceur (1368) ou effaçait ses tests
+ * d'origine (0) ; une suite seule rouge gonflait la différence. Ces lanceurs vont dans `hors_compte`. Aucun lanceur comparable (`par_lanceur` vide),
+ * ou null si aucun des deux journaux n'a de bilan : compte non mesurable, que le verdict dit avant de revenir au compte par banc.
  */
-export function cachesReussis(origine: string, bras: string): number | null {
-  const o = testsReussis(origine), b = testsReussis(bras);
-  if (!o || !b) return null;
-  return [...new Set([...Object.keys(o), ...Object.keys(b)])].reduce((s, k) => s + Math.max(0, (o[k] ?? 0) - (b[k] ?? 0)), 0);
+export function cachesReussis(origine: string, bras: string): CompteCaches | null {
+  const o = bilans(origine) ?? {}, b = bilans(bras) ?? {}, par_lanceur: Record<string, number> = {}, hors_compte: string[] = [];
+  for (const k of [...new Set([...Object.keys(o), ...Object.keys(b)])].sort()) {
+    if (!o[k] || !b[k]) hors_compte.push(`${k} : absent de la suite ${o[k] ? 'seule' : 'avec les tests d\'origine'}`);
+    else if (b[k].rates) hors_compte.push(`${k} : ${b[k].rates} rouge(s) dans la suite seule`);
+    else par_lanceur[k] = Math.max(0, o[k].reussis - b[k].reussis);
+  }
+  return Object.keys(par_lanceur).length || hors_compte.length ? { par_lanceur, hors_compte } : null;
 }
 
 /** L733 : chemins qui ne sont pas le travail d'un banc (plan, registre, docs, captures MCP, Markdown). */

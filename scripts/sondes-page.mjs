@@ -300,7 +300,8 @@ window.__sondes = { ${FONCTIONS.map((f) => f.name).join(', ')} };
 /**
  * Lecture seule, dans la page (revue r1) : les voies d'écriture que le routage réseau de Playwright ne voit pas ou ne coupe pas seul. `sendBeacon`
  * rend false, `RTCPeerConnection` et `WebTransport` lèvent ; chaque tentative est notée par la liaison `__sondesEcriture` (voie, détail).
- * HTTP non GET et messages WebSocket sont coupés au niveau du contexte (scripts/sondes-interaction.mjs, sonder).
+ * HTTP non GET est coupé au réseau du navigateur et les workers sont gardés à leur démarrage (scripts/sondes-garde.mjs) ; les messages WebSocket de la
+ * page et de ses iframes sont coupés par le routage du contexte (scripts/sondes-interaction.mjs, couperLesEcritures). Ce script ne court pas dans les workers.
  */
 export const SCRIPT_LECTURE_SEULE = `(() => {
 const noter = (voie, detail) => { try { window.__sondesEcriture && window.__sondesEcriture(voie, String(detail).slice(0, 80)); } catch (e) { /* rien */ } };

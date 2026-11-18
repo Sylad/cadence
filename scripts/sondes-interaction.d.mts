@@ -20,11 +20,12 @@ export interface Rapport {
   url: string; largeur: number; hauteur: number; seuil: number; date: string; rendu?: 'gpu' | 'logiciel';
   repos: Array<{ cible: string; dx: number; dy: number }>; controles: Controle[]; parcours: Array<{ nom: string; pas: Pas[] }>; ecrituresBloquees: number;
   couverts?: Array<{ nom: string; role: 'bascule' | 'bouton'; liste: boolean }>; ecritures?: Ecriture[];
+  workers?: Array<{ type: string; url: string }>; nonGardes?: string[];
 }
 export type Etape = { type: 'cliquer'; sel: string; n: number } | { type: 'attendre'; ms: number } | { type: 'touche'; touche: string };
 export interface Parcours { nom: string; etapes: Etape[] }
 export interface Io { cwd: string; env: NodeJS.ProcessEnv; out: (l: string) => void; err: (l: string) => void }
-export interface Navigateur { navigateur: unknown; chemin: string; rendu: 'gpu' | 'logiciel'; fermer: () => Promise<void> }
+export interface Navigateur { navigateur: unknown; chemin: string; rendu: 'gpu' | 'logiciel'; gardeErreur?: string; fermer: () => Promise<void> }
 
 export const DEFAUTS: Readonly<Options>;
 export function lireParcours(texte: string, route: string): Parcours[];
@@ -35,7 +36,7 @@ export function sonder(navigateur: unknown, url: string, o: Options, parcours: P
 export function tousLesConstats(r: Rapport): Array<Constat & { ou: string }>;
 export function nonMesures(r: Rapport): string[];
 export function clicsMesures(r: Rapport): number;
-export function codeSortie(r: Rapport): 0 | 1 | 3 | 4;
+export function codeSortie(r: Rapport): 0 | 1 | 2 | 3 | 4;
 export function formater(r: Rapport): string;
 export function lireOptions(argv: string[]): Options & { url: string };
 export function main(argv: string[], io: Io): Promise<number>;

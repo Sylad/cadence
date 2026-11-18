@@ -5,6 +5,9 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { cheminsPlaywright, codeSortie, constatsClic, DEFAUTS, formater, lancerNavigateur, lireOptions, lireParcours, main, nonMesures, sonder, tousLesConstats, type Rapport } from '../scripts/sondes-interaction.mjs';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { gardeDe } from '../scripts/sondes-garde.mjs';
 import { serveurSondes } from './sondes-serveur-l778.js';
 
 const page = (nom: string) => pathToFileURL(join(import.meta.dirname, 'fixtures', 'sondes', `${nom}.html`)).href;
@@ -228,5 +231,75 @@ describe.skipIf(!lance)('L778 revue r1 — lecture seule, navigation, rien de me
     expect(c!.mesure.nonMesure).toMatch(/remplacé par le clic.*2 équivalent/);
     expect(c!.constats).toEqual([]);
     expect(codeSortie(r)).toBe(4);
+  });
+});
+
+describe('L778 revue r2 — le rapport ne dit que ce que la lecture seule couvre', () => {
+  const r: Rapport = { url: 'u', largeur: 390, hauteur: 844, seuil: 1, date: 'd', repos: [], ecrituresBloquees: 0, controles: [], parcours: [],
+    workers: [{ type: 'worker', url: 'http://h/w.js' }, { type: 'shared_worker', url: 'http://h/s.js' }] };
+
+  it('n\'affirme plus « rien n\'a atteint le serveur » ; dit les voies coupées, les workers gardés et ce qui n\'est pas couvert', () => {
+    const e = { voie: 'http', cible: 'http://h/x', detail: 'POST http://h/x', ou: '« x » (bouton de liste)' };
+    const t = formater({ ...r, ecrituresBloquees: 1, ecritures: [e] });
+    expect(t).not.toContain('rien n\'a atteint le serveur');
+    expect(t).toContain('coupée(s) dans le navigateur avant d\'en sortir : 1');
+    expect(t).toContain('worker(s) gardé(s) : 1 worker, 1 shared_worker');
+    expect(t).toContain('non couvert : un GET qui écrit côté serveur');
+  });
+
+  it('une cible qu\'on n\'a pas pu garder rend la passe non vérifiée (code 2), même avec des constats', () => {
+    const k = { id: '1', nom: 'A', role: 'bascule' as const, liste: true, mesure: { sautMax: 40, sautFinal: 40, defilement: [], regions: null }, constats: [{ type: 'saut' as const, valeur: 40, texte: 'saut' }] };
+    const n: Rapport = { ...r, controles: [k], nonGardes: ['shared_worker http://h/s.js : Runtime.evaluate : refus'] };
+    expect(codeSortie(n)).toBe(2);
+    expect(formater(n)).toContain('cible non gardée, ses écritures n\'ont pas été coupées : shared_worker http://h/s.js : Runtime.evaluate : refus — passe non vérifiée');
+  });
+
+  it('la doc, le changelog et les agents n\'affirment pas une coupure totale et nomment ce qui n\'est pas couvert', () => {
+    const lire = (f: string) => readFileSync(join(import.meta.dirname, '..', f), 'utf8');
+    for (const f of ['docs/sondes-interaction.md', 'changelog.d/L778.md', 'agents/qa-reviewer.md', 'agents/ux-reviewer.md', 'scripts/sondes-interaction.mjs']) {
+      const t = lire(f);
+      expect(t, f).not.toMatch(/rien n'a atteint le serveur|every way the browser (can )?writes?|cut every way|every way the browser writes is cut/i);
+    }
+    const doc = lire('docs/sondes-interaction.md');
+    expect(doc).toContain('SharedWorker');
+    expect(doc).toMatch(/not covered/i);
+    for (const f of ['changelog.d/L778.md', 'agents/qa-reviewer.md', 'agents/ux-reviewer.md']) expect(lire(f), f).toMatch(/GET that writes|not covered/i);
+  });
+});
+
+describe.skipIf(!lance)('L778 revue r2 — workers dédiés, partagés, module et blob : rien n\'atteint le serveur (navigateur réel)', () => {
+  const dossier = join(import.meta.dirname, 'fixtures', 'sondes');
+
+  it('l\'essai du relecteur : POST et ws.send depuis Worker, SharedWorker, worker module, worker blob et worker qui garde les natives : rien n\'est reçu', async () => {
+    const srv = await serveurSondes(dossier);
+    try {
+      const r = await sonder(lance!.navigateur, `${srv.url}/workers.html`, { ...RAPIDE, parListe: 6, charge: 600 }, []);
+      expect(srv.recu.connexions).toBeGreaterThanOrEqual(5); // chaque worker a ouvert sa socket : la lecture passe
+      expect(srv.recu.http.filter((l) => !l.startsWith('GET '))).toEqual([]);
+      expect(srv.recu.websocket).toEqual([]);
+      const de = (nom: string) => r.ecritures!.filter((e) => e.ou === `« ${nom} » (bouton de liste)`).map((e) => `${e.voie} ${e.detail}`);
+      expect(de('x')).toEqual(expect.arrayContaining(['websocket WORKER DELETE', expect.stringMatching(/^http POST .*\/worker-post$/)]));
+      expect(de('y')).toEqual(expect.arrayContaining(['websocket SHARED DELETE', expect.stringMatching(/^http POST .*\/shared-post$/)]));
+      expect(de('m')).toEqual(expect.arrayContaining(['websocket MODULE DELETE', expect.stringMatching(/^http POST .*\/module-post$/)]));
+      expect(de('b')).toEqual(expect.arrayContaining(['websocket BLOB DELETE', expect.stringMatching(/^http POST .*\/blob-post$/)]));
+      expect(de('c')).toEqual(expect.arrayContaining(['websocket CAPTURE DELETE', 'WebTransport bloqué']));
+      expect(r.workers!.filter((w) => w.type === 'shared_worker')).toHaveLength(1);
+      expect(r.nonGardes).toEqual([]);
+      for (const c of r.controles) expect(nonMesures(r).some((m) => m.startsWith(`« ${c.nom} » — le clic a tenté d'écrire`))).toBe(true);
+      expect(codeSortie(r)).toBe(3);
+    } finally {
+      await srv.fermer();
+    }
+  });
+
+  it('sans garde (navigateur lancé sans port de débogage), rien n\'est sondé', async () => {
+    const pw = createRequire(join(lance!.chemin, 'package.json'))(lance!.chemin);
+    const nu = await pw.chromium.launch({ headless: true });
+    try {
+      expect(gardeDe(nu)).toBeUndefined();
+      await expect(sonder(nu, page('stable'), RAPIDE, [])).rejects.toThrow(/garde de lecture seule absente/);
+    } finally {
+      await nu.close();
+    }
   });
 });

@@ -33,6 +33,8 @@
     "scripts/references.d.mts",
     "scripts/sondes-interaction.mjs",
     "scripts/sondes-interaction.d.mts",
+    "scripts/sondes-garde.mjs",
+    "scripts/sondes-garde.d.mts",
     "scripts/sondes-page.mjs",
     "scripts/sondes-page.d.mts",
     ".claude-plugin",

@@ -10,7 +10,8 @@ import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { SCRIPT_LECTURE_SEULE, SCRIPT_SONDES } from './sondes-page.mjs';
+import { ARG_DEBOGAGE, armerGarde, couperLesEcritures, gardeDe, lectureSeule } from './sondes-garde.mjs';
+import { SCRIPT_SONDES } from './sondes-page.mjs';
 
 /** Les seuils par défaut, documentés dans docs/sondes-interaction.md#thresholds. */
 export const DEFAUTS = Object.freeze({ seuil: 1, max: 30, parListe: 3, attente: 1000, charge: 5000, repos: 3000, largeur: 1440, hauteur: 900 });
@@ -83,8 +84,11 @@ async function afficheDesImages(navigateur) {
   }
 }
 
-/** Les lancements essayés : rendu par le GPU d'abord, puis rendu logiciel (`--use-gl=disabled`) quand le GPU de la machine ne rend aucune image. */
-const LANCEMENTS = [{ rendu: 'gpu', args: [] }, { rendu: 'logiciel', args: ['--use-gl=disabled'] }];
+/**
+ * Les lancements essayés : rendu par le GPU d'abord, puis rendu logiciel (`--use-gl=disabled`) quand le GPU de la machine ne rend aucune image.
+ * Chacun ouvre le port de débogage (127.0.0.1, port libre) par lequel la garde de lecture seule parle au navigateur (scripts/sondes-garde.mjs).
+ */
+const LANCEMENTS = [{ rendu: 'gpu', args: [ARG_DEBOGAGE] }, { rendu: 'logiciel', args: ['--use-gl=disabled', ARG_DEBOGAGE] }];
 
 function chargerPlaywright(chemin) {
   try { return { chemin, pw: createRequire(join(resolve(chemin), 'package.json'))(resolve(chemin)) }; } catch { return null; }
@@ -105,7 +109,7 @@ async function lancerQuiAffiche(pw, args) {
  * Charge Playwright puis lance Chromium (celui du paquet, sinon Chrome installé) ; null quand rien ne se lance. Un navigateur qui ne rend aucune image
  * (GPU de la machine bloqué, vécu le 18-11 sous WSL) est refermé et relancé en rendu logiciel ; `rendu` le dit, le rapport aussi (WebGL y est coupé).
  * Le navigateur prend ses dossiers temporaires (profil, artefacts) dans un dossier à lui, retiré par `fermer()` : une passe ne laisse rien dans le
- * dossier temporaire de la machine.
+ * dossier temporaire de la machine. La garde de lecture seule y est armée (armerGarde) ; si elle ne s'arme pas, `gardeErreur` le dit.
  */
 export async function lancerNavigateur(env, cwd) {
   const tmp = mkdtempSync(join(tmpdir(), 'cadence-sondes-'));
@@ -116,7 +120,11 @@ export async function lancerNavigateur(env, cwd) {
     for (const { rendu, args } of LANCEMENTS) {
       for (const { chemin, pw } of modules) {
         const navigateur = await lancerQuiAffiche(pw, args);
-        if (navigateur) return { navigateur, chemin, rendu, fermer: async () => { await navigateur.close(); rmSync(tmp, { recursive: true, force: true }); } };
+        if (!navigateur) continue;
+        // Sans garde, `sonder` refuse de jouer (lecture seule non garantie) : l'erreur est gardée pour le dire.
+        const garde = await armerGarde(navigateur, tmp).catch((e) => ({ erreur: premiereLigne(e) }));
+        const fermer = async () => { garde.fermer?.(); await navigateur.close(); rmSync(tmp, { recursive: true, force: true }); };
+        return { navigateur, chemin, rendu, gardeErreur: garde.erreur, fermer };
       }
     }
   } finally {
@@ -313,38 +321,17 @@ async function jouerParcours(s, parcours) {
   return out;
 }
 
-const METHODES_LUES = ['GET', 'HEAD', 'OPTIONS'];
-
 /**
- * Lecture seule (revue r1 : un bouton d'icône avait envoyé « DELETE item 1 » par WebSocket) : chaque voie d'écriture du navigateur est coupée, et
- * chaque tentative notée { voie, cible, detail } dans `ecritures`. HTTP hors GET, HEAD, OPTIONS (fetch, XHR, formulaire POST) : avorté ; WebSocket :
- * la connexion et la réception passent, aucun message de la page n'est transmis au serveur ; service workers : refusés au contexte (ils serviraient
- * des requêtes hors du routage) ; sendBeacon, RTCPeerConnection, WebTransport : neutralisés dans la page (SCRIPT_LECTURE_SEULE). Un GET qui écrit
- * côté serveur passe : la sonde ne peut pas le reconnaître (docs/sondes-interaction.md).
+ * Toute la passe sur une page, en lecture seule : la garde du navigateur (scripts/sondes-garde.mjs) doit être armée, sinon rien n'est sondé (lève).
+ * Chaque écriture tentée est coupée, comptée et rattachée au clic qui l'a faite ; les workers gardés et les cibles non gardées sont rendus.
  */
-async function couperLesEcritures(contexte, ecritures) {
-  if (typeof contexte.routeWebSocket !== 'function') {
-    throw new Error('ce Playwright ne sait pas intercepter les WebSocket (routeWebSocket, version 1.48 ou plus) : lecture seule non garantie, rien n\'est sondé');
-  }
-  await contexte.route('**/*', (r) => {
-    const q = r.request();
-    if (METHODES_LUES.includes(q.method())) return r.continue();
-    ecritures.push({ voie: 'http', cible: q.url(), detail: `${q.method()} ${q.url()}`.slice(0, 120) });
-    // Un formulaire POST est une navigation : 204 laisse la page où elle est (un abandon la remplacerait par une page d'erreur).
-    return q.isNavigationRequest() ? r.fulfill({ status: 204, body: '' }) : r.abort();
-  });
-  await contexte.routeWebSocket(/.*/, (ws) => {
-    ws.connectToServer();
-    ws.onMessage((message) => { ecritures.push({ voie: 'websocket', cible: ws.url(), detail: String(message).slice(0, 80) }); });
-  });
-  await contexte.exposeFunction('__sondesEcriture', (voie, detail) => { ecritures.push({ voie, cible: '', detail }); });
-  await contexte.addInitScript({ content: SCRIPT_LECTURE_SEULE });
-}
-
-/** Toute la passe sur une page, en lecture seule (couperLesEcritures) : chaque écriture tentée est bloquée, comptée et rattachée au clic qui l'a faite. */
 export async function sonder(navigateur, url, o, parcours) {
-  const contexte = await navigateur.newContext({ viewport: { width: o.largeur, height: o.hauteur }, serviceWorkers: 'block' });
+  const garde = gardeDe(navigateur);
+  if (!garde) throw new Error('garde de lecture seule absente (navigateur lancé sans port de débogage) : lecture seule non garantie, rien n\'est sondé');
   const ecritures = [];
+  garde.ouvrirPasse(ecritures);
+  const contexte = await navigateur.newContext({ viewport: { width: o.largeur, height: o.hauteur }, serviceWorkers: 'block' });
+  let bilanGarde;
   try {
     await couperLesEcritures(contexte, ecritures);
     await contexte.addInitScript({ content: SCRIPT_SONDES });
@@ -353,10 +340,13 @@ export async function sonder(navigateur, url, o, parcours) {
     const repos = await s.page.evaluate((ms) => window.__sondes.sdRepos(ms), o.repos);
     const { controles, couverts } = o.sansBalayage ? { controles: [], couverts: [] } : await balayer(s);
     const parcoursMesures = await jouerParcours(s, parcours);
+    await s.page.waitForTimeout(150); // une note de la garde partie à la fin est encore comptée
     for (const e of ecritures) e.ou ??= 'hors de tout clic (chargement, minuterie)';
+    bilanGarde = garde.fermerPasse();
     return { url, largeur: o.largeur, hauteur: o.hauteur, seuil: o.seuil, date: new Date().toISOString(), rendu: o.rendu, repos, controles, couverts, parcours: parcoursMesures,
-      ecrituresBloquees: ecritures.length, ecritures };
+      ecrituresBloquees: ecritures.length, ecritures, workers: bilanGarde.workers, nonGardes: bilanGarde.echecs };
   } finally {
+    if (!bilanGarde) garde.fermerPasse();
     await contexte.close();
   }
 }
@@ -414,10 +404,11 @@ export function clicsMesures(r) {
 }
 
 /**
- * Le code de sortie : 1 avec constats, 4 non mesurable (aucun clic mesuré : rien n'est vérifié), 3 passe partielle (des clics non mesurés,
- * couverts ou qui ont tenté d'écrire), 0 tout mesuré sans constat. Le code 2 (usage, navigateur, erreur de la passe) est rendu par main.
+ * Le code de sortie : 2 quand une cible (worker) n'a pas pu être gardée (lecture seule non garantie : non vérifié), 1 avec constats, 4 non mesurable (aucun clic mesuré : rien n'est vérifié), 3 passe partielle (des clics non mesurés,
+ * couverts ou qui ont tenté d'écrire), 0 tout mesuré sans constat. Les autres codes 2 (usage, navigateur, erreur de la passe) sont rendus par main.
  */
 export function codeSortie(r) {
+  if (r.nonGardes?.length) return 2;
   if (tousLesConstats(r).length) return 1;
   if (!clicsMesures(r)) return 4;
   return nonMesures(r).length ? 3 : 0;
@@ -447,7 +438,8 @@ export function formater(r) {
   const lignes = [...entete(r, manques.length, mesures), bilan(constats.length, manques.length, mesures)];
   for (const k of constats) lignes.push(`  ✗ ${k.ou} : ${k.texte}`);
   if (manques.length) lignes.push(`non mesuré(s) : ${manques.length}`, ...manques.map((m) => `  ? ${m}`));
-  if (ecritures.length) lignes.push(`écriture(s) tentée(s), bloquée(s) — rien n'a atteint le serveur : ${ecritures.length}`, ...ecritures.map((e) => `  ! ${e.ou} : ${decrireEcriture(e)}`));
+  lignes.push(...lectureSeule(r));
+  if (ecritures.length) lignes.push(`écriture(s) tentée(s), coupée(s) dans le navigateur avant d'en sortir : ${ecritures.length}`, ...ecritures.map((e) => `  ! ${e.ou} : ${decrireEcriture(e)}`));
   lignes.push('mesures :');
   for (const c of r.controles) lignes.push(`  ${c.id}. « ${c.nom} » (${c.role}) : ${ligneMesure(c.mesure)}`);
   for (const p of r.parcours) for (const s of p.pas) lignes.push(`  ${nomDuPas(p, s)} : ${s.nonMesure ? `non mesuré (${s.nonMesure})` : ligneMesure(s.mesure)}`);
@@ -474,7 +466,8 @@ export function lireOptions(argv) {
 
 /**
  * `cadence sondes` : 0 tout mesuré sans constat, 1 avec constats (et seulement alors), 3 sans constat mais des clics non mesurés (passe partielle),
- * 4 aucun clic mesuré (non mesurable), 2 usage, attendus illisibles, navigateur introuvable ou passe interrompue par une erreur (non vérifié).
+ * 4 aucun clic mesuré (non mesurable), 2 usage, attendus illisibles, navigateur introuvable, garde de lecture seule non armée, cible (worker) non
+ * gardée ou passe interrompue par une erreur (non vérifié).
  */
 export async function main(argv, io) {
   let o;
@@ -493,6 +486,10 @@ export async function main(argv, io) {
     return 2;
   }
   try {
+    if (lance.gardeErreur) {
+      io.err(`sondes : garde de lecture seule non armée (${lance.gardeErreur}) : rien n'est sondé, non vérifié`);
+      return 2;
+    }
     const r = await sonder(lance.navigateur, o.url, { ...o, rendu: lance.rendu }, parcours);
     if (o.json) writeFileSync(resolve(io.cwd, o.json), JSON.stringify(r, null, 2) + '\n');
     io.out(formater(r));

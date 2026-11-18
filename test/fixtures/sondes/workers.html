@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Sonde — écritures depuis des workers</title>
+<style>body{font:14px sans-serif;margin:0;padding:16px} li{padding:6px 0}</style></head>
+<body>
+<!-- L778 revue r2 : l'essai du relecteur. Chaque bouton d'icône sans nom fait écrire un worker (dédié, partagé, module, blob) par HTTP non GET
+     et par WebSocket : la sonde les presse, rien ne doit atteindre le serveur. -->
+<ul id="items">
+  <li>Item 1 <button id="x">x</button></li>
+  <li>Item 2 <button id="y">y</button></li>
+  <li>Item 3 <button id="m">m</button></li>
+  <li>Item 4 <button id="b">b</button></li>
+  <li>Item 5 <button id="c">c</button></li>
+</ul>
+<script>
+  const dedie = new Worker('/worker-ecrit.js?nom=WORKER');
+  let partage = null;
+  try { partage = new SharedWorker('/worker-ecrit.js?nom=SHARED&partage=1'); partage.port.start(); } catch (e) { /* refusé */ }
+  let module = null;
+  try { module = new Worker('/worker-ecrit.js?nom=MODULE', { type: 'module' }); } catch (e) { /* refusé */ }
+  let blob = null;
+  try {
+    const code = `const o = ${JSON.stringify(location.origin)};
+      const ws = new WebSocket(o.replace('http', 'ws') + '/socket');
+      onmessage = () => { fetch(o + '/blob-post', { method: 'POST', body: 'x' }).catch(() => {}); if (ws.readyState === 1) ws.send('BLOB DELETE'); else ws.onopen = () => ws.send('BLOB DELETE'); };`;
+    blob = new Worker(URL.createObjectURL(new Blob([code], { type: 'text/javascript' })));
+  } catch (e) { /* refusé */ }
+  document.getElementById('x').addEventListener('click', () => dedie.postMessage('go'));
+  document.getElementById('y').addEventListener('click', () => partage && partage.port.postMessage('go'));
+  document.getElementById('m').addEventListener('click', () => module && module.postMessage('go'));
+  const capture = new Worker('/worker-capture.js');
+  document.getElementById('c').addEventListener('click', () => capture.postMessage('go'));
+  document.getElementById('b').addEventListener('click', () => blob && blob.postMessage('go'));
+</script>
+</body></html>

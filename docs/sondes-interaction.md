@@ -21,7 +21,7 @@ cadence sondes <url> [--largeur 1440] [--hauteur 900] [--seuil 1] [--max 30] [--
 | 1 | findings, and only then |
 | 3 | no finding, but a partial pass: clicks not measured (`?`), see below |
 | 4 | not measurable: no click measured at all (every control covered, none on the page, all refused) |
-| 2 | not verified: usage error, unreadable expectations, no browser, or a pass broken by an error |
+| 2 | not verified: usage error, unreadable expectations, no browser, the read-only guard not armed or a worker not guarded, or a pass broken by an error |
 
 A click is « not measured » when the control vanished or was refused, was covered by another element at this viewport size, was replaced
 by the click with no single equivalent to follow, when a journey found fewer elements than it asks for, or when the click tried to write
@@ -37,12 +37,27 @@ launches the bundled Chromium, else the installed Chrome (`channel: 'chrome'`). 
 complete) is relaunched with software rendering (`--use-gl=disabled`); the report header says so, and WebGL is then off: what a WebGL
 map draws is not probed. Its temporary folders (profile, artefacts) live in a folder of its own, removed at the end.
 
-**Read only.** Every way the browser can write is cut, and every attempt is counted and reported with the control that made it:
+**Read only.** The probe cuts the ways a page can write that it knows of, at the level of the browser where it can, and counts every
+attempt with the control that made it. Before the second review (r2), a dedicated `Worker` and a `SharedWorker` still wrote to the server
+(a `POST` and WebSocket messages): Playwright's routing does not see the requests of a `SharedWorker` nor the WebSockets of any worker, and
+its init scripts do not run in workers. Since then, the probe talks to the browser over the DevTools protocol too
+(`scripts/sondes-garde.mjs`, through the debugging port Chromium opens on 127.0.0.1 for the pass):
 
-- HTTP other than `GET`, `HEAD`, `OPTIONS` (fetch, XHR, a `POST` form) is aborted; a form navigation gets an empty 204, so the page stays;
-- WebSocket: the connection opens and the page receives, but no message from the page reaches the server;
-- service workers are refused (they could serve requests outside the routing); `navigator.sendBeacon` returns false; `RTCPeerConnection`
-  and `WebTransport` throw. `EventSource` only reads (a `GET`), so it passes.
+- HTTP other than `GET`, `HEAD`, `OPTIONS` (fetch, XHR, `sendBeacon`, a `POST` form) is refused **in the browser's network**, before it
+  leaves, for every target: page, iframes, popups, `Worker`, `SharedWorker`, module and blob workers; a form navigation gets an empty 204,
+  so the page stays;
+- WebSocket: in the page and its iframes, the connection opens and the page receives, but no message reaches the server (Playwright's
+  WebSocket routing); in a worker, every worker is attached **paused at its start** (nested workers too), and `send` is cut before its first
+  line runs, even for a script that keeps the native function in a variable;
+- `WebTransport` and `WebSocketStream` throw in workers (replayed just before the worker's first script, when the browser has set them);
+  `navigator.sendBeacon` returns false and `RTCPeerConnection` and `WebTransport` throw in the page; service workers are refused (they could
+  serve requests outside the routing). `EventSource` only reads (a `GET`), so it passes.
+
+The report says what the read-only covered for the pass (`lecture seule : …`, the workers it guarded, and what is not covered) and counts
+the writes « cut in the browser before they left it »; it never says the server received nothing, which it cannot measure. A target it
+could not guard (an error while attaching a worker) is listed `✗ cible non gardée` and the pass is « not verified » (code 2); without the
+debugging port the probe refuses to run (code 2). **Not covered:** a `GET` that writes; a browser other than Chromium (the guard speaks
+its protocol); while the pass runs, the debugging port is open to local processes of the machine.
 
 A `GET` that writes on the server side (`?delete=1`) passes: nothing in the request says so. The context is anonymous (no session), which
 most apps refuse to write for anyway. The sweep never presses a link, a submit or reset button, a button of a `POST` form, or a control
@@ -117,6 +132,7 @@ fresh page. `--sans-balayage` runs the journeys alone.
 
 `test/sondes-interaction-l778.test.ts` plays the probes in a real browser on local pages (`test/fixtures/sondes/`): a list whose rows jump
 when ticked (the D-6 case reduced to the bone) and the same list that does not jump, a good and a bad dialog, a box that scrolls by itself,
-icon buttons that write by every way (a local HTTP and WebSocket server, `test/sondes-serveur-l778.ts`, proves it receives nothing),
+icon buttons that write through the page and through workers (dedicated, shared, module, blob, one keeping the native `send`): a local
+HTTP and WebSocket server, `test/sondes-serveur-l778.ts`, proves it receives nothing,
 buttons that navigate by script, a page where every control is covered, a list rebuilt by the click.
 The browser part is skipped, and says so, on a machine with no loadable Playwright.

@@ -34,7 +34,8 @@ export async function serveurSondes(dossier: string): Promise<{ url: string; rec
     const chemin = (req.url ?? '/').split(/[?#]/)[0]!;
     try {
       const corps = readFileSync(join(dossier, chemin.replace(/^\/+/, '')));
-      res.writeHead(200, { 'content-type': chemin.endsWith('.html') ? 'text/html; charset=utf-8' : 'text/plain' }).end(corps);
+      const type = chemin.endsWith('.html') ? 'text/html; charset=utf-8' : chemin.endsWith('.js') ? 'text/javascript' : 'text/plain';
+      res.writeHead(200, { 'content-type': type }).end(corps);
     } catch {
       res.writeHead(req.method === 'GET' ? 404 : 200).end('ok');
     }

@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { gardeDe } from '../scripts/sondes-garde.mjs';
 import { serveurSondes } from './sondes-serveur-l778.js';
+import { ENTETES_LARGE, essaiLarge, essaiMinimal, essaiPrudent } from './sondes-essais-r3-l778.js';
 
 const page = (nom: string) => pathToFileURL(join(import.meta.dirname, 'fixtures', 'sondes', `${nom}.html`)).href;
 const RAPIDE = { ...DEFAUTS, charge: 200, repos: 1500, attente: 400 };
@@ -255,7 +256,7 @@ describe('L778 revue r2 — le rapport ne dit que ce que la lecture seule couvre
     const t = formater({ ...r, ecrituresBloquees: 1, ecritures: [e] });
     expect(t).not.toContain('rien n\'a atteint le serveur');
     expect(t).toContain('coupée(s) dans le navigateur avant d\'en sortir : 1');
-    expect(t).toContain('worker(s) gardé(s) : 1 worker, 1 shared_worker');
+    expect(t).toContain('Worker(s) dédié(s) gardé(s) : 1'); // revue r3 : un SharedWorker n'est plus « gardé », son constructeur est retiré de la page
     expect(t).toContain('non couvert : un GET qui écrit côté serveur');
   });
 
@@ -282,22 +283,25 @@ describe('L778 revue r2 — le rapport ne dit que ce que la lecture seule couvre
 describe.skipIf(!lance)('L778 revue r2 — workers dédiés, partagés, module et blob : rien n\'atteint le serveur (navigateur réel)', () => {
   const dossier = join(import.meta.dirname, 'fixtures', 'sondes');
 
-  it('l\'essai du relecteur : POST et ws.send depuis Worker, SharedWorker, worker module, worker blob et worker qui garde les natives : rien n\'est reçu', async () => {
+  // Revue r3 : le SharedWorker de la page n'est plus « gardé » (il écrivait encore) : son constructeur est retiré, il ne démarre pas, le bouton « y » n'a plus rien à écrire.
+  it('l\'essai du relecteur : POST et ws.send depuis Worker, worker module, worker blob et worker qui garde les natives : rien n\'est reçu ; le SharedWorker ne démarre pas', async () => {
     const srv = await serveurSondes(dossier);
     try {
       const r = await sonder(lance!.navigateur, `${srv.url}/workers.html`, { ...RAPIDE, parListe: 6, charge: 600 }, []);
-      expect(srv.recu.connexions).toBeGreaterThanOrEqual(5); // chaque worker a ouvert sa socket : la lecture passe
+      expect(srv.recu.connexions).toBeGreaterThanOrEqual(4); // chaque Worker dédié a ouvert sa socket : la lecture passe
       expect(srv.recu.http.filter((l) => !l.startsWith('GET '))).toEqual([]);
       expect(srv.recu.websocket).toEqual([]);
       const de = (nom: string) => r.ecritures!.filter((e) => e.ou === `« ${nom} » (bouton de liste)`).map((e) => `${e.voie} ${e.detail}`);
       expect(de('x')).toEqual(expect.arrayContaining(['websocket WORKER DELETE', expect.stringMatching(/^http POST .*\/worker-post$/)]));
-      expect(de('y')).toEqual(expect.arrayContaining(['websocket SHARED DELETE', expect.stringMatching(/^http POST .*\/shared-post$/)]));
+      expect(de('y')).toEqual([]);
+      expect(srv.recu.http.filter((l) => l.includes('nom=SHARED'))).toEqual([]); // le script du SharedWorker n'a jamais été demandé
+      expect(r.coupees).toEqual([{ nom: 'SharedWorker', fois: 1 }]);
       expect(de('m')).toEqual(expect.arrayContaining(['websocket MODULE DELETE', expect.stringMatching(/^http POST .*\/module-post$/)]));
       expect(de('b')).toEqual(expect.arrayContaining(['websocket BLOB DELETE', expect.stringMatching(/^http POST .*\/blob-post$/)]));
       expect(de('c')).toEqual(expect.arrayContaining(['websocket CAPTURE DELETE', 'WebTransport bloqué']));
-      expect(r.workers!.filter((w) => w.type === 'shared_worker')).toHaveLength(1);
+      expect(r.workers!.map((w) => w.type)).toEqual(['worker', 'worker', 'worker', 'worker']);
       expect(r.nonGardes).toEqual([]);
-      for (const c of r.controles) expect(nonMesures(r).some((m) => m.startsWith(`« ${c.nom} » — le clic a tenté d'écrire`))).toBe(true);
+      for (const c of r.controles) expect(nonMesures(r).some((m) => m.startsWith(`« ${c.nom} » — le clic a tenté d'écrire`)), c.nom).toBe(c.nom !== 'y');
       expect(codeSortie(r)).toBe(3);
     } finally {
       await srv.fermer();
@@ -314,4 +318,130 @@ describe.skipIf(!lance)('L778 revue r2 — workers dédiés, partagés, module e
       await nu.close();
     }
   });
+});
+
+describe('L778 revue r3 — fonctions retirées de la page : le rapport les nomme et ne dit que ce qui est mesuré', () => {
+  const r: Rapport = { url: 'u', largeur: 390, hauteur: 844, seuil: 1, date: 'd', repos: [], ecrituresBloquees: 0, controles: [], parcours: [],
+    workers: [{ type: 'worker', url: 'http://h/w.js' }] };
+
+  it('une fonction retirée que la page a demandée est dite « fonction coupée pendant la sonde : <nom> », avec le compte', () => {
+    const t = formater({ ...r, coupees: [{ nom: 'SharedWorker', fois: 2 }, { nom: 'navigator.serviceWorker.register', fois: 1 }] });
+    expect(t).toContain('fonction coupée pendant la sonde : SharedWorker (demandée 2 fois par la page ou un iframe ; un test de présence compte)');
+    expect(t).toContain('fonction coupée pendant la sonde : navigator.serviceWorker.register (demandée 1 fois');
+    expect(formater(r)).not.toContain('fonction coupée pendant la sonde');
+  });
+
+  it('une erreur de la page sur une fonction coupée rend la passe partielle (code 3), jamais « aucun constat » tout court', () => {
+    const k = { id: '1', nom: 'x', role: 'bouton' as const, liste: true, mesure: { sautMax: 0, sautFinal: 0, defilement: [], regions: null }, constats: [] };
+    expect(codeSortie({ ...r, controles: [k] })).toBe(0);
+    const e: Rapport = { ...r, controles: [k], coupees: [{ nom: 'SharedWorker', fois: 1 }], erreursCoupees: ['SharedWorker is not a constructor'] };
+    expect(codeSortie(e)).toBe(3);
+    const t = formater(e);
+    expect(t).not.toMatch(/^aucun constat$/m);
+    expect(t).toContain('passe partielle : la page a levé une erreur sur une fonction coupée');
+    expect(t).toContain('  ? erreur de la page sur une fonction coupée : SharedWorker is not a constructor');
+  });
+
+  it('la ligne « lecture seule » nomme les fonctions retirées, ne compte que les Workers dédiés, et dit WebTransport réel non couvert', () => {
+    const t = formater(r);
+    expect(t).toContain('retirés de la page et de chaque iframe avant tout script : SharedWorker, WebSocketStream, WebTransport, navigator.serviceWorker.register');
+    expect(t).toContain('Worker(s) dédié(s) gardé(s) : 1');
+    expect(t).toMatch(/non couvert : un GET qui écrit côté serveur ; WebTransport réel \(aucun serveur HTTP\/3/);
+    expect(t).not.toMatch(/workers : avant leur démarrage|shared_worker/);
+  });
+
+  it('un SharedWorker ou un service worker qui démarre quand même, ou une fonction non retirée, rend la passe non vérifiée (code 2)', () => {
+    const n: Rapport = { ...r, nonGardes: ['shared_worker http://h/s.js : démarré alors que SharedWorker est retiré de la page'] };
+    expect(codeSortie(n)).toBe(2);
+    expect(formater(n)).toContain('✗ cible non gardée');
+  });
+
+  it('la doc, le changelog et les agents ne promettent plus « every worker » ni « paused at its start » pour un SharedWorker, et nomment WebTransport réel', () => {
+    const lire = (f: string) => readFileSync(join(import.meta.dirname, '..', f), 'utf8');
+    for (const f of ['docs/sondes-interaction.md', 'changelog.d/L778.md', 'agents/qa-reviewer.md', 'agents/ux-reviewer.md']) {
+      const t = lire(f).replace(/\s+/g, ' ');
+      expect(t, f).not.toMatch(/every worker|no message reaches the server|shared, module and blob workers\)/i);
+      expect(t, f).toMatch(/SharedWorker/);
+      expect(t, f).toMatch(/removed/i);
+      expect(t, f).toMatch(/not covered:?\*{0,2} [^.]*WebTransport/i);
+      expect(t, f).toContain('fonction coupée pendant la sonde');
+    }
+    expect(lire('docs/sondes-interaction.md')).toMatch(/HTTP\/3/);
+  });
+});
+
+describe.skipIf(!lance)('L778 revue r3 — les deux essais du relecteur rejoués : aucune écriture reçue, SharedWorker compris (navigateur réel)', () => {
+  const dossier = join(import.meta.dirname, 'fixtures', 'sondes');
+  const ESSAI = { ...DEFAUTS, charge: 1500, repos: 500, attente: 800 };
+  const ecrits = (http: string[]) => http.filter((l) => !/^(GET|HEAD|OPTIONS) /.test(l));
+  const rapports = (http: string[]) => http.filter((l) => l.startsWith('GET /report?')).map((l) => decodeURIComponent(l.slice('GET /report?'.length)));
+  const coupees = (r: Rapport) => (r.coupees ?? []).map((c) => c.nom);
+
+  it('essai minimal (exp3/run2.mjs) : ni « SHARED DELETE NATIF » ni « PAGE STREAM DELETE » ; le SharedWorker ne démarre pas, le rapport le dit', async () => {
+    const srv = await serveurSondes(dossier, essaiMinimal());
+    try {
+      const r = await sonder(lance!.navigateur, `${srv.url}/p.html`, ESSAI, []);
+      expect(srv.recu.websocket).toEqual([]);
+      expect(ecrits(srv.recu.http)).toEqual([]);
+      expect(srv.recu.http.filter((l) => /\/(shared|sw)\.js/.test(l))).toEqual([]); // ni le SharedWorker ni le service worker n'ont été chargés
+      expect(srv.recu.connexions).toBe(0);
+      expect(coupees(r)).toContain('SharedWorker');
+      expect(formater(r)).toContain('fonction coupée pendant la sonde : SharedWorker');
+      // la page ne teste pas SharedWorker : son script lève à sa première ligne, ses boutons sont morts. Le rapport le dit, la passe est partielle.
+      expect(r.erreursCoupees).toEqual(['SharedWorker is not a constructor']);
+      expect(formater(r)).not.toMatch(/^aucun constat$/m);
+      expect(codeSortie(r)).toBe(3);
+      expect(r.workers).toEqual([]);
+      expect(r.nonGardes).toEqual([]);
+    } finally {
+      await srv.fermer();
+    }
+  });
+
+  it('la même app, prudente (elle teste chaque fonction) : boutons vivants, chaque fonction retirée est absente dans la page, un iframe et un popup neufs', async () => {
+    const srv = await serveurSondes(dossier, essaiPrudent());
+    try {
+      const r = await sonder(lance!.navigateur, `${srv.url}/p.html`, ESSAI, []);
+      expect(srv.recu.websocket).toEqual([]);
+      expect(ecrits(srv.recu.http)).toEqual([]);
+      expect(srv.recu.http.filter((l) => /\/(shared|sw)\.js/.test(l))).toEqual([]);
+      const vus = rapports(srv.recu.http);
+      expect(vus).toEqual(expect.arrayContaining(['shared=absent', 'clic-shared=undefined', 'wsstream=absent', 'sw=refuse']));
+      for (const nom of ['iframe', 'popup']) for (const k of ['SharedWorker', 'WebSocketStream', 'WebTransport']) expect(vus, `${nom}.${k}`).toContain(`${nom}.${k}=absent`);
+      expect(vus.filter((v) => /PRESENT|CONSTRUIT|ENREGISTRE/.test(v))).toEqual([]);
+      expect(coupees(r)).toEqual(expect.arrayContaining(['SharedWorker', 'WebSocketStream', 'WebTransport', 'navigator.serviceWorker.register']));
+      expect(r.controles.map((c) => c.mesure.sautMax)).toEqual([0, 0, 0]); // les trois boutons sont pressés et mesurés
+      expect(r.erreursCoupees).toEqual([]); // elle teste avant de s'en servir : rien ne lève
+      expect(r.nonGardes).toEqual([]);
+    } finally {
+      await srv.fermer();
+    }
+  });
+
+  it('essai large (exp3/run.mjs) : page, 4 sortes d\'iframe, popup, Workers de toute sorte, SharedWorker, service worker, ping, formulaire, CSP : rien n\'est reçu', async () => {
+    const srv = await serveurSondes(dossier, essaiLarge(), ENTETES_LARGE);
+    try {
+      const r = await sonder(lance!.navigateur, `${srv.url}/p.html`, ESSAI, []);
+      expect(srv.recu.websocket).toEqual([]); // r3 : 31 messages reçus
+      expect(ecrits(srv.recu.http)).toEqual([]);
+      expect(srv.recu.connexions).toBeGreaterThan(10); // page, iframes et Workers dédiés ont ouvert leur socket : la lecture passe
+      expect(srv.recu.http.filter((l) => /\/sw\.js|w\.js\?partage|parent\.js\?p(charge|clic)/.test(l))).toEqual([]); // aucun SharedWorker, aucun service worker chargé
+      const vus = rapports(srv.recu.http);
+      expect(vus.filter((v) => /CONSTRUIT|PASSE|ENREGISTRE|=true/.test(v))).toEqual([]);
+      expect(vus).toEqual(expect.arrayContaining(['partage=refuse', 'sw=refuse', 'page-charge.wsstream=absent', 'page-charge.wt=absent', 'page-clic.wsstream=absent',
+        'iframeblanc-charge.wsstream=absent', 'iframesrc-charge.wsstream=absent', 'iframesrcdoc-charge.wsstream=absent', 'iframeblanc-clic.wt=absent',
+        'dedie-charge.wsstream-debut=leve', 'dedie-charge.wt-debut=leve', 'module-charge.wsstream-debut=leve', 'blob-charge.wsstream-debut=leve',
+        'petit-fils-charge.wsstream-debut=leve', 'de-enfant-charge.wt-debut=leve', 'dedie-charge.wsstream-message=leve']));
+      expect(vus.filter((v) => /^partage/.test(v) && v !== 'partage=refuse')).toEqual([]); // aucun SharedWorker n'a tourné
+      expect(vus.filter((v) => /^rafale\d+-charge\.wsstream-debut=leve$/.test(v)).length).toBeGreaterThanOrEqual(12); // 12 par chargement de la page
+      expect(coupees(r)).toEqual(expect.arrayContaining(['SharedWorker', 'WebSocketStream', 'WebTransport', 'navigator.serviceWorker.register']));
+      expect(r.workers!.every((w) => w.type === 'worker')).toBe(true);
+      expect(r.workers!.length).toBeGreaterThanOrEqual(30);
+      expect(r.nonGardes).toEqual([]);
+      const voies = new Set(r.ecritures!.map((e) => e.voie));
+      for (const v of ['http', 'websocket', 'sendBeacon', 'WebSocketStream', 'WebTransport']) expect(voies, v).toContain(v);
+    } finally {
+      await srv.fermer();
+    }
+  }, 120_000);
 });

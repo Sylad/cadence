@@ -19,9 +19,9 @@ cadence sondes <url> [--largeur 1440] [--hauteur 900] [--seuil 1] [--max 30] [--
 |---|---|
 | 0 | every click measured, no finding |
 | 1 | findings, and only then |
-| 3 | no finding, but a partial pass: clicks not measured (`?`), see below |
+| 3 | no finding, but a partial pass: clicks not measured (`?`), or a page error on a removed function, see below |
 | 4 | not measurable: no click measured at all (every control covered, none on the page, all refused) |
-| 2 | not verified: usage error, unreadable expectations, no browser, the read-only guard not armed or a worker not guarded, or a pass broken by an error |
+| 2 | not verified: usage error, unreadable expectations, no browser, the read-only guard not armed, a target not guarded (see Read only), or a pass broken by an error |
 
 A click is « not measured » when the control vanished or was refused, was covered by another element at this viewport size, was replaced
 by the click with no single equivalent to follow, when a journey found fewer elements than it asks for, or when the click tried to write
@@ -38,27 +38,46 @@ same for every package. It never installs anything: without a browser it says so
 complete) is relaunched with software rendering (`--use-gl=disabled`); the report header says so, and WebGL is then off: what a WebGL
 map draws is not probed. Its temporary folders (profile, artefacts) live in a folder of its own, removed at the end.
 
-**Read only.** The probe cuts the ways a page can write that it knows of, at the level of the browser where it can, and counts every
-attempt with the control that made it. Before the second review (r2), a dedicated `Worker` and a `SharedWorker` still wrote to the server
-(a `POST` and WebSocket messages): Playwright's routing does not see the requests of a `SharedWorker` nor the WebSockets of any worker, and
-its init scripts do not run in workers. Since then, the probe talks to the browser over the DevTools protocol too
-(`scripts/sondes-garde.mjs`, through the debugging port Chromium opens on 127.0.0.1 for the pass):
+**Read only.** The probe closes the ways a page can write that it knows of, and counts every attempt with the control that made it. Two
+mechanisms, each stated for what was measured against a local HTTP and WebSocket server that records all it receives.
 
-- HTTP other than `GET`, `HEAD`, `OPTIONS` (fetch, XHR, `sendBeacon`, a `POST` form) is refused **in the browser's network**, before it
-  leaves, for every target: page, iframes, popups, `Worker`, `SharedWorker`, module and blob workers; a form navigation gets an empty 204,
-  so the page stays;
-- WebSocket: in the page and its iframes, the connection opens and the page receives, but no message reaches the server (Playwright's
-  WebSocket routing); in a worker, every worker is attached **paused at its start** (nested workers too), and `send` is cut before its first
-  line runs, even for a script that keeps the native function in a variable;
-- `WebTransport` and `WebSocketStream` throw in workers (replayed just before the worker's first script, when the browser has set them);
-  `navigator.sendBeacon` returns false and `RTCPeerConnection` and `WebTransport` throw in the page; service workers are refused (they could
-  serve requests outside the routing). `EventSource` only reads (a `GET`), so it passes.
+*Cut in the browser* (`scripts/sondes-garde.mjs`, over the DevTools protocol, through the debugging port Chromium opens on 127.0.0.1 for
+the pass, and Playwright's WebSocket routing):
 
-The report says what the read-only covered for the pass (`lecture seule : …`, the workers it guarded, and what is not covered) and counts
-the writes « cut in the browser before they left it »; it never says the server received nothing, which it cannot measure. A target it
-could not guard (an error while attaching a worker) is listed `✗ cible non gardée` and the pass is « not verified » (code 2); without the
-debugging port the probe refuses to run (code 2). **Not covered:** a `GET` that writes; a browser other than Chromium (the guard speaks
-its protocol); while the pass runs, the debugging port is open to local processes of the machine.
+- HTTP other than `GET`, `HEAD`, `OPTIONS` (fetch, XHR, `keepalive`, `<a ping>`, a CSP report, a `POST` form) is refused **in the
+  browser's network**, before it leaves, for the page, its iframes, popups and dedicated `Worker`s (classic, module, blob, nested); a
+  form navigation gets an empty 204, so the page stays; `navigator.sendBeacon` returns false;
+- WebSocket messages of the page and of its iframes: the connection opens and the page receives, the messages it sends are not
+  forwarded (Playwright's WebSocket routing);
+- a dedicated `Worker` is attached paused at its start (nested ones too): the `send` of its WebSockets forwards nothing, even for a script
+  that keeps the native function in a variable, and `WebSocketStream` and `WebTransport` throw there;
+- `RTCPeerConnection` throws in the page. `EventSource` only reads (a `GET`), so it passes.
+
+*Removed from the page* (third review, r3). Closing each writing API one by one did not converge: a `SharedWorker` started before the
+guard reached it and still wrote through its WebSocket, and `WebSocketStream` passed in the page. So what the guard cannot close for sure
+is taken away: an init script that runs **before any script of the page**, in the page, every iframe and every popup, makes `SharedWorker`,
+`WebSocketStream` and `WebTransport` `undefined` (as in a browser that does not have them; the page can neither delete nor redefine the
+property) and makes `navigator.serviceWorker.register` return a rejected promise. A page that tests for them takes its fallback. A page
+that calls one without testing throws (`SharedWorker is not a constructor`) and its script stops there: the probe keeps that error
+(`? erreur de la page sur une fonction coupée : …`) and the pass is partial (code 3), never « no finding ». Each time the page asks for
+one, the report says so:
+
+```text
+  fonction coupée pendant la sonde : SharedWorker (demandée 2 fois par la page ou un iframe ; un test de présence compte) — ce qui en dépend dans l'app n'est pas sondé
+```
+
+A feature test (`typeof WebTransport`) counts as asking: the probe cannot tell it from a use. What the app does with the removed function
+(a socket kept in a `SharedWorker`, an offline cache) is not probed, and a reviewer reads that line before trusting « no finding ».
+
+The report says what the read-only covered for the pass (`lecture seule : …`, the number of dedicated workers it guarded, the functions
+removed, and what is not covered) and counts the writes « cut in the browser before they left it »; it never says the server received
+nothing, which it cannot measure. The pass is « not verified » (code 2, `✗ cible non gardée`) when a worker could not be attached, when a
+`SharedWorker` or a service worker starts although the page cannot create one, or when a function could not be removed; without the
+debugging port the probe refuses to run (code 2).
+
+**Not covered:** a `GET` that writes; a real `WebTransport` session (no HTTP/3 server in the tests: only the absence of the constructor in
+the page and its throwing in a dedicated worker are verified); a browser other than Chromium (the guard speaks its protocol); while the
+pass runs, the debugging port is open to local processes of the machine.
 
 A `GET` that writes on the server side (`?delete=1`) passes: nothing in the request says so. The context is anonymous (no session), which
 most apps refuse to write for anyway. The sweep never presses a link, a submit or reset button, a button of a `POST` form, or a control
@@ -133,7 +152,10 @@ fresh page. `--sans-balayage` runs the journeys alone.
 
 `test/sondes-interaction-l778.test.ts` plays the probes in a real browser on local pages (`test/fixtures/sondes/`): a list whose rows jump
 when ticked (the D-6 case reduced to the bone) and the same list that does not jump, a good and a bad dialog, a box that scrolls by itself,
-icon buttons that write through the page and through workers (dedicated, shared, module, blob, one keeping the native `send`): a local
-HTTP and WebSocket server, `test/sondes-serveur-l778.ts`, proves it receives nothing,
+icon buttons that write through the page and through dedicated workers (classic, module, blob, one keeping the native `send`): a local
+HTTP and WebSocket server, `test/sondes-serveur-l778.ts`, records what it receives, and receives no write;
+the two trials of the third review (`test/sondes-essais-r3-l778.ts`: a `SharedWorker` that keeps `send`, `WebSocketStream` in the page,
+four kinds of iframe, a popup, a burst of workers writing at their first line, a service worker, `<a ping>`, forms, a CSP report): no
+write received, the `SharedWorker` never loaded;
 buttons that navigate by script, a page where every control is covered, a list rebuilt by the click.
 The browser part is skipped, and says so, on a machine with no loadable Playwright.

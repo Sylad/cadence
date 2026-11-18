@@ -297,19 +297,48 @@ ${FONCTIONS.map((f) => f.toString()).join('\n')}
 window.__sondes = { ${FONCTIONS.map((f) => f.name).join(', ')} };
 })();`;
 
+/** Les constructeurs retirés de la page et de chaque iframe avant tout script (revue r3) : la garde ne sait pas les fermer à coup sûr. */
+export const FONCTIONS_RETIREES = ['SharedWorker', 'WebSocketStream', 'WebTransport'];
+/** L'enregistrement d'un service worker, refusé dans la page : le nom que le rapport lui donne. */
+export const ENREGISTREMENT_SW = 'navigator.serviceWorker.register';
+
 /**
- * Lecture seule, dans la page (revue r1) : les voies d'écriture que le routage réseau de Playwright ne voit pas ou ne coupe pas seul. `sendBeacon`
- * rend false, `RTCPeerConnection` et `WebTransport` lèvent ; chaque tentative est notée par la liaison `__sondesEcriture` (voie, détail).
- * HTTP non GET est coupé au réseau du navigateur et les workers sont gardés à leur démarrage (scripts/sondes-garde.mjs) ; les messages WebSocket de la
- * page et de ses iframes sont coupés par le routage du contexte (scripts/sondes-interaction.mjs, couperLesEcritures). Ce script ne court pas dans les workers.
+ * Lecture seule, dans la page et dans chaque iframe ou popup, AVANT tout script de la page (script d'initialisation du contexte).
+ * - Revue r1 : `sendBeacon` rend false, `RTCPeerConnection` lève ; chaque tentative est notée par la liaison `__sondesEcriture` (voie, détail).
+ * - Revue r3 : fermer chaque API d'écriture une à une ne convergeait pas (un SharedWorker gardait `send`, WebSocketStream passait dans la page).
+ *   Les constructeurs que la garde ne sait pas fermer à coup sûr sont RETIRÉS : `SharedWorker`, `WebSocketStream`, `WebTransport` valent
+ *   `undefined` (propriété non configurable : la page ne peut ni la supprimer ni la redéfinir), comme dans un navigateur qui ne les a pas ;
+ *   `navigator.serviceWorker.register` rend une promesse rejetée (posé sur le prototype et sur l'objet). Chaque lecture d'un constructeur retiré (un test de présence compte : la page
+ *   l'a demandé) et chaque enregistrement tenté sont notés par la liaison `__sondesCoupee` : le rapport dit « fonction coupée pendant la sonde ».
+ *   Un constructeur resté en place est noté (`reste`) : la passe est alors non vérifiée.
+ * HTTP non GET est coupé au réseau du navigateur et les Workers dédiés sont gardés à leur démarrage (scripts/sondes-garde.mjs) ; les messages
+ * WebSocket de la page et de ses iframes sont coupés par le routage du contexte (couperLesEcritures). Ce script ne court pas dans les workers.
  */
 export const SCRIPT_LECTURE_SEULE = `(() => {
 const noter = (voie, detail) => { try { window.__sondesEcriture && window.__sondesEcriture(voie, String(detail).slice(0, 80)); } catch (e) { /* rien */ } };
+let muet = false;
+const dire = (quoi, nom) => { if (muet) return; try { window.__sondesCoupee && window.__sondesCoupee(quoi, nom, location.href); } catch (e) { /* rien */ } };
+for (const nom of ${JSON.stringify(FONCTIONS_RETIREES)}) {
+  try { Object.defineProperty(window, nom, { configurable: false, enumerable: false, get() { dire('coupee', nom); return undefined; }, set() { /* retiré */ } }); } catch (e) { /* vu ci-dessous */ }
+}
+muet = true;
+const restes = ${JSON.stringify(FONCTIONS_RETIREES)}.filter((nom) => { try { return window[nom] !== undefined; } catch (e) { return true; } });
+muet = false;
+for (const nom of restes) dire('reste', nom);
+if (typeof ServiceWorkerContainer === 'function') {
+  // Sur le prototype ET sur l'objet : le blocage des service workers de Playwright pose sa propre fonction sur navigator.serviceWorker (elle
+  // rend une promesse tenue : la page croit l'enregistrement fait). Non configurable, non modifiable : ni la page ni un autre script ne la remplace.
+  const refuse = function register() { dire('coupee', ${JSON.stringify(ENREGISTREMENT_SW)}); return Promise.reject(new DOMException('service worker refusé : sondes en lecture seule', 'SecurityError')); };
+  for (const o of [ServiceWorkerContainer.prototype, navigator.serviceWorker]) {
+    try { if (o) Object.defineProperty(o, 'register', { configurable: false, writable: false, value: refuse }); } catch (e) { /* vu ci-dessous */ }
+  }
+  if (navigator.serviceWorker && navigator.serviceWorker.register !== refuse) dire('reste', ${JSON.stringify(ENREGISTREMENT_SW)});
+}
 if (navigator.sendBeacon) {
   const balise = function sendBeacon(url, data) { noter('sendBeacon', 'POST ' + url + (data === undefined ? '' : ' « ' + String(data) + ' »')); return false; };
   try { Object.defineProperty(Navigator.prototype, 'sendBeacon', { configurable: true, writable: true, value: balise }); } catch (e) { /* rien */ }
 }
-for (const nom of ['RTCPeerConnection', 'webkitRTCPeerConnection', 'WebTransport']) {
+for (const nom of ['RTCPeerConnection', 'webkitRTCPeerConnection']) {
   if (!(nom in window)) continue;
   const bloque = function () { noter(nom, (arguments[0] && typeof arguments[0] === 'string') ? arguments[0] : ''); throw new DOMException(nom + ' bloqué : sondes en lecture seule', 'SecurityError'); };
   try { Object.defineProperty(window, nom, { configurable: true, writable: true, value: bloque }); } catch (e) { /* rien */ }

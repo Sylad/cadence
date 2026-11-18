@@ -1,5 +1,6 @@
 // L778, revue r1 : un petit serveur HTTP et WebSocket local pour prouver que les sondes n'écrivent rien. Il sert les pages de
 // test/fixtures/sondes/ et note TOUT ce qu'il reçoit : chaque requête HTTP (méthode et chemin) et chaque message WebSocket.
+// Revue r3 : il sert aussi des pages données en mémoire (`pages`, celles des essais du relecteur : test/sondes-essais-r3-l778.ts), avec leurs en-têtes.
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
@@ -26,16 +27,19 @@ function trames(tampon: Buffer): { textes: string[]; reste: Buffer } {
   return { textes, reste: tampon.subarray(i) };
 }
 
-export async function serveurSondes(dossier: string): Promise<{ url: string; recu: Recu; fermer: () => Promise<void> }> {
+type Pages = Record<string, string | ((requete: string) => string)>;
+
+export async function serveurSondes(dossier: string, pages: Pages = {}, entetes: Record<string, Record<string, string>> = {}): Promise<{ url: string; recu: Recu; fermer: () => Promise<void> }> {
   const recu: Recu = { http: [], websocket: [], connexions: 0 };
   const sockets = new Set<Socket>();
   const serveur: Server = createServer((req, res) => {
     recu.http.push(`${req.method} ${req.url}`);
-    const chemin = (req.url ?? '/').split(/[?#]/)[0]!;
+    const [chemin = '/', requete = ''] = (req.url ?? '/').split(/[?#]/);
     try {
-      const corps = readFileSync(join(dossier, chemin.replace(/^\/+/, '')));
+      const page = pages[chemin];
+      const corps = page === undefined ? readFileSync(join(dossier, chemin.replace(/^\/+/, ''))) : typeof page === 'function' ? page(requete) : page;
       const type = chemin.endsWith('.html') ? 'text/html; charset=utf-8' : chemin.endsWith('.js') ? 'text/javascript' : 'text/plain';
-      res.writeHead(200, { 'content-type': type }).end(corps);
+      res.writeHead(200, { 'content-type': type, ...entetes[chemin] }).end(corps);
     } catch {
       res.writeHead(req.method === 'GET' ? 404 : 200).end('ok');
     }

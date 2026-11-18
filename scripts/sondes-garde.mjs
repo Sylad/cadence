@@ -1,18 +1,21 @@
-// Lecture seule des sondes au niveau du navigateur (L778, revue r2) : la seconde revue a vu un Worker dédié et un SharedWorker écrire sur le serveur
-// (POST /shared-post, « WORKER DELETE » et « SHARED DELETE » par WebSocket) alors que le routage Playwright du contexte ne voit ni les requêtes d'un
-// SharedWorker ni les WebSocket d'un worker, et que ses scripts d'initialisation ne s'exécutent pas dans les workers.
-// La garde parle au navigateur par le protocole DevTools (CDP), à côté de Playwright, sur le port de débogage que Chromium ouvre sur 127.0.0.1 :
-// - HTTP : `Fetch` est activé au niveau du NAVIGATEUR, donc pour toute requête de toute cible (page, iframe, popup, Worker, SharedWorker, service
-//   worker) ; hors GET, HEAD, OPTIONS elle est refusée avant de partir (une navigation de formulaire reçoit un 204 vide : la page reste) ;
-// - workers : chaque cible est attachée EN PAUSE à son démarrage (`waitForDebuggerOnStart`, récursif : workers d'une page, d'un iframe, d'un worker) ;
-//   le prélude y est joué tout de suite, puis rejoué juste avant la première ligne de son script (arrêt « beforeScriptExecution ») : `send` des
-//   WebSocket ne transmet plus rien, `WebTransport` et `WebSocketStream` lèvent ; puis le worker repart.
+// Lecture seule des sondes au niveau du navigateur (L778, revues r2 et r3).
+// r2 : un Worker dédié et un SharedWorker écrivaient sur le serveur ; le routage Playwright du contexte ne voit ni les requêtes d'un SharedWorker ni
+// les WebSocket d'un worker, et ses scripts d'initialisation ne s'exécutent pas dans les workers. La garde parle donc au navigateur par le protocole
+// DevTools (CDP), à côté de Playwright, sur le port de débogage que Chromium ouvre sur 127.0.0.1 :
+// - HTTP : `Fetch` est activé au niveau du NAVIGATEUR, pour toute requête de toute cible ; hors GET, HEAD, OPTIONS elle est refusée avant de partir
+//   (une navigation de formulaire reçoit un 204 vide : la page reste) ;
+// - Workers dédiés : chaque cible est attachée EN PAUSE à son démarrage (`waitForDebuggerOnStart`, récursif) ; le prélude y est joué tout de suite,
+//   puis rejoué juste avant la première ligne de son script : `send` des WebSocket ne transmet plus rien, `WebTransport` et `WebSocketStream` lèvent.
+// r3 : pour un SharedWorker, ce prélude arrivait APRÈS sa première ligne (il écrivait encore par WebSocket), et WebSocketStream passait dans la page.
+// Changement de mécanisme (décision du lead) : ce que la garde ne sait pas fermer à coup sûr est RETIRÉ de la page et de chaque iframe avant tout
+// script (SCRIPT_LECTURE_SEULE de scripts/sondes-page.mjs : SharedWorker, WebSocketStream, WebTransport, enregistrement d'un service worker), et le
+// rapport dit « fonction coupée pendant la sonde : <nom> ». Un SharedWorker ou un service worker qui démarrerait quand même rend la passe non vérifiée.
 // Chaque tentative est notée { voie, cible, detail } dans le puits de la passe en cours. Une cible qu'on n'a pas pu garder est notée dans `echecs` :
 // la passe est alors « non vérifiée » (scripts/sondes-interaction.mjs). Le même module coupe les WebSocket de la page (couperLesEcritures) et écrit
-// la ligne « lecture seule » du rapport (lectureSeule). Méthode et limites : docs/sondes-interaction.md (Read only).
+// les lignes « lecture seule » du rapport (lectureSeule). Méthode et limites : docs/sondes-interaction.md (Read only).
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { SCRIPT_LECTURE_SEULE } from './sondes-page.mjs';
+import { ENREGISTREMENT_SW, FONCTIONS_RETIREES, SCRIPT_LECTURE_SEULE } from './sondes-page.mjs';
 
 /** L'argument de lancement de Chromium qui ouvre le port de débogage (port choisi par le système, écrit dans DevToolsActivePort du profil). */
 export const ARG_DEBOGAGE = '--remote-debugging-port=0';
@@ -21,6 +24,9 @@ const METHODES_LUES = ['GET', 'HEAD', 'OPTIONS'];
 const TYPES_WORKER = ['worker', 'shared_worker', 'service_worker'];
 const TYPES_DOCUMENT = ['page', 'iframe'];
 const LIAISON = '__sondesEcritureWorker';
+
+/** Les workers que la garde ne sait pas couper avant leur première ligne (revue r3) : leur constructeur est retiré de la page, ils ne doivent pas démarrer. */
+const TYPES_NON_FERMES = { shared_worker: 'SharedWorker est retiré de la page', service_worker: "l'enregistrement d'un service worker est refusé" };
 
 /**
  * Le prélude joué dans chaque worker avant son code : messages WebSocket, WebTransport et WebSocketStream coupés, chaque tentative notée par la
@@ -141,7 +147,10 @@ class Garde {
     await this.envoyer('Debugger.enable', {}, sessionId);
     const { breakpointId } = await this.envoyer('Debugger.setInstrumentationBreakpoint', { instrumentation: 'beforeScriptExecution' }, sessionId);
     this.avantScript.set(sessionId, { breakpointId, quoi: `${t.type} ${t.url}` });
-    if (this.passe) this.workers.push({ type: t.type, url: t.url });
+    if (!this.passe) return;
+    // Revue r3 : dans un SharedWorker le prélude arrive après la première ligne du script. Il est joué quand même, mais la passe n'est plus vérifiée.
+    if (TYPES_NON_FERMES[t.type]) this.echecs.push(`${t.type} ${t.url} : démarré alors que ${TYPES_NON_FERMES[t.type]} ; la garde ne sait pas le couper avant sa première ligne`);
+    else this.workers.push({ type: t.type, url: t.url });
   }
 
   async prelude(sessionId) {
@@ -181,7 +190,7 @@ class Garde {
     this.workers = [];
   }
 
-  /** Retire le puits et rend le bilan de la passe : cibles non gardées, workers gardés. */
+  /** Retire le puits et rend le bilan de la passe : cibles non gardées, Workers dédiés gardés. */
   fermerPasse() {
     const bilan = { echecs: this.echecs, workers: this.workers };
     this.passe = null;
@@ -209,16 +218,18 @@ export async function armerGarde(navigateur, dossier) {
 }
 
 /**
- * Lecture seule (revue r1 : un bouton d'icône avait envoyé « DELETE item 1 » par WebSocket ; revue r2 : un Worker et un SharedWorker écrivaient
- * encore). Chaque tentative est notée { voie, cible, detail } dans `ecritures`.
- * - HTTP hors GET, HEAD, OPTIONS : refusé au réseau du navigateur, pour toute cible (page, iframe, popup, Worker, SharedWorker) : scripts/sondes-garde.mjs ;
+ * Lecture seule (revue r1 : un bouton d'icône avait envoyé « DELETE item 1 » par WebSocket ; r2 : un Worker et un SharedWorker écrivaient encore ;
+ * r3 : un SharedWorker et WebSocketStream écrivaient encore). Chaque tentative est notée { voie, cible, detail } dans `ecritures`.
+ * - HTTP hors GET, HEAD, OPTIONS : refusé au réseau du navigateur (garde) ;
  * - WebSocket : dans la page et ses iframes, la connexion et la réception passent, aucun message n'est transmis (routage WebSocket de Playwright) ;
- *   dans un worker, `send` est coupé avant son démarrage (garde) ;
- * - service workers refusés au contexte ; sendBeacon, RTCPeerConnection, WebTransport neutralisés dans la page (SCRIPT_LECTURE_SEULE), WebTransport
- *   et WebSocketStream dans les workers (garde).
+ *   dans un Worker dédié, `send`, WebSocketStream et WebTransport sont coupés avant sa première ligne (garde) ;
+ * - SharedWorker, WebSocketStream, WebTransport retirés et enregistrement d'un service worker refusé, dans la page et chaque iframe, avant tout
+ *   script (SCRIPT_LECTURE_SEULE) ; chaque demande de la page est comptée dans `coupees` ({ nom, fois }), une fonction restée en place dans `restes` ;
+ * - sendBeacon rend false, RTCPeerConnection lève (SCRIPT_LECTURE_SEULE) ; service workers refusés au contexte aussi ;
+ * - une erreur non rattrapée de la page qui nomme un constructeur retiré est gardée dans `erreurs` : la passe est partielle.
  * Un GET qui écrit côté serveur passe : la sonde ne peut pas le reconnaître (docs/sondes-interaction.md).
  */
-export async function couperLesEcritures(contexte, ecritures) {
+export async function couperLesEcritures(contexte, ecritures, coupees = [], restes = [], erreurs = []) {
   if (typeof contexte.routeWebSocket !== 'function') {
     throw new Error('ce Playwright ne sait pas intercepter les WebSocket (routeWebSocket, version 1.48 ou plus) : lecture seule non garantie, rien n\'est sondé');
   }
@@ -227,20 +238,38 @@ export async function couperLesEcritures(contexte, ecritures) {
     ws.onMessage((message) => { ecritures.push({ voie: 'websocket', cible: ws.url(), detail: String(message).slice(0, 80) }); });
   });
   await contexte.exposeFunction('__sondesEcriture', (voie, detail) => { ecritures.push({ voie, cible: '', detail }); });
+  await contexte.exposeFunction('__sondesCoupee', (quoi, nom, ou) => {
+    if (quoi === 'reste') return void restes.push(`${nom} dans ${ou} : fonction non retirée, la page peut encore écrire par elle`);
+    const deja = coupees.find((c) => c.nom === nom);
+    if (deja) deja.fois += 1; else coupees.push({ nom: String(nom), fois: 1 });
+  });
+  // Une page qui se sert d'un constructeur retiré sans tester sa présence lève (« SharedWorker is not a constructor ») : son script s'arrête là,
+  // l'app ne tourne plus comme chez l'utilisateur. L'erreur est gardée : la passe est partielle, jamais « aucun constat » (essai minimal de r3).
+  contexte.on('weberror', (w) => {
+    const message = String(w.error()?.message ?? w.error()).split('\n')[0];
+    if (FONCTIONS_RETIREES.some((nom) => message.includes(nom)) && !erreurs.includes(message)) erreurs.push(message);
+  });
   await contexte.addInitScript({ content: SCRIPT_LECTURE_SEULE });
 }
 
 /**
- * Ce que la lecture seule a couvert pendant la passe, et ce qu'elle ne couvre pas : le rapport n'affirme rien au-delà (revue r2). Une cible non gardée
- * (worker qu'on n'a pas pu couper) rend la passe non vérifiée.
+ * Ce que la lecture seule a couvert pendant la passe, et ce qu'elle ne couvre pas : le rapport n'affirme rien au-delà de ce qui est mesuré (revues
+ * r2 et r3). Chaque fonction retirée que la page a demandée a sa ligne « fonction coupée pendant la sonde ». Une cible non gardée (worker qu'on
+ * n'a pas pu couper, SharedWorker ou service worker démarré, fonction non retirée) rend la passe non vérifiée.
  */
 export function lectureSeule(r) {
-  const workers = r.workers ?? [];
-  const parType = ['worker', 'shared_worker', 'service_worker'].map((t) => [t, workers.filter((w) => w.type === t).length]).filter(([, k]) => k)
-    .map(([t, k]) => `${k} ${t}`).join(', ');
-  const lignes = [`lecture seule : HTTP hors GET/HEAD/OPTIONS refusé au réseau du navigateur (page, iframes, popups, workers) ; messages WebSocket coupés `
-    + `(page et iframes : routage Playwright ; workers : avant leur démarrage) ; sendBeacon, RTCPeerConnection, WebTransport coupés ; service workers `
-    + `refusés ; worker(s) gardé(s) : ${parType || 'aucun'} — non couvert : un GET qui écrit côté serveur`];
+  const dedies = (r.workers ?? []).filter((w) => w.type === 'worker').length;
+  const lignes = [`lecture seule : HTTP hors GET/HEAD/OPTIONS refusé au réseau du navigateur (page, iframes, popups, Workers dédiés) ; messages WebSocket `
+    + `de la page et des iframes non transmis (routage Playwright) ; dans un Worker dédié, send des WebSocket, WebSocketStream et WebTransport coupés avant `
+    + `sa première ligne ; retirés de la page et de chaque iframe avant tout script : ${[...FONCTIONS_RETIREES, ENREGISTREMENT_SW].join(', ')} ; sendBeacon `
+    + `rend false, RTCPeerConnection lève ; Worker(s) dédié(s) gardé(s) : ${dedies || 'aucun'} — non couvert : un GET qui écrit côté serveur ; WebTransport `
+    + `réel (aucun serveur HTTP/3 à l'essai : seule l'absence du constructeur est vérifiée)`];
+  for (const c of r.coupees ?? []) {
+    lignes.push(`  fonction coupée pendant la sonde : ${c.nom} (demandée ${c.fois} fois par la page ou un iframe ; un test de présence compte) — ce qui en dépend dans l'app n'est pas sondé`);
+  }
+  for (const e of r.erreursCoupees ?? []) {
+    lignes.push(`  ? erreur de la page sur une fonction coupée : ${e} — son script s'est arrêté là, l'app ne tourne pas ici comme chez l'utilisateur : passe partielle`);
+  }
   for (const e of r.nonGardes ?? []) lignes.push(`  ✗ cible non gardée, ses écritures n'ont pas été coupées : ${e} — passe non vérifiée`);
   return lignes;
 }

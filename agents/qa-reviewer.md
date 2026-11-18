@@ -87,8 +87,10 @@ under `nonVerifie`. A defect seen only with it is ranked on the usual severity s
    - interactions: run `cadence sondes <page url> --json <tmp>/sondes-<page>-<width>.json` from the project folder, with
      `--largeur 390 --hauteur 844` for the phone width (method and thresholds: `docs/sondes-interaction.md` of the package). It
      clicks the toggles and list buttons of the page and plays the `parcours:` lines of its section; it cuts the writes it knows of
-     (HTTP other than GET in every target, WebSocket messages of the page and of every worker, beacons…) and reports each attempt, so
-     it keeps to step 5; not covered: a GET that writes on the server side — its `lecture seule :` line says what the pass covered. Code 3 or 4 (partial, nothing measured) is « not verified ». Give one line of measures per page and width (`sondes : <n> contrôles, <k> parcours, <c> constats`).
+     (HTTP other than GET, WebSocket messages of the page, its iframes and dedicated workers, beacons…) and reports each attempt, so
+     it keeps to step 5; `SharedWorker`, `WebSocketStream`, `WebTransport` and service worker registration are removed from the page
+     for the pass: relay each line « fonction coupée pendant la sonde : <name> » (what the app does with that function is not probed).
+     Not covered: a GET that writes on the server side, a real WebTransport session — its `lecture seule :` line says what the pass covered. Code 3 or 4 (partial, nothing measured) is « not verified ». Give one line of measures per page and width (`sondes : <n> contrôles, <k> parcours, <c> constats`).
      A failed `parcours:` line (a jump, an undergone scroll, a dialog that keeps the focus out or ignores Escape) is a *defect* of
      the expectations, ranked *major*; a finding of the generic sweep is usability, handed to `ux-reviewer` in one line with its
      measure; exit code 2, and the `?` lines of a partial pass (exit code 3), go under « Not verified ».

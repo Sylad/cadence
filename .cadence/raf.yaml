@@ -3924,12 +3924,14 @@ lots:
     created: 2026-11-18
   - id: L781
     title: "cadence run : les commandes de projet qui appellent cadence (npm run news → cadence news build, puis npm run plan) ne peuvent pas tourner dans la session du run ; 3 lots le 18-11 (finance L172, L173 ; warhammer L71 fait à la main) rendus avec nouveautes-data non régénéré, le lead rejoue à chaque fois — les jouer à l'intégration du run (ou autoriser cadence news build dans la session), avec un test"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-18
     started: 2026-11-19
     notes:
       - { date: 2026-11-19, text: "19-11 : revue r1 non conforme (M1 warhammer et la plupart des projets déclarent news dans frontend/package.json ; M2 commit de régénération enterré après une correction → conflit au rebase ; M3 scripts.news n'est pas une convention de cadence). Choix du lead : déclencheur explicite dans cadence.yaml (commandes + dossier), aucun script deviné ; retirer tous les commits du run portant le trailer de régénération avant toute reprise. Correction relancée avec le rapport." }
+    review: { date: 2026-11-19, verdict: "conforme (r2 du 19-11 : M1-M3 et m1, m3, m4, m5 corrigés, mutations vérifiées, 95 tests ciblés ; plan.onWrite inchangé ; mineurs r2-1..3 → lot ouvert ; reste à déclarer run.regenerate dans les projets après publication)", commit: 6c674b1a5581d486cc300dfdf9f7448e0946d3df }
+    finished: 2026-11-19
   - id: L782
     title: "cadence run : la bascule sur Fable « après deux revues non conformes » (L726) ne s'est pas faite pour L778 — r1 et r2 non conformes, la correction du 18-11 13 h 38 a tourné sur Opus ; le plan ne garde qu'un champ review (le dernier verdict), l'historique des revues n'est donc pas compté. Test qui échoue sur ce cas."
     status: todo
@@ -3945,6 +3947,16 @@ lots:
     status: todo
     estimate: 1
     created: 2026-11-18
+  - id: L785
+    title: "cadence run, suites de la revue r2 de L781 : une clé mal formée sous run: arrête le run sur un état explicite (pas une porte rouge rendue à la session) ; le journal dit « régénération non retirée » quand le retrait est annulé ; ne pas relire tous les fichiers non suivis du worktree à chaque essai"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-19
+  - id: L786
+    title: "Hook pre-push : la porte jouée par cadence run (porte complète avant l'avance rapide) compte comme verdict de porte pour le sha intégré — aujourd'hui « aucun verdict de la porte pour ce sha » après chaque run (cluster-sante a3cc356, finance le 19-11), le lead rejoue la porte entière avant de pousser"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-19
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

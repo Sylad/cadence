@@ -3944,10 +3944,12 @@ lots:
     created: 2026-11-18
   - id: L784
     title: "Hook pre-push : un commit de plan seul (.cadence/ uniquement) qui cite des lots ouverts (« L779 et L780 ouverts ») est compté comme du code de ces lots sans revue et bloque le push — vécu à la publication de 2.0.16 (43c4083) ; ignorer les commits qui ne touchent que .cadence/"
-    status: todo
+    status: done
     estimate: 1
     created: 2026-11-18
     review: { date: 2026-11-19, verdict: "conforme (r2) : M1 et M2 de r1 corrigés ; porte verte à 45ae682 ; suite N1/N2 (onWrite.files lu dans l'arbre courant) en lot fils de L786", commit: 45ae68298af14198060c3580f697c100a0d90cd3 }
+    started: 2026-11-19
+    finished: 2026-11-19
   - id: L785
     title: "cadence run, suites de la revue r2 de L781 : une clé mal formée sous run: arrête le run sur un état explicite (pas une porte rouge rendue à la session) ; le journal dit « régénération non retirée » quand le retrait est annulé ; ne pas relire tous les fichiers non suivis du worktree à chaque essai"
     status: todo
@@ -3955,13 +3957,16 @@ lots:
     created: 2026-11-19
   - id: L786
     title: "Hook pre-push : la porte jouée par cadence run (porte complète avant l'avance rapide) compte comme verdict de porte pour le sha intégré — aujourd'hui « aucun verdict de la porte pour ce sha » après chaque run (cluster-sante a3cc356, finance le 19-11), le lead rejoue la porte entière avant de pousser"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-19
     started: 2026-11-19
     review: { date: 2026-11-19, verdict: "conforme (r2, avec L784) : la porte de cadence run vaut au push (53368050, 45ae6829) ; porte verte à 45ae682", commit: null }
     tasks:
-      - { id: t1, title: "onWrite.files : une sortie déclarée par un commit de plan seul fait hériter verdict et dispense de revue ; la revue lit encore onWrite dans l'arbre courant via ownFiles, contre docs/deliver.md (N1, N2 de la revue r2 de L784) — refuser un fichier de code ou de docs comme sortie de plan", status: todo }
+      - { id: t1, title: "onWrite.files : une sortie déclarée par un commit de plan seul fait hériter verdict et dispense de revue ; la revue lit encore onWrite dans l'arbre courant via ownFiles, contre docs/deliver.md (N1, N2 de la revue r2 de L784) — refuser un fichier de code ou de docs comme sortie de plan", status: dropped }
+    notes:
+      - { date: 2026-11-19, text: "[L786/t1] abandonné : ouverte par erreur en sous-tâche : la suite est le lot L790" }
+    finished: 2026-11-19
   - id: L787
     title: "cadence run : une session ne change jamais l'état d'une demande du registre (livrée, vérifiée) — c'est le geste du lead après livraison ; à l'intégration, un changement d'état écrit par la session est refusé ou remis, et dit dans le rapport. Vécu 3 fois le 19-11 (maritime D-7 et D-3, codex D-2 passées « livrée » avant revue et sans rien en ligne)"
     status: todo
@@ -3974,6 +3979,11 @@ lots:
     created: 2026-11-19
   - id: L789
     title: "verify --gate en copie jetable : les fichiers ignorés dont dépendent les tests (ex. .termes-prives d'expertise-gis) ne sont pas copiés — 2 tests rouges dans la copie, verts dans l'arbre principal (vécu 19-11) ; les relier comme les dépendances, ou une clé de config qui les nomme"
+    status: todo
+    estimate: 1
+    created: 2026-11-19
+  - id: L790
+    title: "onWrite.files : une sortie déclarée par un commit de plan seul fait hériter verdict et dispense de revue ; la revue lit encore onWrite dans l'arbre courant via ownFiles, contre docs/deliver.md (N1, N2 de la revue r2 de L784) — refuser un fichier de code ou de docs comme sortie de plan"
     status: todo
     estimate: 1
     created: 2026-11-19

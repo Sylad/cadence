@@ -304,6 +304,17 @@ export function surveillerFenetres(contexte, fenetres) {
   contexte.on('page', suivre);
   for (const page of contexte.pages()) suivre(page);
   return {
+    /**
+     * Avant que la sonde ferme elle-même une de ses pages (réouverture, L784) : les lectures en cours finies, puis chaque frame encore sans preuve relue.
+     * Sans cela, la fermeture faisait échouer une lecture relancée par une navigation dans le même document (`#x` d'un lien cliqué) et la page de la sonde
+     * était dite « fermée avant que la sonde ait pu y lire le marqueur » (porte rouge du 19-11, sous charge). La preuve exigée ne change pas.
+     */
+    async avantFermeture(page) {
+      for (const f of page.frames()) {
+        await encours.get(f);
+        if (!etats.has(f) && !page.isClosed() && !f.isDetached()) await verifier(f);
+      }
+    },
     /** Relit tout ce qui vit encore ; ce qui reste sans preuve est dit. À appeler avant de fermer le contexte. */
     async bilan() {
       await Promise.all([...encours.values()]);

@@ -242,6 +242,7 @@ async function ouvrir(s) {
   const page = await s.contexte.newPage();
   page.on('framenavigated', (f) => { if (f === page.mainFrame()) s.navigations += 1; });
   s.page = page;
+  if (ancien) await s.surveillance?.avantFermeture(ancien).catch(() => {}); // L784 : la sonde ne ferme pas une page dont elle lit encore le marqueur
   if (ancien) await ancien.close().catch(() => {});
   await s.page.goto(s.url, { waitUntil: 'load', timeout: 60000 });
   await s.page.waitForTimeout(s.o.charge);
@@ -348,7 +349,7 @@ export async function sonder(navigateur, url, o, parcours) {
     await couperLesEcritures(contexte, ecritures, { coupees, restes, erreurs: erreursCoupees, fenetres });
     await contexte.addInitScript({ content: SCRIPT_SONDES });
     const surveillance = surveillerFenetres(contexte, fenetres);
-    const s = { contexte, page: null, url, o, ecritures, navigations: 0 };
+    const s = { contexte, page: null, url, o, ecritures, navigations: 0, surveillance };
     await ouvrir(s);
     const repos = await s.page.evaluate((ms) => window.__sondes.sdRepos(ms), o.repos);
     const { controles, couverts } = o.sansBalayage ? { controles: [], couverts: [] } : await balayer(s);

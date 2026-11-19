@@ -3947,6 +3947,7 @@ lots:
     status: todo
     estimate: 1
     created: 2026-11-18
+    review: { date: 2026-11-19, verdict: "conforme (r2) : M1 et M2 de r1 corrigés ; porte verte à 45ae682 ; suite N1/N2 (onWrite.files lu dans l'arbre courant) en lot fils de L786", commit: 45ae68298af14198060c3580f697c100a0d90cd3 }
   - id: L785
     title: "cadence run, suites de la revue r2 de L781 : une clé mal formée sous run: arrête le run sur un état explicite (pas une porte rouge rendue à la session) ; le journal dit « régénération non retirée » quand le retrait est annulé ; ne pas relire tous les fichiers non suivis du worktree à chaque essai"
     status: todo
@@ -3954,9 +3955,13 @@ lots:
     created: 2026-11-19
   - id: L786
     title: "Hook pre-push : la porte jouée par cadence run (porte complète avant l'avance rapide) compte comme verdict de porte pour le sha intégré — aujourd'hui « aucun verdict de la porte pour ce sha » après chaque run (cluster-sante a3cc356, finance le 19-11), le lead rejoue la porte entière avant de pousser"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-19
+    started: 2026-11-19
+    review: { date: 2026-11-19, verdict: "conforme (r2, avec L784) : la porte de cadence run vaut au push (53368050, 45ae6829) ; porte verte à 45ae682", commit: null }
+    tasks:
+      - { id: t1, title: "onWrite.files : une sortie déclarée par un commit de plan seul fait hériter verdict et dispense de revue ; la revue lit encore onWrite dans l'arbre courant via ownFiles, contre docs/deliver.md (N1, N2 de la revue r2 de L784) — refuser un fichier de code ou de docs comme sortie de plan", status: todo }
   - id: L787
     title: "cadence run : une session ne change jamais l'état d'une demande du registre (livrée, vérifiée) — c'est le geste du lead après livraison ; à l'intégration, un changement d'état écrit par la session est refusé ou remis, et dit dans le rapport. Vécu 3 fois le 19-11 (maritime D-7 et D-3, codex D-2 passées « livrée » avant revue et sans rien en ligne)"
     status: todo
@@ -3964,6 +3969,11 @@ lots:
     created: 2026-11-19
   - id: L788
     title: "Lots visibles : fiche d'états avant le code (D-29) — pour un lot visible, cadence run fait écrire d'abord une fiche courte (chaque état de l'écran × chaque largeur 320/390/840/1440/paysage, la règle d'interface qui s'applique, ce qui ne doit pas changer), en tire les sondes d'acceptation avant le code (comme spec: true), et la fait relire avant de coder ; mesure sur une semaine : passes par lot visible (UXW-11 : 5, LAYER-FIND1 : 2+ le 19-11) et défauts UX trouvés après le code ; essai sur UXW-12, UXW-13, TYPO-1 ; retiré sans gain ; précision de Sylvain : ne pas ralentir comme cadence V1, la spec sert à moins de maintenance — fiche par ÉCRAN réutilisée par les lots, pas une fiche neuve par lot ; au-dessus, une charte d interface PAR PROJET (principes, palette, composants, motifs d interaction) que chaque spec d écran cite et ne contredit pas — maritime a docs/charte-graphique.md, les autres projets n en ont pas ; les tests fonctionnels (sondes d acceptation) sont écrits d après la spec par une AUTRE session que celle qui code, en parallèle du code — mesure aussi le temps total et le coût par lot visible"
+    status: todo
+    estimate: 1
+    created: 2026-11-19
+  - id: L789
+    title: "verify --gate en copie jetable : les fichiers ignorés dont dépendent les tests (ex. .termes-prives d'expertise-gis) ne sont pas copiés — 2 tests rouges dans la copie, verts dans l'arbre principal (vécu 19-11) ; les relier comme les dépendances, ou une clé de config qui les nomme"
     status: todo
     estimate: 1
     created: 2026-11-19

@@ -2,7 +2,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
-import { workCommits } from './audit.js';
+import { isPlanSideOnly, workCommits } from './audit.js';
 import { fileAt, isAncestor, readCommits, tryGit, type Commit } from './git.js';
 import { linkCommits } from './link.js';
 import type { Lot, Plan } from './plan.js';
@@ -137,7 +137,8 @@ function unreviewedByLot(g: ReviewGuard, commits: Commit[], judge: Judge, tip: s
   for (const [id, linkedSubjects] of linkCommits(g.plan.lots(), subjects, g.plan.refs).byLot) {
     const linked = linkedSubjects.map((c) => bySha.get(c.sha) ?? c);
     // Commits de plan, de version, acquittés, ignorés ou d'avant l'adoption du plan : rien à relire (`workCommits`, la même règle que `raf done`).
-    const late = workCommits(g.plan, g.root, linked).filter((c) => (!since || c.day >= since) && !judge(lots.get(id)!, c, tip));
+    // L784 : un commit qui ne touche que le plan, `.cadence/` (registre des demandes) et les fichiers que `plan.onWrite` régénère n'est pas du code du lot qu'il cite.
+    const late = workCommits(g.plan, g.root, linked).filter((c) => !isPlanSideOnly(c.sha, g.plan, g.root) && (!since || c.day >= since) && !judge(lots.get(id)!, c, tip));
     if (late.length) out.set(id, late);
   }
   return out;

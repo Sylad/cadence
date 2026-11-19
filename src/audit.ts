@@ -15,6 +15,7 @@ import { isRecurring } from './recurring.js';
 import { resourceIssues } from './resources.js';
 import { windowIssues } from './plan-window.js';
 import { isFragmentPath } from './changelog-fragments.js';
+import { planSide } from './plan-side.js';
 import { escapeRe, isOpen, type Lot, type Plan, type Ref, type Verdict } from './plan.js';
 
 /** Chemin de la configuration lue, relatif à la racine : celui de --config, sinon cadence.yaml. */
@@ -102,6 +103,20 @@ export function isPlanOnly(sha: string, plan: Plan, root: string): boolean {
   const created = (f: string) => fileAt(root, `${sha}^`, f) === null && onlyInitKeys(fileAt(root, sha, f)); // cadence.yaml naît avec le plan : `raf init` puis la porte de tests, un seul commit (L377)
   const initScaffold = (f: string) => f === '.gitignore' && onlyInitGitignore(root, sha, f);
   return files.length > 0 && files.every((f) => initScaffold(f) || (own.has(f) && (f !== config || created(f) || onlyPlanKeyChanged(root, sha, f))));
+}
+
+/**
+ * Commit de plan seul au sens du hook pre-push (L784) : `isPlanOnly`, ou un commit dont chaque fichier est un fichier du plan (`planSide` : le plan, `.cadence/**`,
+ * les fichiers que `plan.onWrite` régénère) ou un fichier tenu avec le plan (hors configuration). Le registre des demandes (`.cadence/demandes/`) commité avec
+ * un lot ouvert n'est pas le code de ce lot.
+ */
+export function isPlanSideOnly(sha: string, plan: Plan, root: string): boolean {
+  if (isPlanOnly(sha, plan, root)) return true;
+  const config = configRel(plan, root);
+  const own = ownFiles(plan, root);
+  const side = planSide({ planFile: relative(root, plan.path), config, produced: plan.produced });
+  const files = changedFiles(root, sha);
+  return files.length > 0 && files.every((f) => side(f) || (own.has(f) && f !== config));
 }
 
 /** Fichiers d'une version : manifestes JSON (dont seul le champ `version` bouge) et CHANGELOG. */

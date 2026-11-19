@@ -20,6 +20,7 @@ import { briefRegistre, entreeCommitee, preparerRegistre, registreOuvert, regist
 import { fichiersNonCommites, nommerFichiers, PLAN_EN_ATTENTE } from '../../../scripts/arbre-non-commite.mjs'; // L722 : même lecture que src/repo-held.ts
 import { environnementPerime, ignorerPerime, lignesPerime } from '../../../scripts/environnement-porte.mjs'; // L764 : même lecture que src/verify-gate.ts
 import { regenerer, retirerRegenerations, TRAILER_REGENERATION } from './regenerer.js';
+import { noterVerdict } from '../../../scripts/verdicts-porte.mjs'; // L786 : même écriture que src/gate-verdict.ts (verify --gate)
 import { debutProcessus, inscrireCreneau, occupantVivant, prendreVerrou, rendreVerrou, roleVerrou } from '../verrou.js';
 
 /** D-15 : le run reprend une minute après l'heure de remise à zéro annoncée, relit son état au plus tard toutes les 10 min (une reprise par --reponse arrête
@@ -136,11 +137,14 @@ function perime(e: Etat, out: (l: string) => void): string | null {
   return [...lignes, `  après la remise à niveau : cadence run --reponse ${e.id} "environnement remis à niveau" (la session reprend, puis la porte est rejouée)`].join('\n');
 }
 function jouerPorte(cmds: string[], cwd: string): { ok: boolean; sortie: string } {
+  let p = { ok: true, sortie: '' };
   for (const c of cmds) {
     const r = spawnSync('bash', ['-c', c], { cwd, encoding: 'utf8', timeout: PORTE_MS, maxBuffer: 64 << 20 });
-    if (r.status !== 0) return { ok: false, sortie: `$ ${c}\n${`${r.stdout ?? ''}${r.stderr ?? ''}`.slice(-4000)}${r.error ? `\n${r.error.message}` : ''}` };
+    if (r.status !== 0) { p = { ok: false, sortie: `$ ${c}\n${`${r.stdout ?? ''}${r.stderr ?? ''}`.slice(-4000)}${r.error ? `\n${r.error.message}` : ''}` }; break; }
   }
-  return { ok: true, sortie: '' };
+  // L786 : le verdict du commit jugé, là où le hook pre-push le lit (même fichier que verify --gate) ; sans commande (--sans-porte), aucune porte n'a jugé.
+  if (cmds.length) noterVerdict(cwd, git(cwd, 'rev-parse', 'HEAD'), p.ok ? 0 : 1, new Date());
+  return p;
 }
 
 // L709 (issue #55) : rien de ce qui lie un processus à la session Claude Code lanceuse (pid, socket, auth rafraîchie par l'hôte) ; `neuve` : 1re session, id de l'état.

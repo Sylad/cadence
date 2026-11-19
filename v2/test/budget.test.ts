@@ -79,6 +79,7 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // commitées en un commit du lot, retirées puis rejouées avant un rebase, sans ligne tassée.
   // L781 (revue r1) : run 1152 (+15) : run.regenerate déclaré dans cadence.yaml (lu par scripts/regeneration.mjs) au lieu de scripts.news, tous les
   // commits de régénération retirés avant un rebase ou une reprise de session, échec de régénération à correction propre, sans ligne tassée.
+  // L784 : run 1156 (+4) : la porte du run note son verdict pour le hook pre-push (scripts/verdicts-porte.mjs, le fichier de verify --gate, L786), sans ligne tassée.
   // L775 : bench 1609 (+21), sequence 717 (+2), mesure 2326 : le détecteur de fuites ignore les appels refusés par le hook du bras (refusParHook, partagé
   // avec lectureReferences), sans ligne tassée.
   // L777 : bench 1672 (+63), mesure 2389 : « tests d'origine verts » compte les tests d'origine réussis par bras (testsReussis, cachesReussis, lus dans les

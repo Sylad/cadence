@@ -200,11 +200,15 @@ describe('un commit qui ne touche que le plan reprend le verdict de son parent (
     expect(head).not.toBe(top);
   });
 
-  it('R6 — un autre fichier sous .cadence/ ou un plan d\'un autre nom n\'est pas « le plan » : refus', async () => {
+  // L786 : sans gate.readsPlan, tout fichier sous .cadence/ (registre des demandes, archives) est du plan ; un fichier hors du plan et de .cadence/ ne l'est pas.
+  it('R6 — un plan d\'un autre nom hors de .cadence/ n\'est pas « le plan » : refus ; un autre fichier sous .cadence/ l\'est (L786)', async () => {
     const { repo, first, head } = project('true');
     await cli(repo, '', {}, 'verify', '--gate', '--sha', head);
-    const other = commitFiles(repo, { '.cadence/autre.yaml': 'x\n' }, 'autre');
+    const other = commitFiles(repo, { 'docs/raf.yaml': 'x\n' }, 'autre');
     expect((await cli(repo, push(other, first), {}, 'hook', 'pre-push')).code).toBe(3);
+    git(repo, 'reset', '-q', '--hard', head);
+    const cadence = commitFiles(repo, { '.cadence/autre.yaml': 'x\n' }, 'autre');
+    expect((await cli(repo, push(cadence, first), {}, 'hook', 'pre-push')).code).toBe(0);
   });
 
   it('R7 — le plan est celui que cadence.yaml désigne (plan: path), pas toujours .cadence/raf.yaml', async () => {
@@ -213,8 +217,8 @@ describe('un commit qui ne touche que le plan reprend le verdict de son parent (
     await cli(repo, '', {}, 'verify', '--gate', '--sha', head);
     const top = commitFiles(repo, { 'docs/mon-plan.yaml': 'a\n' }, 'plan');
     expect((await cli(repo, push(top, first), {}, 'hook', 'pre-push')).code).toBe(0);
-    const defaut = planOnly(repo, 'b'); // .cadence/raf.yaml n'est plus le plan de ce projet
-    expect((await cli(repo, push(defaut, first), {}, 'hook', 'pre-push')).code).toBe(3);
+    const ailleurs = commitFiles(repo, { 'raf.yaml': 'b\n' }, 'plan'); // un fichier nommé comme un plan, hors de .cadence/, n'est pas le plan de ce projet
+    expect((await cli(repo, push(ailleurs, first), {}, 'hook', 'pre-push')).code).toBe(3);
   });
 
   it('R8 — un commit de fusion (deux parents) ne reprend rien, même si ses fichiers se limitent au plan', async () => {

@@ -3928,6 +3928,8 @@ lots:
     estimate: 0.5
     created: 2026-11-18
     started: 2026-11-19
+    notes:
+      - { date: 2026-11-19, text: "19-11 : revue r1 non conforme (M1 warhammer et la plupart des projets déclarent news dans frontend/package.json ; M2 commit de régénération enterré après une correction → conflit au rebase ; M3 scripts.news n'est pas une convention de cadence). Choix du lead : déclencheur explicite dans cadence.yaml (commandes + dossier), aucun script deviné ; retirer tous les commits du run portant le trailer de régénération avant toute reprise. Correction relancée avec le rapport." }
   - id: L782
     title: "cadence run : la bascule sur Fable « après deux revues non conformes » (L726) ne s'est pas faite pour L778 — r1 et r2 non conformes, la correction du 18-11 13 h 38 a tourné sur Opus ; le plan ne garde qu'un champ review (le dernier verdict), l'historique des revues n'est donc pas compté. Test qui échoue sur ce cas."
     status: todo

@@ -81,6 +81,15 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [2.0.17] - 2026-11-19
+
+### Fixed
+
+- The `pre-push` hook no longer counts a plan-only commit as code of the lots its subject cites (L784, [docs/deliver.md](docs/deliver.md)): a commit whose every file is the plan, a file under `.cadence/` (the request register) or a file of `plan.onWrite.files` passes the review guard, so creating a lot together with its request no longer blocks the push; `cadence.yaml` beyond its `plan:` key is still work.
+- A sha integrated by `cadence run` is no longer refused at push « aucun verdict de la porte pour ce sha » (lot L786, delivered with L784): the run's full gate writes its verdict where the hook reads it, with the same code as `cadence verify --gate`, and, when `orchestrate.gate.readsPlan` is absent, a plan-only commit placed above it (plan, `.cadence/`, `plan.onWrite` output) takes that verdict instead of asking for a new gate. The run's gate plays the steps of `verify --gate` (build, then test, a test declared in parts included: on warhammer40k it played the build alone) and writes a verdict only for a tree equal to its commit, read before the gate (nothing uncommitted or untracked before or after, `HEAD` unmoved); the `plan.onWrite.files` that inherit a verdict are read in the commits crossed and at the sha judged, never in the working tree.
+- The interaction probes no longer report their own page as « fenêtre fermée avant que la sonde ait pu y lire le marqueur » when they reopen it: a same-document navigation (a clicked `#x` link) restarted the marker read, and closing the old page made that read fail under load. The probe now finishes its reads, and rereads any frame still unproven, before closing one of its own pages; a page without the marker is still reported as unguarded.
+- `cadence run` plays the regeneration commands a project declares under `run.regenerate` of `cadence.yaml` (L781, [docs/config.md](docs/config.md#generated-files-runregenerate)): the session may not run `cadence`, so a project whose News data comes from `cadence news build` got its lots integrated with stale data. Each `{ command, dir }` runs in the worktree before each gate, and what it changes is committed in one commit of the lot with a neutral message; nothing is guessed from a script name, and without the key the run is unchanged. A failing command is handed back to the session like a red gate, with its own correction. Every regeneration commit of the run is removed before a rebase or a resumed session and played again, so a correction never buries it and two runs never conflict on the generated file. The key is validated with the rest of `cadence.yaml`.
+
 ## [2.0.16] - 2026-11-18
 
 ### Added

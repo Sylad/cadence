@@ -77,6 +77,8 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // L773 (issue #64) : run 1032 (+5) : un journal par run --fond, nommé d'après l'id du run (nouvelIdRun, ID_RUN, id passé par le lanceur), sans ligne tassée.
   // L781 : run 1137 (+105) : regenerer.ts, les commandes du projet qui appellent cadence (npm run news, plan.onWrite) jouées par le run avant la porte et
   // commitées en un commit du lot, retirées puis rejouées avant un rebase, sans ligne tassée.
+  // L781 (revue r1) : run 1152 (+15) : run.regenerate déclaré dans cadence.yaml (lu par scripts/regeneration.mjs) au lieu de scripts.news, tous les
+  // commits de régénération retirés avant un rebase ou une reprise de session, échec de régénération à correction propre, sans ligne tassée.
   // L775 : bench 1609 (+21), sequence 717 (+2), mesure 2326 : le détecteur de fuites ignore les appels refusés par le hook du bras (refusParHook, partagé
   // avec lectureReferences), sans ligne tassée.
   // L777 : bench 1672 (+63), mesure 2389 : « tests d'origine verts » compte les tests d'origine réussis par bras (testsReussis, cachesReussis, lus dans les

@@ -104,3 +104,24 @@ never read as « no reference »: an unknown key under `references` or in an ent
 and each command says so: `cadence run` in its launch lines, `cadence ref` on its error output, once per command
 (« references en liste (ancienne forme de cadence run) : lue comme references.run ; écrire … »). Move the list under `run:` to silence it; such a
 file has no `dir`, so `cadence ref` uses its default folder.
+
+## Generated files: `run.regenerate`
+
+A `cadence run` session may not run `cadence` or `raf`. A project whose generated files come from such a command (the News data of
+`cadence news build`, a published plan) declares it, and the run plays it itself, in its worktree, after the rebase and before each gate (L781):
+
+```yaml
+run:
+  regenerate:                                 # played in order; nothing declared, nothing played
+    - { command: npm run news, dir: frontend } # dir: folder of the repository (default: its root)
+    - { command: npm run plan }
+```
+
+What the commands change is committed as one commit of the lot, hooks included, with a neutral message
+(`chore(<lot>): régénère les fichiers générés déclarés (cadence run <id>)`, trailer `Cadence-Run-Regeneration: <id>`), so the gate judges the
+commit that is integrated. Nothing is guessed from a script name: a project without the key runs as before, even with a `news` script.
+A failing command, a missing `dir`, a commit refused by a hook, or an uncommitted file the commands rewrite is handed back to the session like a
+red gate, with the files put back as they were; this has its own correction, it does not use the one of the gate.
+Before every rebase and every resumed session, all the run's regeneration commits are removed and played again on the updated tree.
+Output written to files that git ignores is seen by the gate but never committed. `dir` is relative to the repository, without `..`,
+`/` or `~`; any other key, or a malformed entry, is refused by `cadence run` and by the gate that validates `cadence.yaml`, with the key at fault.

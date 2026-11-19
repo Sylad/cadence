@@ -142,3 +142,10 @@
 - Hypothèse : une app qui ouvre et referme un popup, ou retire un iframe, avant que la sonde ait lu son marqueur rend la passe non vérifiée (code 2) même sans écriture : c'est le prix du « fermé par défaut ».
 - Non couvert, écrit dans la doc et la ligne « lecture seule » : la raison de `ws.close(1000, raison)` atteint le serveur (123 octets au plus).
 - Tests : test/sondes-fenetres-l778.test.ts (pages de exp4/run5.mjs : v15, v16, v4, v9, v14, plus document.open, deux popups avec page, popup ouvert depuis un iframe ; v1 : un seul popup n'est pas signalé) ; les essais r2 et r3 vérifient `fenetres` vide.
+
+## cadence run : run.regenerate, fichiers générés rejoués par le run (L781, revue r1)
+
+- Décision (revue r1, choix du lead) : plus aucun script deviné. Le run ne régénère que ce que le projet déclare dans `cadence.yaml`, `run.regenerate: [{ command, dir }]` (`dir` relatif au dépôt, racine par défaut, sans `..`, `/` ni `~`). La clé est lue par `scripts/regeneration.mjs`, partagé par v2/src/run/regenerer.ts et validateConfig (src/config-set.ts). Clés connues sous `run:` : purgeAfterDays, worktreeOutside, regenerate. Sans la clé, le run est celui d'avant, même avec un `scripts.news`. Doc : docs/config.md#generated-files-runregenerate.
+- Workflow : après le rebase, juste avant chaque porte, les commandes sont jouées dans le worktree, puis commitées en un commit `chore(<lot>): régénère les fichiers générés déclarés (cadence run <id>)` (trailer `Cadence-Run-Regeneration`). Échec (commande, clé mal formée, dossier absent, hook qui refuse, ou fichier non commité réécrit, m1) : fichiers remis comme avant, rendu à la session comme une porte rouge, avec sa **propre** correction (m3).
+- M2 : `retirerRegenerations` retire TOUS les commits de régénération du run depuis la base (`reset --keep` en tête, `rebase --onto R~1 R` enfoui, abandon propre sinon), au début de `rebaser` et au début de chaque session reprise (correction, `--reponse`, quota), sauf pendant un rebase en cours.
+- Tests : v2/test/run-regeneration-l781.test.ts (dont un vrai `cadence news build` lancé par vite-node dans `frontend/`), test/run-regenerate-config-l781.test.ts.

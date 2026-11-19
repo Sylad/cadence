@@ -31,6 +31,8 @@
     "scripts/options-raf.d.mts",
     "scripts/references.mjs",
     "scripts/references.d.mts",
+    "scripts/regeneration.mjs",
+    "scripts/regeneration.d.mts",
     "scripts/sondes-interaction.mjs",
     "scripts/sondes-interaction.d.mts",
     "scripts/sondes-garde.mjs",

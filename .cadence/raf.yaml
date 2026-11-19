@@ -3924,9 +3924,10 @@ lots:
     created: 2026-11-18
   - id: L781
     title: "cadence run : les commandes de projet qui appellent cadence (npm run news → cadence news build, puis npm run plan) ne peuvent pas tourner dans la session du run ; 3 lots le 18-11 (finance L172, L173 ; warhammer L71 fait à la main) rendus avec nouveautes-data non régénéré, le lead rejoue à chaque fois — les jouer à l'intégration du run (ou autoriser cadence news build dans la session), avec un test"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-18
+    started: 2026-11-19
   - id: L782
     title: "cadence run : la bascule sur Fable « après deux revues non conformes » (L726) ne s'est pas faite pour L778 — r1 et r2 non conformes, la correction du 18-11 13 h 38 a tourné sur Opus ; le plan ne garde qu'un champ review (le dernier verdict), l'historique des revues n'est donc pas compté. Test qui échoue sur ce cas."
     status: todo

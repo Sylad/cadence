@@ -35,6 +35,8 @@
     "scripts/regeneration.d.mts",
     "scripts/verdicts-porte.mjs",
     "scripts/verdicts-porte.d.mts",
+    "scripts/etapes-porte.mjs",
+    "scripts/etapes-porte.d.mts",
     "scripts/sondes-interaction.mjs",
     "scripts/sondes-interaction.d.mts",
     "scripts/sondes-garde.mjs",

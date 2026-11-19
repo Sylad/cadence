@@ -97,6 +97,37 @@ describe('hook pre-push, revue : un commit de plan seul qui cite des lots ouvert
     expect(r.code).toBe(3);
     expect(r.err).toContain(`L1 (${a.slice(0, 7)})`);
   });
+
+  it('R12 (revue r1, m4 b) — un renommage src/x.ts → .cadence/x.ts qui cite un lot ouvert reste à relire (la suppression de src/x.ts est du code)', async () => {
+    const { dir } = await project();
+    await cli(dir, '', 'add', 'Cache');
+    await cli(dir, '', 'start', 'L1');
+    git(dir, 'add', '-A');
+    const base = change(dir, { 'src/x.ts': 'export const x = 1;\n' }, 'chore: x');
+    mkdirSync(join(dir, '.cadence'), { recursive: true });
+    git(dir, 'mv', 'src/x.ts', '.cadence/x.ts');
+    const a = change(dir, {}, 'feat(L1): x rangé');
+    const r = await prePush(dir, push(a, base));
+    expect(r.code).toBe(3);
+    expect(r.err).toContain(`L1 (${a.slice(0, 7)})`);
+  });
+
+  it('R13 (revue r1, m4 c) — une fusion qui cite un lot ouvert et dont le second parent porte du code non relu : refusée', async () => {
+    const { dir } = await project();
+    await cli(dir, '', 'add', 'Cache');
+    await cli(dir, '', 'start', 'L1');
+    git(dir, 'add', '-A');
+    const base = change(dir, demande(5), 'plan: L1 démarré (D-5)');
+    git(dir, 'checkout', '-qb', 'cote');
+    change(dir, { 'src/cote.ts': '1\n' }, 'wip');
+    git(dir, 'checkout', '-q', '-');
+    change(dir, demande(6), 'plan: D-6');
+    git(dir, '-c', 'user.email=t@t', '-c', 'user.name=t', 'merge', '-q', '--no-ff', '-m', 'fix(L1): fusion de cote', 'cote');
+    const m = head(dir);
+    const r = await prePush(dir, push(m, base));
+    expect(r.code).toBe(3);
+    expect(r.err).toContain('L1');
+  });
 });
 
 describe('hook pre-push, porte : un commit de plan seul au-dessus d\'un sha à porte verte reprend son verdict (L786)', () => {
@@ -146,5 +177,25 @@ describe('hook pre-push, porte : un commit de plan seul au-dessus d\'un sha à p
     const r = await prePush(dir, push(p, base));
     expect(r.code).toBe(3);
     expect(r.err).toContain('aucun verdict de la porte pour ce sha');
+  });
+
+  it('R10 (revue r1, m1) — plan.onWrite.files lu au sha jugé : une sortie déclarée dans l\'arbre courant seulement n\'hérite pas du verdict', async () => {
+    const { dir, base } = project();
+    // cadence.yaml de l'arbre (non commité) déclare src/a.ts comme sortie de plan.onWrite ; le sha vert ne le déclarait pas.
+    writeFileSync(join(dir, 'cadence.yaml'), 'orchestrate:\n  test: "true"\nplan:\n  path: .cadence/raf.yaml\n  onWrite: { command: \'true\', files: [public/plan.json, src/a.ts] }\n');
+    git(dir, 'add', 'src/a.ts');
+    const p = change(dir, { 'src/a.ts': '2\n' }, 'plan: régénéré');
+    const r = await prePush(dir, push(p, base));
+    expect(r.code).toBe(3);
+    expect(r.err).toContain('aucun verdict de la porte pour ce sha');
+  });
+
+  it('R11 (revue r1, m1) — la sortie déclarée au sha jugé hérite toujours, même quand l\'arbre courant ne la déclare plus', async () => {
+    const { dir, base } = project();
+    const p = change(dir, { 'public/plan.json': '{"lots":[]}\n' }, 'plan: régénéré');
+    writeFileSync(join(dir, 'cadence.yaml'), 'orchestrate:\n  test: "true"\nplan:\n  path: .cadence/raf.yaml\n');
+    const r = await prePush(dir, push(p, base));
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
   });
 });

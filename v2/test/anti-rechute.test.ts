@@ -136,7 +136,7 @@ const FLAGS_CLI: Record<string, string[]> = {
 const prefixe = (k: string) => (k.startsWith('src/bench/') || k === 'src/sequence/cli.ts' || k === 'src/cli.ts' ? 'bench' : 'cadence2'); // l'aide de cli.ts et le banc séquence décrivent les options de « bench »
 // Budgets de R29 : relever un total ou un module (même sous le total) est une violation ; le baisser est permis.
 const BUDGET_R29: Record<string, { total: number; modules: Record<string, number> }> = {
-  noyau: { total: 3000, modules: { plan: 350, accueil: 200, run: 1156, porte: 250, deliver: 450, hooks: 215 } }, // R32 : hooks, mécanisme du bras candidat ; issue #57 : run 455, run.ts détassé, messages gardés à toute fin ; L722 : run 466 (+11), le départ nomme les fichiers non commités de l'arbre principal (pas de ligne tassée)
+  noyau: { total: 3000, modules: { plan: 350, accueil: 200, run: 1174, porte: 250, deliver: 450, hooks: 215 } }, // R32 : hooks, mécanisme du bras candidat ; issue #57 : run 455, run.ts détassé, messages gardés à toute fin ; L722 : run 466 (+11), le départ nomme les fichiers non commités de l'arbre principal (pas de ligne tassée)
   // L723 : run 520, rebase seul quand la cible avance pendant la porte (conflit rendu à la session, porte rejouée, arbre principal sale nommé), sans ligne tassée
   // L723 (revue, M1) : run 539, un conflit de rebase résolu est ajouté à l'état (conflits, détail de fin) et au journal sans remplacer le rapport du travail, sans ligne tassée
   // L722 (revue r1) : run 532 (-7), la lecture des fichiers non commités vient de scripts/arbre-non-commite.mjs, partagée avec src (copie retirée de run.ts)
@@ -183,6 +183,8 @@ const BUDGET_R29: Record<string, { total: number; modules: Record<string, number
   // L781 : run 1137 (+105) : regenerer.ts, les commandes du projet qui appellent cadence (scripts.news, plan.onWrite) jouées par le run avant la porte et commitées, retirées puis rejouées avant un rebase, sans ligne tassée.
   // L781 (revue r1) : run 1152 (+15) : run.regenerate déclaré dans cadence.yaml (scripts/regeneration.mjs) au lieu de scripts.news, tous les commits de régénération retirés avant un rebase ou une reprise de session, échec de régénération à correction propre, fichier non commité réécrit refusé, sans ligne tassée.
   // L784 : run 1156 (+4) : la porte du run note son verdict (scripts/verdicts-porte.mjs) là où le hook pre-push le lit, comme verify --gate (L786), sans ligne tassée.
+  // L784 (revue r1) : run 1174 (+18) : la porte du run joue les étapes de verify --gate (scripts/etapes-porte.mjs : build puis test, parties comprises) et ne note un verdict
+  // que pour un arbre égal au commit avant et après la porte, au même HEAD (M1, M2), sans ligne tassée.
   // L775 : bench 1609 (+21), sequence 717 (+2), mesure 2326 : un appel refusé par le hook du bras n'est plus compté en fuite (refusParHook), sans ligne tassée.
   // L777 : bench 1672 (+63), mesure 2389 : « tests d'origine verts » compte les tests d'origine réussis par bras, marge de bruit (MARGE_CACHES, retirée en revue r1), sans ligne tassée.
   // L777 (revue r1) : bench 1693 (+21), mesure 2410 : marge retirée (candidat ≥ A test par test), lanceur compté seulement s'il a un bilan dans les deux journaux

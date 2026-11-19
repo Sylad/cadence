@@ -12,7 +12,7 @@ import { matchesHead, readCommits, stage, stagedFiles, syncIndexWithHead } from 
 import { installHook, pendingCommitMessage, REFUSED } from '../hook.js';
 import { gateRefusal, pushRefusal, UNGATED_ENV } from '../push-guard.js';
 import { reviewRefusal, UNREVIEWED_ENV, type ReviewGuard } from '../push-review.js';
-import { planSide } from '../plan-side.js';
+import type { PlanSideRefs } from '../plan-side.js';
 import { citedRefs } from '../link.js';
 import { loadEntries } from '../news.js';
 import { Plan, RafError } from '../plan.js';
@@ -196,12 +196,10 @@ interface PrePushArgs {
   remoteName: string | undefined;
   configPath: string;
   planFile: string;
-  /** `plan.onWrite.files` (L786) : ce que la régénération du plan écrit, relatif à la racine. */
-  produced: string[];
   review: Omit<ReviewGuard, 'plan' | 'verdictCommand'> & { load: (() => Plan) | null };
 }
 
-function prePush(io: Io, { root, remoteName, configPath, planFile, produced, review }: PrePushArgs): number {
+function prePush(io: Io, { root, remoteName, configPath, planFile, review }: PrePushArgs): number {
   let input = '';
   try {
     input = io.stdin ? io.stdin() : readFileSync(0, 'utf8');
@@ -229,7 +227,7 @@ function prePush(io: Io, { root, remoteName, configPath, planFile, produced, rev
   } catch {
     // Config illisible : ni porte ni clé de verdict.
   }
-  const side = gateSide(config, { planFile, config: relative(root, configPath), produced });
+  const side = gateSide(config, { planFile, config: relative(root, configPath) });
   const gated = overridable(io, gateRefusal(root, Boolean(config?.test || config?.build), input, planFile, side), UNGATED_ENV);
   if (gated) return gated;
   if (!review.load) return 0;
@@ -242,13 +240,13 @@ function prePush(io: Io, { root, remoteName, configPath, planFile, produced, rev
   return overridable(io, unreviewed, UNREVIEWED_ENV);
 }
 
-/** L786 : sans `gate.readsPlan`, aucun test ne lit le plan : un commit de plan seul (plan, `.cadence/`, sorties de `plan.onWrite`) reprend le verdict du sha dessous. */
-function gateSide(config: ReturnType<typeof readOrchestrateConfig> | null, files: Parameters<typeof planSide>[0]): ((file: string) => boolean) | undefined {
-  return config?.gate?.readsPlan ? undefined : planSide(files);
+/**
+ * L786 : sans `gate.readsPlan`, aucun test ne lit le plan : un commit de plan seul (plan, `.cadence/`, sorties de `plan.onWrite` lues au commit, revue r1 m1)
+ * reprend le verdict du sha dessous. Un test qui lit un fichier de `.cadence/` (registre des demandes, `docs-ok.yaml`) le déclare aussi (revue r1, m2).
+ */
+function gateSide(config: ReturnType<typeof readOrchestrateConfig> | null, refs: PlanSideRefs): PlanSideRefs | undefined {
+  return config?.gate?.readsPlan ? undefined : refs;
 }
-
-/** `plan.onWrite.files` de cadence.yaml (L786), relatifs à la racine du dépôt. */
-const onWriteFiles = (c: Ctx): string[] => c.planConfig?.settings?.onWrite?.files ?? [];
 
 /** Un refus du hook pre-push que la variable `env` (posée à 1) passe outre en le disant : 0 si rien n'est refusé ou si la variable est posée, REFUSED sinon. */
 function overridable(io: Io, refusal: string | null, env: string): number {
@@ -291,7 +289,7 @@ export function cmdHook(c: Ctx): number | Promise<number> {
   if (rest[0] === 'pre-push') {
     const planFile = planFileIn(root, planPath);
     const loadAt = (path: string) => Plan.load(path, { ...c.planConfig?.settings, config: configPath });
-    return prePush(io, { root, remoteName: rest[1], configPath, planFile, produced: onWriteFiles(c), review: { root, planFile, loadAt, load: existsSync(planPath) ? loadPlan : null } });
+    return prePush(io, { root, remoteName: rest[1], configPath, planFile, review: { root, planFile, loadAt, load: existsSync(planPath) ? loadPlan : null } });
   }
   throw new RafError('usage : raf hook install|pre-commit|post-commit|pre-push');
 }

@@ -21,6 +21,7 @@ import { fichiersNonCommites, nommerFichiers, PLAN_EN_ATTENTE } from '../../../s
 import { environnementPerime, ignorerPerime, lignesPerime } from '../../../scripts/environnement-porte.mjs'; // L764 : même lecture que src/verify-gate.ts
 import { regenerer, retirerRegenerations, TRAILER_REGENERATION } from './regenerer.js';
 import { noterVerdict } from '../../../scripts/verdicts-porte.mjs'; // L786 : même écriture que src/gate-verdict.ts (verify --gate)
+import { lireEtapes } from '../../../scripts/etapes-porte.mjs'; // L786 (revue r1, M1) : mêmes étapes que verify --gate
 import { debutProcessus, inscrireCreneau, occupantVivant, prendreVerrou, rendreVerrou, roleVerrou } from '../verrou.js';
 
 /** D-15 : le run reprend une minute après l'heure de remise à zéro annoncée, relit son état au plus tard toutes les 10 min (une reprise par --reponse arrête
@@ -110,12 +111,15 @@ function copierDeps(repo: string, wt: string): void {
   }
 }
 
-const orchestrate = (repo: string): { test?: string; build?: string; prodAccess?: boolean } =>
+const orchestrate = (repo: string): { prodAccess?: boolean } =>
   existsSync(join(repo, 'cadence.yaml')) ? (parse(readFileSync(join(repo, 'cadence.yaml'), 'utf8')) as { orchestrate?: object } | null)?.orchestrate ?? {} : {};
-function commandesDeCadenceYaml(repo: string): string[] {
-  const o = orchestrate(repo);
-  return [o.test, o.build].filter((c): c is string => typeof c === 'string' && !!c.trim());
+/** L786 (revue r1, M1) : les étapes de verify --gate (scripts/etapes-porte.mjs : build puis test, en chaîne ou en parties) ; `refus` : cadence.yaml que
+ * verify --gate refuserait, rien n'est joué ni noté. */
+function etapesDeCadenceYaml(repo: string): { commandes: string[]; refus?: string } {
+  const p = lireEtapes(orchestrate(repo));
+  return p.refus !== undefined ? { commandes: [], refus: `orchestrate.${p.refus}` } : { commandes: p.etapes.flatMap((x) => x.commandes) };
 }
+const commandesDeCadenceYaml = (repo: string): string[] => etapesDeCadenceYaml(repo).commandes;
 /** L764 : la porte d'un run est lue dans cadence.yaml AU COMMIT DU RUN (le worktree, rebasé sur la cible) : un run qui corrige sa propre commande de porte est
  * jugé par elle. Quand elle diffère de celle de l'arbre principal, la sortie le dit (une porte affaiblie par le run se voit dans le journal et à la revue). */
 function commandesDuRun(e: Etat, out: (l: string) => void): string[] {
@@ -136,14 +140,23 @@ function perime(e: Etat, out: (l: string) => void): string | null {
   if (ignorerPerime(process.env)) { out(['porte du run : environnement périmé, porte jouée quand même (CADENCE_PORTE_ENV=jouer) — un rouge peut venir de lui :', ...lignes.slice(1, -1)].join('\n')); return null; }
   return [...lignes, `  après la remise à niveau : cadence run --reponse ${e.id} "environnement remis à niveau" (la session reprend, puis la porte est rejouée)`].join('\n');
 }
-function jouerPorte(cmds: string[], cwd: string): { ok: boolean; sortie: string } {
+/** L786 (revue r1, M2) : les fichiers du worktree hors du commit (modifiés, indexés, non suivis même cachés ; les ignorés exceptés), '' s'il est propre ; git muet : sale. */
+const horsCommit = (cwd: string) => (fichiersNonCommites(cwd, { tous: true }) ?? ['(git status illisible)']).join('\n');
+function jouerPorte(cmds: string[], cwd: string, out: (l: string) => void): { ok: boolean; sortie: string } {
+  // L786 (revue r1, M2) : le sha lu AVANT la porte ; un verdict n'est noté que pour un arbre égal à ce commit avant et après, au même HEAD.
+  const sha = git(cwd, 'rev-parse', 'HEAD'), avant = horsCommit(cwd);
   let p = { ok: true, sortie: '' };
   for (const c of cmds) {
     const r = spawnSync('bash', ['-c', c], { cwd, encoding: 'utf8', timeout: PORTE_MS, maxBuffer: 64 << 20 });
     if (r.status !== 0) { p = { ok: false, sortie: `$ ${c}\n${`${r.stdout ?? ''}${r.stderr ?? ''}`.slice(-4000)}${r.error ? `\n${r.error.message}` : ''}` }; break; }
   }
-  // L786 : le verdict du commit jugé, là où le hook pre-push le lit (même fichier que verify --gate) ; sans commande (--sans-porte), aucune porte n'a jugé.
-  if (cmds.length) noterVerdict(cwd, git(cwd, 'rev-parse', 'HEAD'), p.ok ? 0 : 1, new Date());
+  if (!cmds.length) return p; // --sans-porte : aucune porte n'a jugé, rien n'est noté
+  const apres = horsCommit(cwd), tete = git(cwd, 'rev-parse', 'HEAD');
+  const pourquoi = [...(avant ? [`avant la porte, l'arbre portait des fichiers hors du commit (${avant.split('\n').length})`] : []),
+    ...(apres ? [`après la porte, l'arbre porte des fichiers hors du commit (${apres.split('\n').length})`] : []), ...(tete !== sha ? [`HEAD est passé à ${tete.slice(0, 7)}`] : [])];
+  // L786 : le verdict du commit jugé, là où le hook pre-push le lit (même fichier que verify --gate).
+  if (!pourquoi.length) noterVerdict(cwd, sha, p.ok ? 0 : 1, new Date());
+  else out(`porte du run : aucun verdict noté pour ${sha.slice(0, 7)} — ${pourquoi.join(' ; ')} : la porte n'a pas jugé ce commit seul, le hook pre-push exigera une porte de verify à ce sha`);
   return p;
 }
 
@@ -300,7 +313,12 @@ function suite(e: Etat, o: Opts): Etat {
   const q = question(e, o);
   if (q) return q;
   if (git(e.worktree, 'rev-list', '--count', `${e.base}..HEAD`) === '0') { e.etat = 'sans-commit'; e.detail = 'la session n\'a rien commité'; return fin(e, o); }
-  const arretSansCommande = () => { e.etat = 'sans-porte'; e.detail = 'cadence.yaml du run ne déclare ni orchestrate.test ni orchestrate.build : relance avec --sans-porte pour intégrer quand même'; return fin(e, o); };
+  const arretSansCommande = () => {
+    const refus = etapesDeCadenceYaml(e.worktree).refus; // L786 (revue r1, M1) : une porte que verify --gate refuserait n'est pas jouée à moitié
+    e.etat = 'sans-porte';
+    e.detail = `${refus ? `cadence.yaml du run : ${refus}` : 'cadence.yaml du run ne déclare ni orchestrate.test ni orchestrate.build'} : relance avec --sans-porte pour intégrer quand même`;
+    return fin(e, o);
+  };
   if (!commandesDeCadenceYaml(e.worktree).length && !o.sansPorte) return arretSansCommande();
   const br = git(e.worktree, 'rev-parse', '--abbrev-ref', 'HEAD');
   for (let rebase = 1; ; rebase++) {
@@ -314,7 +332,7 @@ function suite(e: Etat, o: Opts): Etat {
       const vieux = r ? null : perime(e, o.out);
       if (vieux) { e.etat = 'environnement-perime'; e.detail = vieux; return fin(e, o); } // L764 : pas de rouge trompeur, pas de correction demandée à la session
       const g = r ? null : regenererRun(e, o.out); // L781 : avant la porte, qui juge le commit intégré, données générées comprises
-      const p = r ? { ok: false, sortie: r } : g && !g.ok ? g : jouerPorte(cmds, e.worktree);
+      const p = r ? { ok: false, sortie: r } : g && !g.ok ? g : jouerPorte(cmds, e.worktree, o.out);
       const c = e.corrections?.at(-1), attendue = c?.verte === undefined ? c : undefined;
       if (p.ok) {
         if (attendue) { attendue.verte = true; sauver(e); o.out(correctionFaite(attendue)); }

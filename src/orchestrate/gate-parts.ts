@@ -3,9 +3,9 @@
 // cadence lance chaque partie séparément, dans son dossier, et attribue chaque rouge à la partie qui l'a imprimé ; une partie sans `replay` garde ses rouges comptés ; la forme chaîne reste telle quelle.
 // Ce module ne change que le lieu du lancement et l'attribution des noms : les règles de verdict (deux rejeux, fichier vu dans la sortie, délai trop juste) restent celles de workers.ts.
 
-import { isAbsolute, posix } from 'node:path';
 import { failedTests, hasUnnamedFailure } from './baseline.js';
 import { isComposedGate, redAlone, replayRed, shellArg, type TightTest } from './workers.js';
+import { commandeDePartie, lirePorteTest } from '../../scripts/etapes-porte.mjs';
 
 /** Une partie de la porte : son dossier (relatif au dépôt), sa commande, et la commande de rejeu seul où `{files}` devient les fichiers rouges qu'elle a imprimés. */
 export interface GatePart {
@@ -35,39 +35,11 @@ export interface GateRan {
 
 export const isParts = (t: GateTest | undefined): t is GatePart[] => Array.isArray(t);
 
-const PART_KEYS = ['dir', 'run', 'replay'];
-
-/** Le dossier d'une partie, normalisé (`./front/` → `front`) ; null s'il est vide, absolu ou contient « .. ». */
-function partDir(v: unknown): string | null {
-  if (typeof v !== 'string' || !v.trim() || isAbsolute(v.trim()) || v.split(/[\\/]/).includes('..')) return null;
-  const n = posix.normalize(v.trim().replaceAll('\\', '/')).replace(/\/+$/, '');
-  return n || null;
-}
-
-/** Lecture de `orchestrate.test` (contrat A1) : la chaîne telle quelle, ou la liste des parties validées ; `bad` fabrique l'erreur de cadence.yaml. */
+/** Lecture de `orchestrate.test` (contrat A1) : la chaîne telle quelle, ou la liste des parties validées ; `bad` fabrique l'erreur de cadence.yaml. Même lecture que la porte de `cadence run` (scripts/etapes-porte.mjs, L786). */
 export function readGateTest(raw: unknown, bad: (what: string) => Error): GateTest {
-  if (typeof raw === 'string') {
-    if (!raw.trim()) throw bad('test : commande non vide attendue');
-    return raw.trim();
-  }
-  if (!Array.isArray(raw)) throw bad('test : commande non vide attendue (chaîne ou liste de parties { dir, run, replay? })');
-  if (!raw.length) throw bad('test : au moins une partie attendue (dir, run, replay facultatif)');
-  const seen = new Set<string>();
-  return raw.map((item): GatePart => {
-    if (typeof item !== 'object' || item === null || Array.isArray(item)) throw bad('test : chaque partie doit être un objet { dir, run, replay? }');
-    const o = item as Record<string, unknown>;
-    for (const k of Object.keys(o)) if (!PART_KEYS.includes(k)) throw bad(`test : clé « ${k} » inconnue dans une partie (attendu : dir, run, replay)`);
-    const dir = partDir(o.dir);
-    if (dir === null || seen.has(dir)) throw bad(`test : dir invalide « ${typeof o.dir === 'string' ? o.dir : JSON.stringify(o.dir)} » (chemin relatif, sans « .. », unique)`);
-    seen.add(dir);
-    if (typeof o.run !== 'string' || !o.run.trim()) throw bad(`test : la commande run de la partie « ${dir} » ne peut pas être vide (chaîne non vide attendue)`);
-    const part: GatePart = { dir, run: o.run.trim() };
-    if (o.replay != null) {
-      if (typeof o.replay !== 'string' || !o.replay.trim() || !o.replay.includes('{files}')) throw bad(`test : le replay de la partie « ${dir} » doit être une commande non vide contenant {files} (remplacé par les fichiers des tests rouges)`);
-      part.replay = o.replay.trim();
-    }
-    return part;
-  });
+  const r = lirePorteTest(raw);
+  if (r.refus !== undefined) throw bad(r.refus);
+  return r.porte;
 }
 
 /** `orchestrate.testReplay` face à `orchestrate.test` (L354, L512) : `{files}` exigé ; refusé avec une liste de parties (le rejeu se déclare par partie) et sur une porte composée en chaîne. */
@@ -115,7 +87,7 @@ export const gateLabel = (t: GateTest): string => (isParts(t) ? t.map((p) => `${
 export const gateReplayable = (t: GateTest | undefined, replay: string | undefined): boolean => (isParts(t) ? t.some((p) => !!p.replay) : !!replay);
 
 /** La commande d'une partie jouée depuis la racine du lieu (worktree local ou de l'hôte) : un dossier introuvable fait sortir le shell en échec en le nommant (« can't cd to dir »), sans test nommé. */
-export const partCommand = (p: GatePart, command = p.run): string => `cd ${shellArg(p.dir)} && ${command}`;
+export const partCommand = (p: GatePart, command = p.run): string => commandeDePartie(p, command);
 
 /** Joue la porte : la chaîne en un bloc ; les parties toutes, chacune dans son dossier (R8 : une partie rouge ne coupe pas les suivantes), code de la première non nulle, sorties fusionnées sous un en-tête « [dir] ». */
 export async function runGate(run: Runner, test: GateTest): Promise<GateRan> {

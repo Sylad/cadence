@@ -8,11 +8,12 @@ export const PLAN_EN_ATTENTE = '.cadence/plan-en-attente.yaml';
 
 /**
  * Les fichiers de l'arbre de `repo` que git voit modifiés, ajoutés, supprimés ou non suivis, hors du plan en attente ; un dossier non suivi est
- * nommé une fois (« dossier/ »), comme le montre git status ; null si git ne répond pas.
+ * nommé une fois (« dossier/ »), comme le montre git status ; null si git ne répond pas. `tous` (L786, revue r1 M2 : la porte d'un run ne note son verdict
+ * que pour un arbre égal au commit) : chaque fichier non suivi, même quand `status.showUntrackedFiles` les cache.
  */
-export function fichiersNonCommites(repo) {
+export function fichiersNonCommites(repo, { tous = false } = {}) {
   // -z : chemins bruts, sans trim qui mangerait l'espace de tête du premier « XY chemin » ( M a.txt) ; sans renommages : l'ancien et le nouveau chemin sont dits.
-  const r = spawnSync('git', ['status', '--porcelain', '--no-renames', '-z'], { cwd: repo, encoding: 'utf8' });
+  const r = spawnSync('git', ['status', '--porcelain', '--no-renames', '-z', ...(tous ? ['--untracked-files=all'] : [])], { cwd: repo, encoding: 'utf8' });
   if (r.status !== 0) return null;
   return r.stdout.split('\0').filter(Boolean).map((e) => e.slice(3)).filter((f) => f !== PLAN_EN_ATTENTE);
 }

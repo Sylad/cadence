@@ -19,6 +19,7 @@ import { tryRemote } from './verify-gate-remote.js';
 import { gateBasis } from './verify-gate-plan.js';
 import { GATE_TIMEOUT_MS, type Ran } from './remote-gate.js';
 import { environnementPerime, ignorerPerime, lignesPerime } from '../scripts/environnement-porte.mjs';
+import { lireEtapes } from '../scripts/etapes-porte.mjs'; // L786 (revue r1, M1) : mêmes étapes que la porte de cadence run
 
 /** Lignes de la fin de la sortie montrées quand aucun test n'est identifiable dans une sortie rouge. */
 const TAIL_LINES = 10;
@@ -179,12 +180,12 @@ function reuseRecorded(f: RecordedGate, steps: { name: string; cmd: string }[], 
   return 0;
 }
 
-/** `cmd` est le libellé (celui du CheckRun d'une vague, pour reprendre son verdict) ; `gate` ce qui est joué : pour des parties (L512), chacune dans son dossier. */
+/**
+ * `cmd` est le libellé (celui du CheckRun d'une vague, pour reprendre son verdict) ; `gate` ce qui est joué : pour des parties (L512), chacune dans son dossier.
+ * Les étapes et leur ordre viennent de scripts/etapes-porte.mjs, la même lecture que la porte de `cadence run` (L786, revue r1 M1).
+ */
 function gateSteps(config: OrchestrateConfig): Step[] {
-  return [
-    ...(config.build ? [{ name: 'build', cmd: config.build, gate: config.build }] : []),
-    ...(config.test ? [{ name: 'tests', cmd: gateLabel(config.test), gate: config.test }] : []),
-  ];
+  return (lireEtapes(config).etapes ?? []).map((e) => ({ name: e.nom, cmd: e.nom === 'tests' ? gateLabel(e.porte) : (e.porte as string), gate: e.porte }));
 }
 
 /** La vague vivante sur le dépôt (son verrou tenu par un processus vivant), null sinon ou si le verrou est illisible. */

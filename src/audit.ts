@@ -15,7 +15,7 @@ import { isRecurring } from './recurring.js';
 import { resourceIssues } from './resources.js';
 import { windowIssues } from './plan-window.js';
 import { isFragmentPath } from './changelog-fragments.js';
-import { planSide } from './plan-side.js';
+import { planSideAt } from './plan-side.js';
 import { escapeRe, isOpen, type Lot, type Plan, type Ref, type Verdict } from './plan.js';
 
 /** Chemin de la configuration lue, relatif à la racine : celui de --config, sinon cadence.yaml. */
@@ -106,15 +106,15 @@ export function isPlanOnly(sha: string, plan: Plan, root: string): boolean {
 }
 
 /**
- * Commit de plan seul au sens du hook pre-push (L784) : `isPlanOnly`, ou un commit dont chaque fichier est un fichier du plan (`planSide` : le plan, `.cadence/**`,
- * les fichiers que `plan.onWrite` régénère) ou un fichier tenu avec le plan (hors configuration). Le registre des demandes (`.cadence/demandes/`) commité avec
+ * Commit de plan seul au sens du hook pre-push (L784) : `isPlanOnly`, ou un commit dont chaque fichier est un fichier du plan (`planSideAt` : le plan, `.cadence/**`,
+ * les fichiers que `plan.onWrite` régénère, déclarés dans le cadence.yaml du commit) ou un fichier tenu avec le plan (hors configuration). Le registre des demandes (`.cadence/demandes/`) commité avec
  * un lot ouvert n'est pas le code de ce lot.
  */
 export function isPlanSideOnly(sha: string, plan: Plan, root: string): boolean {
   if (isPlanOnly(sha, plan, root)) return true;
   const config = configRel(plan, root);
   const own = ownFiles(plan, root);
-  const side = planSide({ planFile: relative(root, plan.path), config, produced: plan.produced });
+  const side = planSideAt(root, sha, { planFile: relative(root, plan.path), config }); // revue r1 (m1, m3) : la définition du hook de porte, lue au commit
   const files = changedFiles(root, sha);
   return files.length > 0 && files.every((f) => side(f) || (own.has(f) && f !== config));
 }

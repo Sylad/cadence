@@ -1,0 +1,33 @@
+{
+  "id": "D-29",
+  "texte": "oui, fais-en un lot cadence",
+  "date": "2026-11-19",
+  "origine": "session du lead : question de Sylvain « en repensant à la discution d'hier, sur ui/ux, on est d'accord que le check des bonnes pratiques, du respect des regles standard doit être vérifier avant l'étape codage, la realisation de spec/maquettes doit vérifier ce qui est fait avant de devoir corriger, enfin chez des humains, avec cadence et toi, je ne sais plus » ; proposition du lead : fiche d'états relue avant le code, sondes d'acceptation tirées de la fiche, mesure des passes par lot visible",
+  "etat": "ouverte",
+  "preuve": "",
+  "precisions": [
+    {
+      "date": "2026-11-19",
+      "texte": "j'ai été dans des projets, les team spécifications/réalisation de maquette prenait 50% du temps total des projets. Ca prenais du temps, mais une fois que les choses était claire, on pouvait enchainer les dev avec moins de questions (il en restait quand meme bien sur, mais beaucoup moins). Le truc c'est que tu code déjà des choses bien, mais on a vu que niveau ui/ux ca ne respectais pas toujours les standard avec pro, c'est pour ça que je voulais mettre les choses au clair. Sans vouloir tout ralentir comme cadence V1, mais chez les humains, du temps passé à fixer les spec, permettais de faire moins de maintenance"
+    },
+    {
+      "date": "2026-11-19",
+      "texte": "ok, commence par le panneau des couches, et oui une spec par écran, pas par lot me parait bien!"
+    },
+    {
+      "date": "2026-11-19",
+      "texte": "même sion see doit aussi d'avoir une vision global pour éviter d'avooir un menu bleu, et le menu d'a coteer jaune 😃 j'exagère un peu, mais il doit y avoir unee \"phiolosophie\", je n'ai pas le bon mot\", par projet sur ce qui doit être fait"
+    },
+    {
+      "date": "2026-11-19",
+      "texte": "bon le projet dont je parlais avec les 50% de temps a faire des spec détaillés, on avait pu comme ça développé en parallèle des la réalisation des tests fonctionnels. J'étais dans une SSII, et ont faisait ca c'était surtout pour gagner de temps et de l'argent, pas la beauté de l'art, c'est pas tellement la philosophie des ssii"
+    },
+    {
+      "date": "2026-11-19",
+      "texte": "oui, j'ai toujours été contre le fait que les dev écrivent leur tests fonctionnels, car en tant que dev on va tester comment le code doit fonctionner selon ce qu'on a fait, pas forcément comment c'est écrit dans les specs."
+    }
+  ],
+  "lots": [
+    "L788"
+  ]
+}

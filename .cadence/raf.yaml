@@ -3957,6 +3957,16 @@ lots:
     status: todo
     estimate: 0.5
     created: 2026-11-19
+  - id: L787
+    title: "cadence run : une session ne change jamais l'état d'une demande du registre (livrée, vérifiée) — c'est le geste du lead après livraison ; à l'intégration, un changement d'état écrit par la session est refusé ou remis, et dit dans le rapport. Vécu 3 fois le 19-11 (maritime D-7 et D-3, codex D-2 passées « livrée » avant revue et sans rien en ligne)"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-19
+  - id: L788
+    title: "Lots visibles : fiche d'états avant le code (D-29) — pour un lot visible, cadence run fait écrire d'abord une fiche courte (chaque état de l'écran × chaque largeur 320/390/840/1440/paysage, la règle d'interface qui s'applique, ce qui ne doit pas changer), en tire les sondes d'acceptation avant le code (comme spec: true), et la fait relire avant de coder ; mesure sur une semaine : passes par lot visible (UXW-11 : 5, LAYER-FIND1 : 2+ le 19-11) et défauts UX trouvés après le code ; essai sur UXW-12, UXW-13, TYPO-1 ; retiré sans gain ; précision de Sylvain : ne pas ralentir comme cadence V1, la spec sert à moins de maintenance — fiche par ÉCRAN réutilisée par les lots, pas une fiche neuve par lot ; au-dessus, une charte d interface PAR PROJET (principes, palette, composants, motifs d interaction) que chaque spec d écran cite et ne contredit pas — maritime a docs/charte-graphique.md, les autres projets n en ont pas ; les tests fonctionnels (sondes d acceptation) sont écrits d après la spec par une AUTRE session que celle qui code, en parallèle du code — mesure aussi le temps total et le coût par lot visible"
+    status: todo
+    estimate: 1
+    created: 2026-11-19
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

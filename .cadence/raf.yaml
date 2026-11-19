@@ -3947,7 +3947,7 @@ lots:
     status: done
     estimate: 1
     created: 2026-11-18
-    review: { date: 2026-11-19, verdict: "conforme (r2) : M1 et M2 de r1 corrigés ; porte verte à 45ae682 ; suite N1/N2 (onWrite.files lu dans l'arbre courant) en lot fils de L786", commit: 45ae68298af14198060c3580f697c100a0d90cd3 }
+    review: { date: 2026-11-19, verdict: "conforme — 118df3da relu par le lead : une mention « (L786) » du fragment changelog.d/L784.md reformulée « (lot L786, delivered with L784) » pour que test/changelog.test.ts ne la compte pas comme lot publié ; sens inchangé, hors v2/, test du CHANGELOG vert (6/6)", commit: 118df3da198ff51ef5ed54acef99485a0f2b8582 }
     started: 2026-11-19
     finished: 2026-11-19
   - id: L785

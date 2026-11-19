@@ -19,6 +19,7 @@ import { cheminWorktree, PORTE_MS, reglagesRun } from '../socle.js';
 import { briefRegistre, entreeCommitee, preparerRegistre, registreOuvert, registreTouche } from '../registre.js';
 import { fichiersNonCommites, nommerFichiers, PLAN_EN_ATTENTE } from '../../../scripts/arbre-non-commite.mjs'; // L722 : même lecture que src/repo-held.ts
 import { environnementPerime, ignorerPerime, lignesPerime } from '../../../scripts/environnement-porte.mjs'; // L764 : même lecture que src/verify-gate.ts
+import { regenerer, retirerRegeneration, TRAILER_REGENERATION } from './regenerer.js';
 import { debutProcessus, inscrireCreneau, occupantVivant, prendreVerrou, rendreVerrou, roleVerrou } from '../verrou.js';
 
 /** D-15 : le run reprend une minute après l'heure de remise à zéro annoncée, relit son état au plus tard toutes les 10 min (une reprise par --reponse arrête
@@ -231,6 +232,15 @@ function quoiPasse(e: Etat, neuve: boolean, sujet?: string): string {
 /** Une session reprise (--reponse, quota) pendant une résolution de conflit ou une correction la continue : même sujet, le rapport du travail reste. */
 const sujetEnCours = (e: Etat) => (e.conflits?.length && e.conflits.at(-1)?.resolu === undefined ? SUJET_CONFLIT
   : e.corrections?.length && e.corrections.at(-1)?.verte === undefined ? SUJET_CORRECTION : undefined);
+/** L781 : les commandes du projet qui appellent cadence (npm run news…) jouées avant la porte et commitées en un commit du lot (./regenerer.ts). */
+function regenererRun(e: Etat, out: (l: string) => void): { ok: boolean; sortie: string } | null {
+  const g = regenerer(e.worktree, e.id, e.lot);
+  if (g?.commit) out(`nouveautés régénérées avant la porte (L781) : commit ${g.commit} (${nommerFichiers(g.fichiers ?? [])})`);
+  return g;
+}
+/** Les commits de régénération du run arrivés sur la cible (relus à l'intégration : un commit retiré avant un rebase n'y est plus). */
+const regenerations = (e: Etat) => essaiGit(e.worktree, 'log', `--format=%h%x09%(trailers:key=${TRAILER_REGENERATION},valueonly)`, `${e.base}..HEAD`).stdout
+  .split('\n').map((l) => l.split('\t')).filter(([, v]) => v?.trim() === e.id).map(([h]) => h);
 const enBref = (sortie: string) => { const l = sortie.split('\n').map((x) => x.trim()).filter(Boolean); return l.length > 1 ? `${l[0]} … ${l.at(-1)}` : l[0] ?? ''; };
 const correctionFaite = (c: Correction) => `porte rouge (${enBref(c.rouge)}) corrigée par la session, porte verte ensuite${c.message ? ` ; la session : ${c.message}` : ''}`;
 const conflitResolu = (e: Etat, c: Conflit) => `conflit au rebase sur ${e.cible} (${c.sur.slice(0, 7)}) résolu par la session, fichiers : ${c.fichiers.join(', ')}`
@@ -288,6 +298,7 @@ function suite(e: Etat, o: Opts): Etat {
   if (!commandesDeCadenceYaml(e.worktree).length && !o.sansPorte) return arretSansCommande();
   const br = git(e.worktree, 'rev-parse', '--abbrev-ref', 'HEAD');
   for (let rebase = 1; ; rebase++) {
+    retirerRegeneration(e.worktree, e.id); // L781 : rejouée après le rebase, sur la cible à jour (sans conflit sur un fichier généré)
     const cible = git(e.repo, 'rev-parse', e.cible), arret = rebaser(e, o, cible);
     if (arret) return arret;
     // Porte complète : une fois ; rouge, la même session corrige une fois et la porte est rejouée (C3 : un seul site de porte).
@@ -297,7 +308,8 @@ function suite(e: Etat, o: Opts): Etat {
       const r = registreTouche(e.worktree, e.registre, cible); // L701 : sans option, rien au registre ; --registre D-n, aucune entrée neuve
       const vieux = r ? null : perime(e, o.out);
       if (vieux) { e.etat = 'environnement-perime'; e.detail = vieux; return fin(e, o); } // L764 : pas de rouge trompeur, pas de correction demandée à la session
-      const p = r ? { ok: false, sortie: r } : jouerPorte(cmds, e.worktree);
+      const g = r ? null : regenererRun(e, o.out); // L781 : avant la porte, qui juge le commit intégré, données générées comprises
+      const p = r ? { ok: false, sortie: r } : g && !g.ok ? g : jouerPorte(cmds, e.worktree);
       const c = e.corrections?.at(-1), attendue = c?.verte === undefined ? c : undefined;
       if (p.ok) {
         if (attendue) { attendue.verte = true; sauver(e); o.out(correctionFaite(attendue)); }
@@ -316,9 +328,11 @@ function suite(e: Etat, o: Opts): Etat {
     o.out(`${e.cible} a avancé pendant la porte : rebase et porte rejouée (${rebase + 1}/${REBASES_MAX})`);
   }
   e.integre = git(e.repo, 'rev-parse', '--short', e.cible); e.etat = 'integre';
+  const regenere = regenerations(e);
   // L723 : intégré, mais une fusion écrite par la session est à relire ; L724 : de même pour une correction après porte rouge
   e.detail = [...(e.porte_changee ? [`${e.porte_changee} — à relire : la porte qui a jugé le run est la sienne`] : []),
-    ...(e.conflits ?? []).filter((c) => c.resolu).map((c) => conflitResolu(e, c)), ...(e.corrections ?? []).filter((c) => c.verte).map(correctionFaite)].join('\n');
+    ...(e.conflits ?? []).filter((c) => c.resolu).map((c) => conflitResolu(e, c)), ...(e.corrections ?? []).filter((c) => c.verte).map(correctionFaite),
+    ...(regenere.length ? [`nouveautés régénérées par le run avant la porte (L781) : commit ${regenere.join(', ')}`] : [])].join('\n');
   const registre = registreOuvert(e.worktree);
   retirerRun(e);
   return fin(e, o, registre);

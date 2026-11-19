@@ -118,12 +118,15 @@ const FLAGS_CLI: Record<string, string[]> = {
   'src/bench/preparer.ts': ['no-hardlinks', 'format', 'is-ancestor', 'all', 'expire', 'prune', 'not'],
   'src/bench/ajouter.ts': ['format', 'reverse', 'grep', 'verify', 'name-only'],
   'src/sequence/mesures.ts': ['porcelain', 'others', 'exclude-standard', 'reporter', 'outputFile', 'yes', 'reporters', 'output', 'silent', 'ignore', 'name-only', 'gitignore'], // flags git, vitest et jscpd (S2, S7 : --gitignore), aucune option de cadence2
-  'src/run/run.ts': ['verify', 'show-toplevel', 'count', 'abort', 'abbrev-ref', 'short', 'ff-only', 'force', 'resume', 'session-id', 'git-path', 'continue', 'skip', 'name-only', 'diff-filter', 'is-ancestor'], // git, claude --resume (reprise de la même session) et --session-id (L709 : id écrit dès le lancement) ; L722 : git status au départ du run lu par scripts/arbre-non-commite.mjs
+  'src/run/run.ts': ['verify', 'show-toplevel', 'count', 'abort', 'abbrev-ref', 'short', 'ff-only', 'force', 'resume', 'session-id', 'git-path', 'continue', 'skip', 'name-only', 'diff-filter', 'is-ancestor', 'format'], // git, claude --resume (reprise de la même session) et --session-id (L709 : id écrit dès le lancement) ; L722 : git status au départ du run lu par scripts/arbre-non-commite.mjs
   // L723 : rebase seul (--git-path, --diff-filter=U, --is-ancestor ; --continue et --skip dans la consigne de résolution), fichiers que le run modifie (--name-only)
   'src/run/cli.ts': ['show-toplevel'],
   // L745 (5e passe) : rev-parse --verify, worktree list --porcelain, status --porcelain --untracked-files --ignore-submodules, merge-base --is-ancestor,
   // rev-list --count --not, checkout --detach, for-each-ref --format ; git worktree remove est lancé sans --force
   'src/run/clore.ts': ['verify', 'porcelain', 'untracked-files', 'ignore-submodules', 'is-ancestor', 'count', 'not', 'detach', 'format'],
+  // L781 : git log --format (commits de régénération du run, à l'intégration) ; regenerer.ts : git status --porcelain --untracked-files, git log --format (trailer),
+  // git reset --keep (retirer la régénération avant un rebase), git rev-parse --short
+  'src/run/regenerer.ts': ['porcelain', 'untracked-files', 'format', 'keep', 'short'],
   'src/run/escalade.ts': ['json'], // L726 : raf list --json, la revue de code du lot dans le plan
   'src/registre.ts': ['name-only', 'diff-filter'], // git diff --name-only, --diff-filter=A (L701 : le registre touché sans option, entrée neuve avec --registre)
   'src/bench/sans-juge.ts': ['name-only'], // L733 : git diff --name-only base..HEAD, les fichiers que le bras a livrés
@@ -133,7 +136,7 @@ const FLAGS_CLI: Record<string, string[]> = {
 const prefixe = (k: string) => (k.startsWith('src/bench/') || k === 'src/sequence/cli.ts' || k === 'src/cli.ts' ? 'bench' : 'cadence2'); // l'aide de cli.ts et le banc séquence décrivent les options de « bench »
 // Budgets de R29 : relever un total ou un module (même sous le total) est une violation ; le baisser est permis.
 const BUDGET_R29: Record<string, { total: number; modules: Record<string, number> }> = {
-  noyau: { total: 3000, modules: { plan: 350, accueil: 200, run: 1032, porte: 250, deliver: 450, hooks: 215 } }, // R32 : hooks, mécanisme du bras candidat ; issue #57 : run 455, run.ts détassé, messages gardés à toute fin ; L722 : run 466 (+11), le départ nomme les fichiers non commités de l'arbre principal (pas de ligne tassée)
+  noyau: { total: 3000, modules: { plan: 350, accueil: 200, run: 1137, porte: 250, deliver: 450, hooks: 215 } }, // R32 : hooks, mécanisme du bras candidat ; issue #57 : run 455, run.ts détassé, messages gardés à toute fin ; L722 : run 466 (+11), le départ nomme les fichiers non commités de l'arbre principal (pas de ligne tassée)
   // L723 : run 520, rebase seul quand la cible avance pendant la porte (conflit rendu à la session, porte rejouée, arbre principal sale nommé), sans ligne tassée
   // L723 (revue, M1) : run 539, un conflit de rebase résolu est ajouté à l'état (conflits, détail de fin) et au journal sans remplacer le rapport du travail, sans ligne tassée
   // L722 (revue r1) : run 532 (-7), la lecture des fichiers non commités vient de scripts/arbre-non-commite.mjs, partagée avec src (copie retirée de run.ts)
@@ -177,6 +180,7 @@ const BUDGET_R29: Record<string, { total: number; modules: Record<string, number
   // L764 (revue r1) : run 923 (+6) : la porte changée par le run reprise au détail et sous la ligne de fin de l'état integre (porte_changee, comme L723), dite une fois par changement, sans ligne tassée
   // L767 : run 1027 (+104) : cadence run --purger [--dry-run] (purger.ts, délai run.purgeAfterDays) et --liste / --clore d'un run qui se reprend dont la tête est déjà sur la cible, sans ligne tassée
   // L773 (issue #64) : run 1032 (+5) : un journal par run --fond, nommé d'après l'id du run (nouvelIdRun, ID_RUN), sans ligne tassée.
+  // L781 : run 1137 (+105) : regenerer.ts, les commandes du projet qui appellent cadence (scripts.news, plan.onWrite) jouées par le run avant la porte et commitées, retirées puis rejouées avant un rebase, sans ligne tassée.
   // L775 : bench 1609 (+21), sequence 717 (+2), mesure 2326 : un appel refusé par le hook du bras n'est plus compté en fuite (refusParHook), sans ligne tassée.
   // L777 : bench 1672 (+63), mesure 2389 : « tests d'origine verts » compte les tests d'origine réussis par bras, marge de bruit (MARGE_CACHES, retirée en revue r1), sans ligne tassée.
   // L777 (revue r1) : bench 1693 (+21), mesure 2410 : marge retirée (candidat ≥ A test par test), lanceur compté seulement s'il a un bilan dans les deux journaux

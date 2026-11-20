@@ -4004,6 +4004,11 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-11-20
+  - id: L794
+    title: "cadence run : un lot visible rendu sans entrée Nouveautés (finance L182 et warhammer L67 le 20-11, 2e occurrence) — le brief bras-A.md:8 dit d'ignorer les « Nouveautés imposées par l'outil », lu par certaines sessions comme « pas d'entrée ». Le brief demande l'entrée (fichier docs/nouveautes/*.md écrit à la main, sans commande cadence, regenerer.ts rejoue le build) pour un lot visible, et la fin du run signale « Nouveautés manquante » (état ou ligne du rapport) quand le lot visible n'en a pas ; test qui le prouve"
+    status: todo
+    estimate: 1
+    created: 2026-11-20
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

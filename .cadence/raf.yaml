@@ -3998,6 +3998,7 @@ lots:
     estimate: 1
     created: 2026-11-19
     started: 2026-11-20
+    review: { date: 2026-11-20, verdict: "non conforme : 1 majeur — la session peut lancer cadence spec <lot> on|off, qui écrit le plan (seuls spec green et spec reseal sont interdits) ; 3 mineurs (revue r1 du 20-11)", commit: 098f74ee931add2471913b1ff21f2d2313a37309 }
   - id: L793
     title: "Étude (veille S47) : lire « Sous-agents Claude Code : leur coût réel en quota » (https://the-bearded-bear.com/blog/sous-agents-claude-code-consommation-quota) et « Harness agentique Claude Code : planner, générateur, évaluateur » (https://the-bearded-bear.com/blog/harness-agentique-claude-code-planner-generateur-evaluateur), les confronter à nos mesures (coût par livraison D-19, agents mécaniques sur Sonnet, découpage de cadence run) ; ouvrir un lot seulement si un gain mesurable en sort"
     status: todo

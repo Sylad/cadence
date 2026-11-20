@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runLot, type LotCtx } from '../src/orchestrate/cycle.js';
@@ -18,7 +18,16 @@ beforeEach(() => {
 });
 afterEach(() => {
   process.env.CADENCE_HOME = fileHome;
+  vi.useRealTimers();
 });
+/**
+ * L800 : les délais de takeRepoWrite (slowMs, pollMs, waitMs) se jouent sur une horloge simulée. À l'horloge réelle, une machine chargée qui
+ * suspend le processus plus longtemps que la fenêtre fait expirer plusieurs minuteurs à la fois ; Node les sert dans l'ordre de leur échéance,
+ * et le test voit alors un ordre qu'il ne demandait pas (l'échéance waitMs avant la ligne slowMs, la ligne slowMs avant l'erreur d'E/S).
+ * Seuls setTimeout/clearTimeout et Date sont simulés : les écritures de fichiers et git restent réelles.
+ */
+const clock = () => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+const tick = (ms: number) => vi.advanceTimersByTimeAsync(ms);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const until = async (f: () => boolean) => {
   for (let i = 0; i < 1000 && !f(); i++) await sleep(10);
@@ -135,21 +144,31 @@ describe('L670 — le verrou du dépôt, erreur d\'E/S', () => {
     mkdirSync(dir, { recursive: true });
     takeLock(file, { pid: process.ppid, wave: 'autre', started: new Date().toISOString() });
     const lines: string[] = [];
+    clock();
     const attente = takeRepoWrite(r, { wave: 'w' }, { slowMs: 60, pollMs: 5, onSlow: (w) => lines.push(w) });
-    await sleep(15);
+    const erreur = attente.then(
+      () => null,
+      (e: unknown) => e,
+    );
+    await tick(15);
+    expect(vi.getTimerCount()).toBe(2); // le minuteur de la ligne (60 ms) et le prochain essai sont armés
     rmSync(dir, { recursive: true, force: true });
-    await expect(attente).rejects.toThrow();
-    await sleep(120);
+    await tick(5); // l'essai suivant lève, bien avant les 60 ms
+    expect(await erreur).toBeInstanceOf(Error);
+    await tick(200);
     expect(lines).toEqual([]);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
 
 describe('L670 — toute attente de plus de 10 s dit au journal ce qu\'elle attend', () => {
   it('R6 — dépôt libre : aucune ligne d\'attente', async () => {
+    const r = gitRepo();
     const lines: string[] = [];
-    const g = await takeRepoWrite(gitRepo(), { wave: 'w' }, { slowMs: 20, onSlow: (w) => lines.push(w) });
+    clock();
+    const g = await takeRepoWrite(r, { wave: 'w' }, { slowMs: 20, onSlow: (w) => lines.push(w) });
     if (g.ok) g.release();
-    await sleep(60);
+    await tick(60);
     expect(lines).toEqual([]);
   });
 
@@ -158,11 +177,13 @@ describe('L670 — toute attente de plus de 10 s dit au journal ce qu\'elle atte
     const first = await takeRepoWrite(r, { wave: 'w' });
     if (!first.ok) throw new Error('premier tour refusé');
     const lines: string[] = [];
+    clock();
     const second = takeRepoWrite(r, { wave: 'w' }, { slowMs: 30, onSlow: (w) => lines.push(w) });
-    await sleep(10);
+    await tick(29);
     expect(lines).toEqual([]);
-    await until(() => lines.length > 0);
-    await sleep(80);
+    await tick(1);
+    expect(lines).toHaveLength(1);
+    await tick(80);
     expect(lines).toHaveLength(1);
     expect(lines[0]).toMatch(/file d'intégration du dépôt/);
     first.release();
@@ -174,7 +195,14 @@ describe('L670 — toute attente de plus de 10 s dit au journal ce qu\'elle atte
     const r = gitRepo();
     writeFileSync(join(sharedStateDir(r), INTEGRATION_LOCK), JSON.stringify({ pid: process.ppid, wave: 'autre', started: new Date().toISOString() }));
     const lines: string[] = [];
-    const g = await takeRepoWrite(r, { wave: 'w' }, { waitMs: 120, pollMs: 10, slowMs: 30, onSlow: (w) => lines.push(w) });
+    clock();
+    const attente = takeRepoWrite(r, { wave: 'w' }, { waitMs: 120, pollMs: 10, slowMs: 30, onSlow: (w) => lines.push(w) });
+    await tick(29);
+    expect(lines).toEqual([]);
+    await tick(1);
+    expect(lines).toHaveLength(1);
+    await tick(100); // l'échéance de 120 ms rend le porteur
+    const g = await attente;
     expect(g.ok).toBe(false);
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain(`vague autre (pid ${process.ppid})`);

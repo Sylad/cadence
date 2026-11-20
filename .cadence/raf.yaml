@@ -3994,15 +3994,16 @@ lots:
     created: 2026-11-19
   - id: L792
     title: "Issue #68 (compte pro) : le brief de cadence run ne nomme pas cadence spec check — une session chargée d'amener des fiches d'écran à « fiche valide » n'a jamais lancé la commande, a reconstruit les règles depuis git et s'est crue à 0 écart (97 restaient ; run 20261119121911-828448). Cause : découverte, pas permission. Nommer les commandes de vérification du projet (spec check, et celles de cadence.yaml) dans le brief quand le lot ou la demande touche des fiches, et le tester sur le texte du brief rendu"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-19
     started: 2026-11-20
-    review: { date: 2026-11-20, verdict: "conforme : M1 et 3 mineurs de r1 traités (hook seul-spec-check refuse cadence spec on|off, 33 commandes testées) ; mineurs — contournements volontaires (node dist/cli.js, /usr/bin/env, npx cadence@version, eval, xargs) non couverts ni documentés ; faux positif sur heredoc non cité de git commit -F (revue r2 du 20-11)", commit: 9966fbc5206188e84a7ea5beda4d993404da05b5 }
+    review: { date: 2026-11-20, verdict: "conforme : r2 conforme (098f74e, 9966fbc) ; t1 (30834b46) relu par le lead — 5 contournements de la r2 reconnus, corps de heredoc ignoré, limites (variables, eval, xargs, sh -c) écrites dans la doc ; 6 tests rouges avant / verts après, 16/16 rejoués", commit: 30834b46f5f10042f5713f18837095fe1210a596 }
     tasks:
       - { id: t1, title: "Hook seul-spec-check : node …/dist/cli.js spec L1 on, node bin/raf.js, /usr/bin/env cadence, npx cadence@<version> passent (rc 0) ; les reconnaître, dire dans la doc que variables, eval et xargs ne sont pas lus ; faux positif git commit -F - <<EOF dont une ligne commence par cadence/raf", status: done }
     notes:
       - { date: 2026-11-20, text: "20-11 : L792/t1 relu par le lead (30834b46 : 6 tests qui échouent avant et passent après, 16/16 rejoués, suite complète 10 892 verte au run) — mineur de la r2, pas de 3e revue" }
+    finished: 2026-11-20
   - id: L793
     title: "Étude (veille S47) : lire « Sous-agents Claude Code : leur coût réel en quota » (https://the-bearded-bear.com/blog/sous-agents-claude-code-consommation-quota) et « Harness agentique Claude Code : planner, générateur, évaluateur » (https://the-bearded-bear.com/blog/harness-agentique-claude-code-planner-generateur-evaluateur), les confronter à nos mesures (coût par livraison D-19, agents mécaniques sur Sonnet, découpage de cadence run) ; ouvrir un lot seulement si un gain mesurable en sort"
     status: todo
@@ -4010,9 +4011,10 @@ lots:
     created: 2026-11-20
   - id: L794
     title: "cadence run : un lot visible rendu sans entrée Nouveautés (finance L182 et warhammer L67 le 20-11, 2e occurrence) — le brief bras-A.md:8 dit d'ignorer les « Nouveautés imposées par l'outil », lu par certaines sessions comme « pas d'entrée ». Le brief demande l'entrée (fichier docs/nouveautes/*.md écrit à la main, sans commande cadence, regenerer.ts rejoue le build) pour un lot visible, et la fin du run signale « Nouveautés manquante » (état ou ligne du rapport) quand le lot visible n'en a pas ; test qui le prouve"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-20
+    started: 2026-11-20
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

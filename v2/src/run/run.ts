@@ -15,12 +15,12 @@ import { lignePasses, modeleDeDepart, modeleDit, numeroCorrection, PASSE_FABLE, 
 import { heureLocale, reconnaitreQuota, type Quota } from './quota.js';
 import { causeSession } from '../trace.js';
 import { CONSIGNE_FINI, garderRapport, origineRapport, type EtatRapport } from '../rapport.js';
-import { cheminWorktree, PORTE_MS, reglagesRun } from '../socle.js';
+import { cheminWorktree, HOOKS, PORTE_MS, reglagesRun } from '../socle.js';
 import { briefRegistre, entreeCommitee, preparerRegistre, registreOuvert, registreTouche } from '../registre.js';
 import { fichiersNonCommites, nommerFichiers, PLAN_EN_ATTENTE } from '../../../scripts/arbre-non-commite.mjs'; // L722 : même lecture que src/repo-held.ts
 import { environnementPerime, ignorerPerime, lignesPerime } from '../../../scripts/environnement-porte.mjs'; // L764 : même lecture que src/verify-gate.ts
 import { regenerer, retirerRegenerations, TRAILER_REGENERATION } from './regenerer.js';
-import { commandesNommees, interditsPourSpec, leverPourSpec } from '../../../scripts/commandes-du-brief.mjs'; // L792 : commandes du projet nommées au brief
+import { avecRefusCadence, commandesNommees, interditsPourSpec, leverPourSpec } from '../../../scripts/commandes-du-brief.mjs'; // L792 : commandes du projet nommées au brief
 import { noterVerdict } from '../../../scripts/verdicts-porte.mjs'; // L786 : même écriture que src/gate-verdict.ts (verify --gate)
 import { lireEtapes } from '../../../scripts/etapes-porte.mjs'; // L786 (revue r1, M1) : mêmes étapes que verify --gate
 import { debutProcessus, inscrireCreneau, occupantVivant, prendreVerrou, rendreVerrou, roleVerrou } from '../verrou.js';
@@ -48,7 +48,10 @@ export interface Etat extends EtatRapport { id: string; repo: string; branche: s
   /** L745 (clore.ts) : la tête du worktree à la fin d'un run non intégré (archivée par --clore, lue par --liste quand la branche est retirée) ; `clos` : posé par
    * --clore, avec ses archives et ce qui est resté (worktree non propre, branche) ; `force` : un état clos avant la 5e passe, sans preuve d'intégration. */
   tete?: string; /** Revue L764 r1 (M3) : la porte lue au commit du run quand elle diffère de celle de la cible, reprise au détail de l'état integre. */
-  porte_changee?: string; /** L792 : le brief nomme `cadence spec check` (scripts/commandes-du-brief.mjs) ; la session peut la lancer, reprises comprises. */ spec_check?: boolean; clos?: { date: string; cible: string; tete: string; integre?: boolean; archives?: string[]; restes?: string[]; force?: true } }
+  porte_changee?: string;
+  /** L792 : le brief nomme `cadence spec check` (scripts/commandes-du-brief.mjs) ; la session peut la lancer, reprises comprises. */
+  spec_check?: boolean;
+  clos?: { date: string; cible: string; tete: string; integre?: boolean; archives?: string[]; restes?: string[]; force?: true } }
 /** `maintenant` et `attendre` : l'horloge et l'attente du quota (D-15), simulées par les tests ; `attendre: null` rend la main sans attendre la remise à zéro. */
 interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null }
 
@@ -175,7 +178,9 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false, sujet?: string
   e.passes = [...(e.passes ?? []), { quoi: quoiPasse(e, neuve, sujet), modele: e.modele ?? 'opus', raison: e.modele_raison ?? (e.modele ? 'choisi au lancement' : 'par défaut') }]; // L726
   sauver(e);
   const bras = { ...(e.mode === 'leger' ? BRAS_LEGER : BRAS_COMPLET), modele: e.modele ?? 'opus' }; // L763 : ses hooks s'ajoutent à ceux du socle
-  const brut = exec(['-p', prompt, ...(neuve ? ['--session-id', e.session] : e.session ? ['--resume', e.session] : []), ...argsClaude(bras, e.worktree, interdits, reglagesRun(e.worktree, process.env, bras.settings))], { cwd: e.worktree, env }); // L705 : coupes du socle (../socle.ts)
+  const socle = reglagesRun(e.worktree, process.env, bras.settings);
+  const reglages = e.spec_check ? avecRefusCadence(socle, HOOKS) : socle; // L792 (revue r1, M1) : tout cadence ou raf hors spec check|qa refusé par hook
+  const brut = exec(['-p', prompt, ...(neuve ? ['--session-id', e.session] : e.session ? ['--resume', e.session] : []), ...argsClaude(bras, e.worktree, interdits, reglages)], { cwd: e.worktree, env }); // L705 : coupes du socle (../socle.ts)
   const id = ajouterSession(claudeVide(), brut.stdout).modeles.join(', '); // L756 (issue #61) : l'id exact de la session, pas l'alias passé à --model
   if (id) e.passes.at(-1)!.id_modele = id;
   const r = lire(brut), cause = causeSession(brut); if (cause) o.out(cause); // L711 : une session arrêtée par un signal le dit dans le journal, avant la suite habituelle
@@ -410,9 +415,10 @@ export function executerRun(a: { id?: string; repo: string; demande: string; pie
   git(repo, 'worktree', 'add', '-q', '-b', `cadence/run-${id}`, worktree, 'HEAD');
   copierDeps(repo, worktree);
   const aig = aiguiller(a.demande, worktree, a.pieces ?? [], a.complet);
-  const nommees = commandesNommees(worktree, orchestrate(worktree), a.demande); // L792 : lues au commit du run, comme sa porte
+  const nommees = commandesNommees(worktree, orchestrate(worktree), a.demande, a.lot); // L792 : lues au commit du run, comme sa porte
   const e: Etat = { id, repo, branche: `cadence/run-${id}`, cible, base: git(worktree, 'rev-parse', 'HEAD'), worktree, fichier: join(runs, `${basename(repo)}-${id}.json`),
-    demande: a.demande, pieces: aig.pieces.map((p) => chemin(worktree, p)), taille: a.taille ?? 'fonction', mode: aig.mode, modele, acces_cluster: orchestrate(worktree).prodAccess === true, registre: a.registre, ...(a.lot ? { lot: a.lot } : {}), ...(nommees.nommeSpec ? { spec_check: true } : {}),
+    demande: a.demande, pieces: aig.pieces.map((p) => chemin(worktree, p)), taille: a.taille ?? 'fonction', mode: aig.mode, modele, acces_cluster: orchestrate(worktree).prodAccess === true, registre: a.registre, ...(a.lot ? { lot: a.lot } : {}),
+    ...(nommees.nommeSpec ? { spec_check: true } : {}),
     modele_raison: depart.raison, ...(depart.correctionRevue ? { correction_revue: true } : {}), ...(depart.correctionsAvant ? { corrections_avant: depart.correctionsAvant } : {}),
     ...(depart.revue ? { revue: depart.revue } : {}), ...(a.journal ? { journal: a.journal } : {}), session: crypto.randomUUID(), cout_usd: 0, etat: 'en-cours', detail: '', debut: new Date().toISOString() };
   sauver(e);

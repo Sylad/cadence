@@ -136,7 +136,7 @@ const FLAGS_CLI: Record<string, string[]> = {
 const prefixe = (k: string) => (k.startsWith('src/bench/') || k === 'src/sequence/cli.ts' || k === 'src/cli.ts' ? 'bench' : 'cadence2'); // l'aide de cli.ts et le banc séquence décrivent les options de « bench »
 // Budgets de R29 : relever un total ou un module (même sous le total) est une violation ; le baisser est permis.
 const BUDGET_R29: Record<string, { total: number; modules: Record<string, number> }> = {
-  noyau: { total: 3000, modules: { plan: 350, accueil: 200, run: 1178, porte: 250, deliver: 450, hooks: 215 } }, // R32 : hooks, mécanisme du bras candidat ; issue #57 : run 455, run.ts détassé, messages gardés à toute fin ; L722 : run 466 (+11), le départ nomme les fichiers non commités de l'arbre principal (pas de ligne tassée)
+  noyau: { total: 3000, modules: { plan: 350, accueil: 200, run: 1184, porte: 250, deliver: 450, hooks: 231 } }, // R32 : hooks, mécanisme du bras candidat ; issue #57 : run 455, run.ts détassé, messages gardés à toute fin ; L722 : run 466 (+11), le départ nomme les fichiers non commités de l'arbre principal (pas de ligne tassée)
   // L723 : run 520, rebase seul quand la cible avance pendant la porte (conflit rendu à la session, porte rejouée, arbre principal sale nommé), sans ligne tassée
   // L723 (revue, M1) : run 539, un conflit de rebase résolu est ajouté à l'état (conflits, détail de fin) et au journal sans remplacer le rapport du travail, sans ligne tassée
   // L722 (revue r1) : run 532 (-7), la lecture des fichiers non commités vient de scripts/arbre-non-commite.mjs, partagée avec src (copie retirée de run.ts)
@@ -185,7 +185,9 @@ const BUDGET_R29: Record<string, { total: number; modules: Record<string, number
   // L784 : run 1156 (+4) : la porte du run note son verdict (scripts/verdicts-porte.mjs) là où le hook pre-push le lit, comme verify --gate (L786), sans ligne tassée.
   // L784 (revue r1) : run 1174 (+18) : la porte du run joue les étapes de verify --gate (scripts/etapes-porte.mjs : build puis test, parties comprises) et ne note un verdict
   // que pour un arbre égal au commit avant et après la porte, au même HEAD (M1, M2), sans ligne tassée.
-  // L792 : run 1178 (+4) : le brief nomme les commandes de vérification du projet quand il a des fiches (scripts/commandes-du-brief.mjs), sans ligne tassée.
+  // L792 : run 1178 (+4) : le brief nomme les commandes de vérification du projet quand il a des fiches (scripts/commandes-du-brief.mjs).
+  // L792 (revue r1) : run 1184 (+6), hooks 231 (+16) : seul-spec-check.mjs refuse tout cadence ou raf hors spec check|qa (M1) ; type Etat et état initial
+  // détassés (m3 : une seule ligne de run.ts au-delà de 250 colonnes, deux avant le lot).
   // L775 : bench 1609 (+21), sequence 717 (+2), mesure 2326 : un appel refusé par le hook du bras n'est plus compté en fuite (refusParHook), sans ligne tassée.
   // L777 : bench 1672 (+63), mesure 2389 : « tests d'origine verts » compte les tests d'origine réussis par bras, marge de bruit (MARGE_CACHES, retirée en revue r1), sans ligne tassée.
   // L777 (revue r1) : bench 1693 (+21), mesure 2410 : marge retirée (candidat ≥ A test par test), lanceur compté seulement s'il a un bilan dans les deux journaux
@@ -288,8 +290,8 @@ const mutations: [string, string, string, (t: string) => string][] = [
   ['C4', 'total noyau relevé', 'budget.json', remplace('"total": 3000', '"total": 3500')],
   ['C4', 'budget sequence relevé', 'budget.json', remplace('"sequence": 717', '"sequence": 900')],
   ['C4', 'budget plan relevé sous le total', 'budget.json', remplace('"plan": 350', '"plan": 1000')],
-  ['C4', 'budget hooks relevé (R32)', 'budget.json', remplace('"hooks": 215', '"hooks": 300')],
-  ['C4', 'hooks déplacé dans la mesure', 'budget.json', (t) => t.replace('"deliver": 450, "hooks": 215', '"deliver": 450').replace('"sequence": 717', '"sequence": 717, "hooks": 215')],
+  ['C4', 'budget hooks relevé (R32)', 'budget.json', remplace('"hooks": 231', '"hooks": 300')],
+  ['C4', 'hooks déplacé dans la mesure', 'budget.json', (t) => t.replace('"deliver": 450, "hooks": 231', '"deliver": 450').replace('"sequence": 717', '"sequence": 717, "hooks": 231')],
   ['C4', 'module sans budget R29', 'budget.json', remplace('"bench": 1693', '"bench": 1693, "outil": 100')],
   ['C4', 'groupe de budget ajouté', 'budget.json', remplace(/\n}\s*$/, ',\n  "autre": { "total": 900, "modules": {} }\n}')],
   ['C4', "option(reste,'zzz') sans entrée", 'src/bench/cli.ts', remplace("option(reste, 'taille')", "option(reste, 'zzz')")],

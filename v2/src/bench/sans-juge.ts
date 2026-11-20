@@ -19,7 +19,8 @@ export function mesurerSansJuge(b: Banc, clone: string, delaiMs = 30 * 60_000, r
   try {
     for (const f of tests) { const c = join(clone, nomCache(f)); if (!existsSync(c)) { mkdirSync(dirname(c), { recursive: true }); copyFileSync(join(origine, f), c); poses.push(c); } }
     const caches_ok = shell('tests d\'origine', b.tests, clone, `${clone}.tests-origine${j}.log`, delaiMs) === 0;
-    const n = cachesReussis(lireJournal(`${clone}.tests-origine${j}.log`), lireJournal(`${clone}.tests-bras${j}.log`));
+    const journal = lireJournal(`${clone}.tests-origine${j}.log`), brut = cachesReussis(journal, lireJournal(`${clone}.tests-bras${j}.log`));
+    const n = brut && exclureTests(brut, journal, TESTS_HORS_COMPTE[b.id] ?? []);
     return { suite_ok, caches_ok, ...(n && { caches_reussis: n.par_lanceur, ...(n.hors_compte.length > 0 && { caches_hors_compte: n.hors_compte }) }) };
   } finally { for (const p of poses) rmSync(p, { force: true }); }
 }
@@ -70,6 +71,48 @@ export function cachesReussis(origine: string, bras: string): CompteCaches | nul
     else par_lanceur[k] = Math.max(0, o[k].reussis - b[k].reussis);
   }
   return Object.keys(par_lanceur).length || hors_compte.length ? { par_lanceur, hors_compte } : null;
+}
+
+/** L798 : un test d'origine laissé hors du compte des deux bras, avec sa raison (docs/v2/banc.md, « Tests d'origine hors compte »). `fichier` : son nom
+ * posé dans le clone (`nomCache`), `nom` : son titre complet tel que jest l'écrit (`describe › it`). */
+export interface TestHorsCompte { lanceur: 'jest'; fichier: string; nom: string; raison: string }
+/**
+ * L798 : tests d'origine retirés du compte, par banc. Seul ajout permis : un test dont le résultat suit un choix d'écriture du bras et non le comportement
+ * qu'il nomme, prouvé sur les journaux des deux bras, raison écrite ici et dans la doc. Il sort du compte des DEUX bras ; tous les autres restent
+ * comptés test par test (L777).
+ */
+export const TESTS_HORS_COMPTE: Record<string, TestHorsCompte[]> = {
+  '3-ol-companion-L241': [{
+    lanceur: 'jest', fichier: 'standings.service.rankings.cache-banc.spec.ts',
+    nom: 'StandingsService — tracker de classement recalculé (L241) › résultats de la ligue en échec (HTTP 503) : le tracé existant est conservé',
+    // banc du 20-11 11:11 : rouge pour cadence-run (ENOENT ligne 84, son `getCurrentStandings` n'écrit plus le tracker) et vert pour A (qui l'écrit, faux),
+    // aux deux passages de chaque bras ; les deux bras conservent le tracker sur un 503.
+    raison: 'sa précondition (un tracker écrit par getCurrentStandings) suit le chemin d\'écriture du bras, pas la conservation sur un 503',
+  }],
+};
+
+/** L798 : vrai si le journal jest montre le test passé : un bilan jest, et ni `● <nom>` ni « Test suite failed to run » dans un bloc FAIL de son fichier. */
+export function testReussiJest(journal: string, fichier: string, nom: string): boolean {
+  if (!bilans(journal)?.jest) return false;
+  let dans = false;
+  for (const brute of journal.replace(SANS_ANSI, '').split('\n')) {
+    const l = brute.trim(), m = /^(PASS|FAIL)\s+(\S+)/.exec(l);
+    if (m) { dans = m[2] === fichier || m[2].endsWith(`/${fichier}`); continue; }
+    if (dans && (l === '● Test suite failed to run' || l === `● ${nom}`)) return false;
+  }
+  return true;
+}
+
+/** L798 : retire du compte d'un bras chaque test de `exclus` qu'il a réussi, et le nomme hors compte (réussi ou raté) avec sa raison. */
+export function exclureTests(n: CompteCaches, journal: string, exclus: TestHorsCompte[]): CompteCaches {
+  const par_lanceur = { ...n.par_lanceur }, hors_compte = [...n.hors_compte];
+  for (const x of exclus) {
+    if (par_lanceur[x.lanceur] === undefined) continue;
+    const ok = testReussiJest(journal, x.fichier, x.nom);
+    if (ok) par_lanceur[x.lanceur] = Math.max(0, par_lanceur[x.lanceur] - 1);
+    hors_compte.push(`${x.lanceur} : « ${x.nom.split(' › ').pop()} » (${x.fichier}, ${ok ? 'réussi' : 'raté'}) : ${x.raison}`);
+  }
+  return { par_lanceur, hors_compte };
 }
 
 /** L733 : chemins qui ne sont pas le travail d'un banc (plan, registre, docs, captures MCP, Markdown). */

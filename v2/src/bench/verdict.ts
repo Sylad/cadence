@@ -9,6 +9,8 @@ import { avisLu, type Jugement, type Meca } from './juges.js';
 export interface MesureSansJuge { suite_ok: boolean; caches_ok: boolean | null; caches_reussis?: Record<string, number>; caches_hors_compte?: string[]; rejoue?: { suite_ok: boolean; caches_ok: boolean | null } }
 export interface ResultatBanc { banc: string; taille: Taille; visible: boolean; reponses: boolean; frais: boolean;
   mesures: Record<string, Mesure>; jugement: Jugement | null; fuites: Record<string, string[]>; fuites_a_verifier?: Record<string, string[]>;
+  /** L798 : fuites certaines de la référence sans effet possible sur le candidat (`fuiteSansEffet`, fuites.ts) : signalées, non bloquantes. */
+  fuites_signalees?: Record<string, string[]>;
   sans_juge?: Record<string, MesureSansJuge>;
   /** L733 : bras qui n'ont livré aucun fichier hors plan et doc, et la raison ; le banc n'est alors pas mesuré (sans juge seulement). */
   non_livre?: Record<string, string> }
@@ -42,6 +44,8 @@ function avisParBanc(res: ResultatBanc[], champ: 'prefere' | 'ui'): { id: string
 }
 const detail = (av: { id: string; label: string }[]) => av.map((x) => `${x.id} : ${x.label}`).join(' · ');
 
+/** L798 : critère non bloquant qui nomme les fuites de la référence sans effet possible sur le candidat. */
+export const FUITES_SIGNALEES = 'fuites de la référence sans effet sur le candidat';
 const c = (nom: string, valeur: string, seuil: string, ok: boolean, bloquant = true): Critere => ({ nom, valeur, seuil, ok, bloquant });
 /** L737 : à partir de cet écart entre deux bras identiques, un banc ne départage plus un vrai × 2 : son temps devient indicatif. */
 export const BRUIT_MAX = 2;
@@ -186,12 +190,14 @@ function critereCaches(mes: ResultatBanc[], ref: string, cand: string): Critere 
 function communs(res: ResultatBanc[], ref: string, cand: string, barre: Barre): { avant: Critere[]; apres: Critere[] } {
   const inutiles = somme(res.filter((r) => !r.reponses).map((r) => r.mesures[cand]?.questions ?? 0));
   const fuites = res.flatMap((r) => Object.entries(r.fuites).flatMap(([b, ps]) => ps.map((p) => `${r.banc}/${b} : ${p}`)));
+  const signalees = res.flatMap((r) => Object.entries(r.fuites_signalees ?? {}).flatMap(([b, ps]) => ps.map((p) => `${r.banc}/${b} : ${p}`)));
   const echecs = res.flatMap((r) => [ref, cand].flatMap((b) => { const e = r.mesures[b]?.echec; return e ? [`${r.banc}/${b} : ${e}`] : []; }));
   const manquants = res.flatMap((r) => [ref, cand].filter((b) => !r.mesures[b]).map((b) => `${r.banc}/${b}`));
   const avant = [
     c('au moins un banc', `${res.length}`, '≥ 1', res.length >= 1),
     c('mesures complètes', manquants.length ? manquants.join(' ; ') : 'toutes', 'toutes', manquants.length === 0),
     c('aucune fuite', fuites.length ? fuites.join(' ; ') : '0', '0', fuites.length === 0),
+    ...(signalees.length ? [c(FUITES_SIGNALEES, signalees.join(' ; '), '0 (signalé)', false, false)] : []),
     c('aucun bras en échec', echecs.length ? echecs.join(' ; ') : '0', '0', echecs.length === 0),
   ];
   const apres = [
@@ -277,7 +283,7 @@ export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdi
     ...(e.duree_s !== undefined ? [`Durée du passage : ${e.duree_s} s`] : []), ...(e.charge ?? []), '', // L762 : charge de la machine
     `| Banc | Temps ${ref} | Temps ${cand} | Tokens ${ref} | Tokens ${cand} | Préféré | Cachés ${ref} · ${cand} | Mutations ${ref} · ${cand} | Suite ${ref} · ${cand} | Attendu ${ref} · ${cand} | Taille déclarée ${ref} · ${cand} |`,
     '|---|---|---|---|---|---|---|---|---|---|---|', ...lignes, '', '| Critère | Valeur | Seuil | Résultat |', '|---|---|---|---|',
-    ...v.criteres.map((c) => `| ${c.nom} | ${c.valeur} | ${c.seuil} | ${c.ok ? 'ok' : c.bloquant ? '**ROUGE**' : c.nom === 'bras qui ont livré le travail' ? '**non livré**' : 'en dessous (indicatif)'} |`), '',
+    ...v.criteres.map((c) => `| ${c.nom} | ${c.valeur} | ${c.seuil} | ${c.ok ? 'ok' : c.bloquant ? '**ROUGE**' : c.nom === 'bras qui ont livré le travail' ? '**non livré**' : c.nom === FUITES_SIGNALEES ? '**signalé**' : 'en dessous (indicatif)'} |`), '',
     ...(rejoues.length ? ['## Suites rejouées', '', 'Rouge pendant que les autres bancs tournaient, rejouée seule après eux : le rejeu compte (L734).', '', ...rejoues, ''] : []),
     ...(nonLivres.length ? ['## Bancs non mesurables', '', 'Un bras n\'a livré aucun fichier hors plan et doc : son temps ne compte pas, ni en victoire ni en défaite. Rejouer le passage.', '', ...nonLivres, ''] : []),
     ...(e.eclair ? ['## Contrôles éclair', '', ...e.eclair.map((l) => `- ${l}`), ''] : []),

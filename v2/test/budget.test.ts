@@ -93,9 +93,12 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // bilans jest, vitest et pytest) avec une marge de bruit (MARGE_CACHES, retirée en revue r1 : elle ne venait pas de bras identiques), sans ligne tassée.
   // L777 (revue r1) : bench 1693 (+21), mesure 2410 : marge retirée, candidat ≥ A test par test ; un lanceur ne compte que s'il a un bilan dans les deux
   // journaux et aucun rouge dans la suite seule (cachesReussis), sinon le banc est non mesurable, sans ligne tassée.
-  it('les totaux sont ceux de R29 : noyau 3000, mesure 2410 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742, L752, L756, L762, L775, L777)', () => {
+  // L798 : bench 1765 (+72), mesure 2482 : un test d'origine dont le résultat suit le chemin d'écriture du bras sort du compte des deux bras, nommé
+  // (TESTS_HORS_COMPTE, testReussiJest, exclureTests), et une fuite de la référence sans effet possible sur le candidat est signalée sans rougir
+  // (fuiteSansEffet, trierFuitesReference, critère non bloquant), sans ligne tassée.
+  it('les totaux sont ceux de R29 : noyau 3000, mesure 2482 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742, L752, L756, L762, L775, L777, L798)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
-    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2410]);
+    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2482]);
   });
   for (const [nom, g] of Object.entries(budget)) {
     it(`groupe ${nom} : la somme des budgets ne dépasse pas ${g.total}`, () =>

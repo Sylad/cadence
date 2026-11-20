@@ -9,7 +9,7 @@ import { chargerBanc, listerBancs, piecesBanc, racineBanc, type Banc } from './b
 import { chargeMachine, lignesCharge, nombreCoeurs, nommer, occupants, refusCharge, registreCreneaux, type Charge } from './charge.js';
 import { chargerBras, executeurClaude, lancerBras, libererReglages, type DefBras, type Executeur, type Mesure } from './bras.js';
 import { enteteEnvironnement, environnement, ligneComparaison, modelesExacts, passagePrecedent, versionClaude, type Environnement } from './environnement.js';
-import { fuitesDuBras } from './fuites.js';
+import { fuitesDuBras, trierFuitesReference } from './fuites.js';
 import { etatGit, juger, travailNonLivre, type Jugement } from './juges.js';
 import { preparer } from './preparer.js';
 import { mesurerSansJuge, sansLivrable } from './sans-juge.js';
@@ -129,6 +129,7 @@ export function jouerBanc(t: Tache, exec: Executeur, prep: typeof preparer, out:
   const ordre = (t.i + t.k - 1 + (t.joues ?? 0)) % 2 === 0 ? [t.ref, t.cand] : [t.cand, t.ref];
   const idBanc = idTache(t); const sous = t.N > 1 ? join(t.bid, `r${t.k}`) : t.bid;
   const mesures: Record<string, Mesure> = {}; const clones: Record<string, string> = {}; const fuites: Record<string, string[]> = {}; const aVerifier: Record<string, string[]> = {}; const suiteBase: Record<string, number> = {}; const bases: Record<string, string> = {};
+  const fuitesSignalees: Record<string, string[]> = {};
   const mapping: Record<string, string> = {}; // c1/c2 -> bras : écrit seulement après les juges (aveugle)
   let jugement: Jugement | null = null; let sansJuge: Record<string, MesureSansJuge> | undefined; let nonLivre: Record<string, string> | undefined; let phase = 'banc invalide'; let b: Banc | undefined;
   const aller = (p: string) => { phase = p; signaler(p); };
@@ -144,6 +145,10 @@ export function jouerBanc(t: Tache, exec: Executeur, prep: typeof preparer, out:
       mesures[n] = { ...m, banc: idBanc, echec: m.echec ?? travailNonLivre(avant, etatGit(c)), taille_declaree: tailleDeclaree(c, avant.head) };
       aller('fuites'); const fu = fuitesDuBras(t.home, t.racine, t.bid, c); fuites[n] = fu.certaines; aVerifier[n] = fu.a_verifier;
     });
+    if (clones[t.ref] && clones[t.cand]) { // L798 : une fuite de la référence sans effet possible sur le candidat est signalée, pas bloquante
+      const tri = trierFuitesReference(fuites[t.ref], join(t.dirRun, sous), clones[t.cand]);
+      fuites[t.ref] = tri.bloquantes; if (tri.signalees.length) fuitesSignalees[t.ref] = tri.signalees;
+    }
     if (ordre.some((n) => mesures[n].echec !== null)) out(`${idBanc} : un bras en échec, ${t.sansJuge ? 'mesure sautée' : 'juges sautés'}`);
     else if (t.sansJuge) {
       // L733 : sans juge, rien d'autre ne verrait qu'un bras n'a écrit que du plan ou de la doc ; son temps ne compte pas, le banc est à rejouer
@@ -167,7 +172,7 @@ export function jouerBanc(t: Tache, exec: Executeur, prep: typeof preparer, out:
     out(`${idBanc} : ${msg}`);
   }
   const r: ResultatBanc = { banc: idBanc, taille: b?.taille ?? 'fonction', visible: b?.visible ?? false, reponses: b?.reponses ?? false, frais: b?.frais ?? false,
-    mesures, jugement, fuites, fuites_a_verifier: aVerifier, ...(sansJuge && { sans_juge: sansJuge }), ...(nonLivre && { non_livre: nonLivre }) };
+    mesures, jugement, fuites, fuites_a_verifier: aVerifier, ...(Object.keys(fuitesSignalees).length && { fuites_signalees: fuitesSignalees }), ...(sansJuge && { sans_juge: sansJuge }), ...(nonLivre && { non_livre: nonLivre }) };
   mkdirSync(join(t.dirRun, sous), { recursive: true });
   writeFileSync(join(t.dirRun, sous, 'resultat.json'), JSON.stringify({ ...r, clones: mapping, suite_base: suiteBase }, null, 2));
   const aRejouer = ordre.filter((n) => sansJuge && (!sansJuge[n].suite_ok || sansJuge[n].caches_ok === false)); // L734 : rouge peut-être de charge, clone gardé

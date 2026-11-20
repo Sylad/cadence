@@ -102,6 +102,24 @@ export function chercherFuites(lignes: string[], r: Regles, home: string, cwd = 
 export const jsonl = (dir: string): string[] => (!existsSync(dir) ? [] : readdirSync(dir).flatMap((e) => {
   const p = join(dir, e); return statSync(p).isDirectory() ? jsonl(p) : p.endsWith('.jsonl') ? [p] : []; }));
 
+/**
+ * L798 (banc du 20-11 11:11 : le bras A écrit `../c2.tsc.txt`, à côté de son propre clone ; le passage était rouge pour la référence) : une fuite
+ * certaine de la RÉFÉRENCE est sans effet possible sur le candidat quand son chemin est un fichier du dossier du banc (`runs/<passage>/<banc>/…`, sans
+ * glob), hors du clone du candidat et de ses fichiers voisins (`c1`, `c1/…`, `c1.captures`, `c1.question.md`, ses journaux). Elle est alors signalée
+ * sans rougir ; toute autre fuite de la référence (secrets, eval, rapports, bancs, projets, un autre banc, contournement du hook, glob) reste bloquante.
+ */
+export function fuiteSansEffet(chemin: string, dossierBanc: string, cloneCandidat: string): boolean {
+  if (/[*?[]/.test(chemin) || !chemin.startsWith(`${dossierBanc}/`)) return false;
+  const cand = cloneCandidat.slice(dossierBanc.length + 1), premier = chemin.slice(dossierBanc.length + 1).split('/')[0];
+  return premier !== '' && premier !== cand && !premier.startsWith(`${cand}.`);
+}
+
+/** L798 : fuites certaines d'un bras de référence séparées en bloquantes et sans effet possible sur le candidat (`fuiteSansEffet`). */
+export function trierFuitesReference(certaines: string[], dossierBanc: string, cloneCandidat: string): { bloquantes: string[]; signalees: string[] } {
+  const signalees = certaines.filter((p) => fuiteSansEffet(p, dossierBanc, cloneCandidat));
+  return { bloquantes: certaines.filter((p) => !signalees.includes(p)), signalees };
+}
+
 export function fuitesDuBras(home: string, racine: string, banc: string, clone: string): Fuites {
   const lignes = jsonl(dossierTranscripts(home, clone)).flatMap((f) => readFileSync(f, 'utf8').split('\n'));
   return chercherFuites(lignes, reglesDuBras(home, racine, banc, clone), home, clone);

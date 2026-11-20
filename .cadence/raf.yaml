@@ -3994,9 +3994,15 @@ lots:
     created: 2026-11-19
   - id: L792
     title: "Issue #68 (compte pro) : le brief de cadence run ne nomme pas cadence spec check — une session chargée d'amener des fiches d'écran à « fiche valide » n'a jamais lancé la commande, a reconstruit les règles depuis git et s'est crue à 0 écart (97 restaient ; run 20261119121911-828448). Cause : découverte, pas permission. Nommer les commandes de vérification du projet (spec check, et celles de cadence.yaml) dans le brief quand le lot ou la demande touche des fiches, et le tester sur le texte du brief rendu"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-19
+    started: 2026-11-20
+  - id: L793
+    title: "Étude (veille S47) : lire « Sous-agents Claude Code : leur coût réel en quota » (https://the-bearded-bear.com/blog/sous-agents-claude-code-consommation-quota) et « Harness agentique Claude Code : planner, générateur, évaluateur » (https://the-bearded-bear.com/blog/harness-agentique-claude-code-planner-generateur-evaluateur), les confronter à nos mesures (coût par livraison D-19, agents mécaniques sur Sonnet, découpage de cadence run) ; ouvrir un lot seulement si un gain mesurable en sort"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-20
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

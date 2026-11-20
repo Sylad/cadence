@@ -6,7 +6,7 @@ import type { Executeur } from '../src/bench/bras.js';
 import { horlogeAPas, passage } from '../src/bench/cli.js';
 import { preparer as prep } from '../src/bench/preparer.js';
 import { dossierTranscripts, fuiteSansEffet, trierFuitesReference } from '../src/bench/fuites.js';
-import { exclureTests, mesurerSansJuge, TESTS_HORS_COMPTE, testReussiJest } from '../src/bench/sans-juge.js';
+import { etatTestJest, exclureTests, mesurerSansJuge, TESTS_HORS_COMPTE, testReussiJest } from '../src/bench/sans-juge.js';
 import { BARRE_SPEC, FUITES_SIGNALEES, rapport, verdictSansJuge, type ResultatBanc } from '../src/bench/verdict.js';
 import { dossierTemp } from './temp.js';
 
@@ -36,6 +36,14 @@ describe('tests d\'origine hors compte (L798)', () => {
   it('un fichier qui n\'a pas tourné, ou un journal sans bilan jest, ne donne pas un test réussi', () => {
     expect(testReussiJest(`${RATE_SUITE}\nTests:       1 failed, 3 passed, 4 total`, 'season-rankings.cache-banc.spec.ts', 'a › b')).toBe(false);
     expect(testReussiJest(A.replace(/Tests:.*$/m, ''), SPEC, T503)).toBe(false);
+    // revue r1 : le fichier absent du journal (hors du testMatch du bras, par exemple) n'a pas tourné : inconnu, pas réussi
+    const sansFichier = A.split('\n').filter((l) => !l.includes(SPEC)).join('\n');
+    expect(etatTestJest(sansFichier, SPEC, T503)).toBe('inconnu'); expect(testReussiJest(sansFichier, SPEC, T503)).toBe(false);
+    expect(etatTestJest(A.replace(/Tests:.*$/m, ''), SPEC, T503)).toBe('inconnu');
+    expect(etatTestJest(`PASS src/modules/standings/${SPEC}\nTests:       3 passed, 3 total`, SPEC, T503)).toBe('réussi');
+    expect(etatTestJest(CADENCE_RUN, SPEC, T503)).toBe('raté');
+    const x = exclureTests({ par_lanceur: { jest: 32 }, hors_compte: [] }, sansFichier, TESTS_HORS_COMPTE['3-ol-companion-L241']);
+    expect(x.par_lanceur).toEqual({ jest: 32 }); expect(x.hors_compte).toEqual([expect.stringContaining(', inconnu) : ')]);
   });
   it('la liste est écrite, avec sa raison, et ne vise que le banc 3', () => {
     expect(Object.keys(TESTS_HORS_COMPTE)).toEqual(['3-ol-companion-L241']);
@@ -82,9 +90,11 @@ describe('fuite de la référence sans effet possible sur le candidat (L798)', (
     for (const p of ['/h/bench-cadence/secrets/7-ol-companion-L160', `${RUNS}/3-ol-companion-L241/c2.x`, '/h/projects/ol', BANC, `${BANC}/c*`, `${BANC}x/c2.y`,
       'contournement : Bash {"command":"rm hooks"}']) expect(fuiteSansEffet(p, BANC, `${BANC}/c1`), p).toBe(false);
   });
-  it('trierFuitesReference sépare les deux', () => {
-    expect(trierFuitesReference([`${BANC}/c2.tsc.txt`, '/h/bench-cadence/secrets/x'], BANC, `${BANC}/c1`))
+  it('trierFuitesReference sépare les deux quand la référence a joué après le candidat ; jouée avant, tout reste bloquant (revue r1)', () => {
+    expect(trierFuitesReference([`${BANC}/c2.tsc.txt`, '/h/bench-cadence/secrets/x'], BANC, `${BANC}/c1`, true))
       .toEqual({ bloquantes: ['/h/bench-cadence/secrets/x'], signalees: [`${BANC}/c2.tsc.txt`] });
+    expect(trierFuitesReference([`${BANC}/c1.tsc.txt`, '/h/bench-cadence/secrets/x'], BANC, `${BANC}/c2`, false))
+      .toEqual({ bloquantes: [`${BANC}/c1.tsc.txt`, '/h/bench-cadence/secrets/x'], signalees: [] });
   });
 
   const m = (bras: string) => ({ bras, banc: 'x', debut: '', fin: '', duree_s: 100, tokens: 0, cout_usd: 0, questions: 0, questions_texte: [], sessions: [], echec: null });
@@ -104,19 +114,24 @@ describe('fuite de la référence sans effet possible sur le candidat (L798)', (
   });
 });
 
-describe('passage mécanique : le tri des fuites se fait au banc, la référence seulement (L798)', () => {
+describe('passage mécanique : le tri des fuites se fait au banc, la référence seulement, et seulement jouée après le candidat (L798)', () => {
   const git = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encoding: 'utf8' }).trim();
   const BRIEF = join(import.meta.dirname, '..', 'briefs', 'bras-A.md'), RUN = '2026-11-20-1200-e1';
   const sortie = JSON.stringify({ session_id: 's', total_cost_usd: 0, modelUsage: {} });
-  const jouer = async (commande: (bras: string) => string) => {
+  /** `refApres` : un passage antérieur du banc (rapport) fait alterner l'ordre (L737) : le candidat joue en c1, la référence en c2. */
+  const jouer = async (commande: (bras: string) => string, refApres = false) => {
     const r = dossierTemp('fuites-l798-'), src = join(r, 'source'), id = '6-c';
     mkdirSync(src); git(src, 'init', '-q', '-b', 'main'); writeFileSync(join(src, 'a.txt'), 'a'); git(src, 'add', '.'); git(src, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'base');
     mkdirSync(join(r, 'bancs', id), { recursive: true }); mkdirSync(join(r, 'secrets', id), { recursive: true });
     writeFileSync(join(r, 'bancs', id, 'banc.yaml'), `projet: p\nsource: ${src}\nbase: ${git(src, 'rev-parse', 'HEAD')}\ninstall: "true"\ntests: "true"\ntaille: grosse\n`);
     writeFileSync(join(r, 'bancs', id, 'demande.md'), 'd');
-    writeFileSync(join(r, 'bras.yaml'), `A:\n  modele: opus\n  brief: ${BRIEF}\ncadence-run:\n  modele: opus\n  brief: ${BRIEF}\n`);
-    const exec: Executeur = (_a, o) => {
-      const bras = o.cwd.endsWith('c1') ? 'A' : 'cadence-run', t = dossierTranscripts(r, o.cwd); // banc 6 seul : c1 = A
+    // le modèle distingue les bras, quel que soit leur ordre
+    writeFileSync(join(r, 'bras.yaml'), `A:\n  modele: opus\n  brief: ${BRIEF}\ncadence-run:\n  modele: sonnet\n  brief: ${BRIEF}\n`);
+    if (refApres) { mkdirSync(join(r, 'rapports')); writeFileSync(join(r, 'rapports', '2026-11-19-1000-e0.json'), JSON.stringify({ resultats: [{ banc: id }] })); }
+    const joues: string[] = [];
+    const exec: Executeur = (a, o) => {
+      const bras = a[a.indexOf('--model') + 1] === 'opus' ? 'A' : 'cadence-run', t = dossierTranscripts(r, o.cwd);
+      joues.push(`${bras}@${o.cwd.slice(-2)}`);
       mkdirSync(t, { recursive: true });
       writeFileSync(join(t, 's.jsonl'), JSON.stringify({ type: 'assistant', cwd: o.cwd, message: { content: [{ type: 'tool_use', id: 'b1', name: 'Bash', input: { command: commande(bras) } }] } }));
       writeFileSync(join(o.cwd, 'x.ts'), bras); git(o.cwd, 'add', '-A'); git(o.cwd, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'bras');
@@ -124,18 +139,33 @@ describe('passage mécanique : le tri des fuites se fait au banc, la référence
     };
     const v = await passage({ ref: 'A', cand: 'cadence-run', hebdo: false, juge: 'opus', maintenant: new Date('2026-11-20T11:00:00Z'), empreinte: 'e1', out: () => {},
       horloge: horlogeAPas('2026-11-20T11:00:00Z', 60_000), racine: r, numeros: ['6'], niveau: 'mecanique', exec, prep, home: r });
+    // l'ordre attendu a bien eu lieu
+    expect(joues.filter((j, i) => joues.indexOf(j) === i)).toEqual(refApres ? ['cadence-run@c1', 'A@c2'] : ['A@c1', 'cadence-run@c2']);
     return { v, res: JSON.parse(readFileSync(join(r, 'runs', RUN, id, 'resultat.json'), 'utf8')), dossier: join(r, 'runs', RUN, id) };
   };
-  it('A écrit `../c1.tsc.txt` (son clone est c1) : signalée, passage vert ; le candidat qui fait de même : rouge', async () => {
-    const { v, res, dossier } = await jouer((b) => (b === 'A' ? 'npx tsc > ../c1.tsc.txt' : 'true'));
-    expect(res.fuites).toEqual({ A: [], 'cadence-run': [] }); expect(res.fuites_signalees).toEqual({ A: [join(dossier, 'c1.tsc.txt')] });
+  it('A joue après le candidat (cas du banc 7 du 20-11 : A en c2) et écrit `../c2.tsc.txt` à côté de son clone : signalée, passage vert', async () => {
+    const { v, res, dossier } = await jouer((b) => (b === 'A' ? 'npx tsc > ../c2.tsc.txt' : 'true'), true);
+    expect(res.clones).toEqual({ c1: 'cadence-run', c2: 'A' });
+    expect(res.fuites).toEqual({ A: [], 'cadence-run': [] }); expect(res.fuites_signalees).toEqual({ A: [join(dossier, 'c2.tsc.txt')] });
     expect(v.vert).toBe(true);
-    const cand = await jouer((b) => (b === 'A' ? 'true' : 'npx tsc > ../c2.tsc.txt'));
-    expect(cand.res.fuites['cadence-run']).toEqual([join(cand.dossier, 'c2.tsc.txt')]); expect(cand.res.fuites_signalees).toBeUndefined();
-    expect(cand.v.vert).toBe(false);
   });
-  it('A écrit dans les fichiers du candidat (`../c2.question.md`) : bloquante', async () => {
-    const { v, res, dossier } = await jouer((b) => (b === 'A' ? 'echo oui > ../c2.question.md' : 'true'));
-    expect(res.fuites.A).toEqual([join(dossier, 'c2.question.md')]); expect(v.vert).toBe(false);
+  it('A joue avant le candidat et écrit `../c1.tsc.txt` : le candidat pouvait la lire (`grep -r ..`), bloquante, passage rouge (revue r1)', async () => {
+    const { v, res, dossier } = await jouer((b) => (b === 'A' ? 'npx tsc > ../c1.tsc.txt' : 'grep -rn error ..'));
+    expect(res.clones).toEqual({ c1: 'A', c2: 'cadence-run' });
+    expect(res.fuites.A).toEqual([join(dossier, 'c1.tsc.txt')]); expect(res.fuites_signalees).toBeUndefined();
+    expect(v.vert).toBe(false);
+  });
+  it('le candidat qui écrit à côté de son clone : rouge, dans les deux ordres', async () => {
+    for (const refApres of [false, true]) {
+      const c = refApres ? 'c1' : 'c2', cand = await jouer((b) => (b === 'A' ? 'true' : `npx tsc > ../${c}.tsc.txt`), refApres);
+      expect(cand.res.fuites['cadence-run'], c).toEqual([join(cand.dossier, `${c}.tsc.txt`)]); expect(cand.res.fuites_signalees).toBeUndefined();
+      expect(cand.v.vert).toBe(false);
+    }
+  });
+  it('A écrit dans les fichiers du candidat : bloquante, dans les deux ordres', async () => {
+    for (const refApres of [false, true]) {
+      const c = refApres ? 'c1' : 'c2', { v, res, dossier } = await jouer((b) => (b === 'A' ? `echo oui > ../${c}.question.md` : 'true'), refApres);
+      expect(res.fuites.A, c).toEqual([join(dossier, `${c}.question.md`)]); expect(v.vert).toBe(false);
+    }
   });
 });

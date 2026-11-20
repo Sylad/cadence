@@ -155,7 +155,7 @@ const BUDGET_R29: Record<string, { total: number; modules: Record<string, number
   // L745 (5e passe, changement de conception) : run 845 (-1), --clore archive chaque tête du run sous refs/cadence/archive/ avant de retirer quoi que ce soit, --liste
   // ne fait qu'afficher (merge-base --is-ancestor), cadence run --archives ; patch-id, tableau de reconnaissance et --force retirés, sans ligne tassée
   // L748 : run 881 (+36), escalade.ts lit aussi les revues du lot mises en attente (.cadence/plan-en-attente.yaml), sans ligne tassée
-  mesure: { total: 2482, modules: { bench: 1765, sequence: 717 } }, // L689 : bench relevé de 800 à 984 plutôt que tassé (décision de Sylvain du 13-11) ; issue #57 : 998, bras.ts détassé, erreur nommée
+  mesure: { total: 2486, modules: { bench: 1769, sequence: 717 } }, // L689 : bench relevé de 800 à 984 plutôt que tassé (décision de Sylvain du 13-11) ; issue #57 : 998, bras.ts détassé, erreur nommée
   // L730 (D-22) : bench 1080, garde proportionnée (banc mécanique avant publication, alerte du banc complet du samedi) et complet.ts, sans ligne tassée
   // L730 (revue) : bench 1090, l'alerte ne tombe que sur un banc complet vert qui rejoue chaque rouge en attente (même séquence)
   // L730 (revue 2) : bench 1100, la garde en quatre règles (le banc rouge rejoué sur l'empreinte à publier, refus nommant les bancs à rejouer)
@@ -196,6 +196,7 @@ const BUDGET_R29: Record<string, { total: number; modules: Record<string, number
   // et aucun rouge dans la suite seule (cachesReussis, caches_hors_compte), banc non mesurable sinon, sans ligne tassée.
   // L798 : bench 1765 (+72), mesure 2482 : test d'origine hors compte des deux bras quand son résultat suit le chemin d'écriture du bras (TESTS_HORS_COMPTE),
   // fuite de la référence sans effet possible sur le candidat signalée sans rougir (fuiteSansEffet), sans ligne tassée.
+  // L798 (revue r1) : bench 1769 (+4), mesure 2486 : fuite de la référence signalée seulement jouée après le candidat, fichier absent du journal jest « inconnu ».
 };
 function reglesBudget(f: Fichiers): string[] {
   const b = JSON.parse(f['budget.json']) as Record<string, { total: number; modules: Record<string, number> }>;
@@ -290,13 +291,13 @@ const mutations: [string, string, string, (t: string) => string][] = [
   ['C2', "modele: 'sonnet'", 'src/bench/bras.ts', ajout("const d = { modele: 'sonnet' };")],
   ['C3', 'trois portes', 'src/bench/banc.ts', ajout('porte(1);\ngate(2);\nverifyAll(3);')],
   ['C3', 'budget porte 400', 'budget.json', remplace('"porte": 250', '"porte": 400')],
-  ['C4', 'total mesure relevé', 'budget.json', remplace('"total": 2482', '"total": 2520')],
+  ['C4', 'total mesure relevé', 'budget.json', remplace('"total": 2486', '"total": 2520')],
   ['C4', 'total noyau relevé', 'budget.json', remplace('"total": 3000', '"total": 3500')],
   ['C4', 'budget sequence relevé', 'budget.json', remplace('"sequence": 717', '"sequence": 900')],
   ['C4', 'budget plan relevé sous le total', 'budget.json', remplace('"plan": 350', '"plan": 1000')],
   ['C4', 'budget hooks relevé (R32)', 'budget.json', remplace('"hooks": 231', '"hooks": 300')],
   ['C4', 'hooks déplacé dans la mesure', 'budget.json', (t) => t.replace('"deliver": 450, "hooks": 231', '"deliver": 450').replace('"sequence": 717', '"sequence": 717, "hooks": 231')],
-  ['C4', 'module sans budget R29', 'budget.json', remplace('"bench": 1765', '"bench": 1765, "outil": 100')],
+  ['C4', 'module sans budget R29', 'budget.json', remplace('"bench": 1769', '"bench": 1769, "outil": 100')],
   ['C4', 'groupe de budget ajouté', 'budget.json', remplace(/\n}\s*$/, ',\n  "autre": { "total": 900, "modules": {} }\n}')],
   ['C4', "option(reste,'zzz') sans entrée", 'src/bench/cli.ts', remplace("option(reste, 'taille')", "option(reste, 'zzz')")],
   ['C4', 'chemin options.json inexistant', 'options.json', remplace('"bench --juge": "docs/v2/2026-11-07-cadence-2-design.md"', '"bench --juge": "docs/v2/mesures/rien.md"')],

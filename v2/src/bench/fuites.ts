@@ -105,8 +105,8 @@ export const jsonl = (dir: string): string[] => (!existsSync(dir) ? [] : readdir
 /**
  * L798 (banc du 20-11 11:11 : le bras A écrit `../c2.tsc.txt`, à côté de son propre clone ; le passage était rouge pour la référence) : une fuite
  * certaine de la RÉFÉRENCE est sans effet possible sur le candidat quand son chemin est un fichier du dossier du banc (`runs/<passage>/<banc>/…`, sans
- * glob), hors du clone du candidat et de ses fichiers voisins (`c1`, `c1/…`, `c1.captures`, `c1.question.md`, ses journaux). Elle est alors signalée
- * sans rougir ; toute autre fuite de la référence (secrets, eval, rapports, bancs, projets, un autre banc, contournement du hook, glob) reste bloquante.
+ * glob), hors du clone du candidat et de ses fichiers voisins (`c1`, `c1/…`, `c1.captures`, `c1.question.md`, ses journaux). Ne juge que le chemin :
+ * l'ordre des bras est jugé par `trierFuitesReference`. Toute autre fuite de la référence (secrets, bancs, projets, autre banc, contournement, glob) bloque.
  */
 export function fuiteSansEffet(chemin: string, dossierBanc: string, cloneCandidat: string): boolean {
   if (/[*?[]/.test(chemin) || !chemin.startsWith(`${dossierBanc}/`)) return false;
@@ -114,9 +114,10 @@ export function fuiteSansEffet(chemin: string, dossierBanc: string, cloneCandida
   return premier !== '' && premier !== cand && !premier.startsWith(`${cand}.`);
 }
 
-/** L798 : fuites certaines d'un bras de référence séparées en bloquantes et sans effet possible sur le candidat (`fuiteSansEffet`). */
-export function trierFuitesReference(certaines: string[], dossierBanc: string, cloneCandidat: string): { bloquantes: string[]; signalees: string[] } {
-  const signalees = certaines.filter((p) => fuiteSansEffet(p, dossierBanc, cloneCandidat));
+/** L798 : fuites certaines de la référence, bloquantes ou sans effet (`fuiteSansEffet`) ; si elle n'a pas joué après le candidat (`refApres`), tout bloque
+ * (revue r1 : jouée avant, son écriture dans le dossier du banc était lisible par le candidat, par `cat ../*.txt` ou `grep -r ..`). */
+export function trierFuitesReference(certaines: string[], dossierBanc: string, cloneCandidat: string, refApres: boolean): { bloquantes: string[]; signalees: string[] } {
+  const signalees = refApres ? certaines.filter((p) => fuiteSansEffet(p, dossierBanc, cloneCandidat)) : [];
   return { bloquantes: certaines.filter((p) => !signalees.includes(p)), signalees };
 }
 

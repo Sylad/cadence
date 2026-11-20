@@ -145,8 +145,8 @@ export function jouerBanc(t: Tache, exec: Executeur, prep: typeof preparer, out:
       mesures[n] = { ...m, banc: idBanc, echec: m.echec ?? travailNonLivre(avant, etatGit(c)), taille_declaree: tailleDeclaree(c, avant.head) };
       aller('fuites'); const fu = fuitesDuBras(t.home, t.racine, t.bid, c); fuites[n] = fu.certaines; aVerifier[n] = fu.a_verifier;
     });
-    if (clones[t.ref] && clones[t.cand]) { // L798 : une fuite de la référence sans effet possible sur le candidat est signalée, pas bloquante
-      const tri = trierFuitesReference(fuites[t.ref], join(t.dirRun, sous), clones[t.cand]);
+    if (clones[t.ref] && clones[t.cand]) { // L798 : une fuite de la référence sans effet possible sur le candidat (jouée après lui) est signalée, pas bloquante
+      const tri = trierFuitesReference(fuites[t.ref], join(t.dirRun, sous), clones[t.cand], ordre.indexOf(t.ref) > ordre.indexOf(t.cand));
       fuites[t.ref] = tri.bloquantes; if (tri.signalees.length) fuitesSignalees[t.ref] = tri.signalees;
     }
     if (ordre.some((n) => mesures[n].echec !== null)) out(`${idBanc} : un bras en échec, ${t.sansJuge ? 'mesure sautée' : 'juges sautés'}`);

@@ -91,26 +91,29 @@ export const TESTS_HORS_COMPTE: Record<string, TestHorsCompte[]> = {
   }],
 };
 
-/** L798 : vrai si le journal jest montre le test passé : un bilan jest, et ni `● <nom>` ni « Test suite failed to run » dans un bloc FAIL de son fichier. */
-export function testReussiJest(journal: string, fichier: string, nom: string): boolean {
-  if (!bilans(journal)?.jest) return false;
-  let dans = false;
+/** L798 : « réussi » si un bilan jest, une ligne PASS/FAIL du fichier, et ni `● <nom>` ni « Test suite failed to run » dans son bloc ; « raté » si l'un des
+ * deux ; « inconnu » sans bilan jest ou si le fichier n'a pas tourné (revue r1 : hors du testMatch du bras, par exemple, ce n'est pas un test réussi). */
+export function etatTestJest(journal: string, fichier: string, nom: string): 'réussi' | 'raté' | 'inconnu' {
+  if (!bilans(journal)?.jest) return 'inconnu';
+  let dans = false, vu = false;
   for (const brute of journal.replace(SANS_ANSI, '').split('\n')) {
     const l = brute.trim(), m = /^(PASS|FAIL)\s+(\S+)/.exec(l);
-    if (m) { dans = m[2] === fichier || m[2].endsWith(`/${fichier}`); continue; }
-    if (dans && (l === '● Test suite failed to run' || l === `● ${nom}`)) return false;
+    if (m) { dans = m[2] === fichier || m[2].endsWith(`/${fichier}`); vu ||= dans; continue; }
+    if (dans && (l === '● Test suite failed to run' || l === `● ${nom}`)) return 'raté';
   }
-  return true;
+  return vu ? 'réussi' : 'inconnu';
 }
 
-/** L798 : retire du compte d'un bras chaque test de `exclus` qu'il a réussi, et le nomme hors compte (réussi ou raté) avec sa raison. */
+export const testReussiJest = (journal: string, fichier: string, nom: string): boolean => etatTestJest(journal, fichier, nom) === 'réussi';
+
+/** L798 : retire du compte d'un bras chaque test de `exclus` qu'il a réussi, et le nomme hors compte (réussi, raté ou inconnu) avec sa raison. */
 export function exclureTests(n: CompteCaches, journal: string, exclus: TestHorsCompte[]): CompteCaches {
   const par_lanceur = { ...n.par_lanceur }, hors_compte = [...n.hors_compte];
   for (const x of exclus) {
     if (par_lanceur[x.lanceur] === undefined) continue;
-    const ok = testReussiJest(journal, x.fichier, x.nom);
-    if (ok) par_lanceur[x.lanceur] = Math.max(0, par_lanceur[x.lanceur] - 1);
-    hors_compte.push(`${x.lanceur} : « ${x.nom.split(' › ').pop()} » (${x.fichier}, ${ok ? 'réussi' : 'raté'}) : ${x.raison}`);
+    const etat = etatTestJest(journal, x.fichier, x.nom);
+    if (etat === 'réussi') par_lanceur[x.lanceur] = Math.max(0, par_lanceur[x.lanceur] - 1);
+    hors_compte.push(`${x.lanceur} : « ${x.nom.split(' › ').pop()} » (${x.fichier}, ${etat}) : ${x.raison}`);
   }
   return { par_lanceur, hors_compte };
 }

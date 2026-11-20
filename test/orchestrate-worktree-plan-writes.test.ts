@@ -188,38 +188,62 @@ describe('R15 — les gardes de dépôt valent pour chaque worktree', () => {
 });
 
 describe('R16 — une seule application lancée à la fois dans le dépôt', () => {
-  async function uxWave(lots: Parameters<typeof setup>[0], ux: (parent: () => string) => (cwd: string, brief: string) => Promise<ReturnType<typeof claudeOut>>) {
+  async function uxWave(lots: Parameters<typeof setup>[0], ux: (parent: () => string) => (cwd: string, brief: string) => Promise<ReturnType<typeof claudeOut>>, over: Parameters<typeof fake>[0] = {}) {
     const app = await fakeApp(0);
     const { parent, repo } = setup(lots, `worktrees: true\nmaquette: false\nux: { command: '${app.command}', url: '${app.url}', timeout: 60 }`); // L567 : le délai ne borne que le démarrage de l'application (rendu dès qu'elle répond), pas la file : 3 s ne tenait pas au lancement de node sous charge
-    const f = fake({ ux: ux(() => parent) });
+    const f = fake({ ...over, ux: ux(() => parent) });
     const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '3'], f);
     return { parent, repo, f, r };
   }
-  it('R16 — deux lots à écran : une seule application lancée à la fois dans le dépôt', async () => {
+  /** L798 : rien ne fixe quel lot passe le premier en revue UX. Le test supposait L1 : quand L2 y arrivait avant (porte complète du 20-11), la session UX
+   * de L1 venait en second et attendait 90 s un L2 déjà « prêt à livrer » (l2NextSeen null), reproduit en retardant l'implémentation de L1. La première
+   * session UX, quel que soit son lot, attend donc que L'AUTRE lot arrive à son étape UX ; la seconde n'observe rien. Le test est joué dans les deux ordres. */
+  const deuxLotsAEcran = (lent: 'L1' | 'L2' | null) => async () => {
     let active = 0;
     let peak = 0;
     const launchesSeen: number[] = [];
-    let l2NextSeen: string | null | undefined;
+    let premier: string | undefined;
+    let autreNextSeen: string | null | undefined;
+    let diag = '';
+    const implement = async (cwd: string, brief: string) => {
+      const lot = lotOf(brief);
+      if (lot === lent) await sleep(3000); // l'autre lot arrive le premier en revue UX
+      return claudeOut(workReport({ commits: [commitFile(cwd, `${lot}.txt`, `feat(${lot}): travail`)] }));
+    };
     const { f, parent } = await uxWave(
       [{ title: 'un', estimate: 1, visible: true }, { title: 'deux', estimate: 1, visible: true }],
-      (parent) => async () => {
+      (parent) => async (_cwd, brief) => {
         active++;
         peak = Math.max(peak, active);
-        // L577 : on attend l'événement « L2 est arrivé à son étape UX » (next = ux, lu dans son état), plus 4,5 s au mur : sous charge L2 n'y était pas encore et le test ne prouvait rien
-        await untilOr(() => store(parent()).readLot('a', 'L2')?.next === 'ux', ATTENTE_R16_MS);
-        l2NextSeen = store(parent()).readLot('a', 'L2')?.next;
-        // Sans file en mémoire, L2 journaliserait son lancement dès son arrivée et attendrait sur le verrou d'URL entre processus (tenu par le même pid) : avec un délai de 60 s `peak` resterait à 1 et les deux UX auraient lieu, seul le journal le distingue.
+        if (premier === undefined) {
+          premier = lotOf(brief);
+          const autre = premier === 'L1' ? 'L2' : 'L1', debut = Date.now();
+          // L577 : on attend l'événement « l'autre lot est arrivé à son étape UX » (next = ux, lu dans son état), pas un délai au mur
+          await untilOr(() => store(parent()).readLot('a', autre)?.next === 'ux', ATTENTE_R16_MS);
+          autreNextSeen = store(parent()).readLot('a', autre)?.next;
+          if (autreNextSeen !== 'ux') {
+            const x = store(parent()).readLot('a', autre), journal = readFileSync(join(store(parent()).dir, 'journal.log'), 'utf8');
+            diag = JSON.stringify({ premier, status: x?.status, next: x?.next, outcome: x?.outcome, attente_ms: Date.now() - debut,
+              journal: journal.split('\n').filter((l) => l.includes(`a:${autre}`)).slice(-15) }, null, 1);
+          }
+        }
+        // Sans file en mémoire, l'autre lot journaliserait son lancement dès son arrivée et attendrait sur le verrou d'URL entre processus (tenu par le même pid) : avec un délai de 60 s `peak` resterait à 1 et les deux UX auraient lieu, seul le journal le distingue.
         launchesSeen.push(readFileSync(join(store(parent()).dir, 'journal.log'), 'utf8').split("lancement de l'application").length - 1);
         active--;
         return claudeOut(reviewReport());
       },
+      { implement },
     );
     expect(f.calls.filter((c) => c.kind === 'ux')).toHaveLength(2); // la seconde revue UX a bien eu lieu, après la première
+    if (lent) expect(premier).toBe(lent === 'L1' ? 'L2' : 'L1'); // l'ordre forcé a bien eu lieu
     expect(peak).toBe(1);
-    expect(l2NextSeen).toBe('ux'); // pendant la session UX de L1, L2 a atteint son étape UX…
+    expect(autreNextSeen, `l'autre lot n'est pas à son étape UX pendant la première : ${diag}`).toBe('ux'); // pendant la première session UX, l'autre lot a atteint son étape UX…
     expect(launchesSeen[0]).toBe(1); // … et attend la file en mémoire : il n'a pas commencé à lancer son application
     for (const id of ['L1', 'L2']) expect(store(parent).readLot('a', id)!.uxNote ?? '').not.toContain('url tenue');
-  }, DELAI_R16_MS);
+  };
+  it('R16 — deux lots à écran : une seule application lancée à la fois dans le dépôt', deuxLotsAEcran(null), DELAI_R16_MS);
+  it('R16 — deux lots à écran, L2 en revue UX avant L1 : une seule application à la fois (L798)', deuxLotsAEcran('L1'), DELAI_R16_MS);
+  it('R16 — deux lots à écran, L1 en revue UX avant L2 : une seule application à la fois (L798)', deuxLotsAEcran('L2'), DELAI_R16_MS);
   it('R16 — le verrou d\'application est par dépôt, pris seulement par les étapes qui lancent l\'application : une étape sans application d\'un autre lot n\'attend pas ce verrou', async () => {
     let l2Status: string | undefined;
     const { f } = await uxWave(

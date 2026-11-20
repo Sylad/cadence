@@ -4034,11 +4034,22 @@ lots:
     created: 2026-11-20
   - id: L798
     title: "Banc mécanique du 20-11 (2026-11-20-1111) rouge sur deux critères sans lien avec le candidat : (1) tests d'origine 80 contre 81, seul écart au banc 3 (31 contre 32, jest), valeur que banc.md dit déjà fluctuer entre 31 et 32 — identifier le test qui bascule et le rendre déterministe ou l'exclure du compte avec sa raison ; (2) « aucune fuite » rouge pour une fuite du bras A (7-ol-companion-L160, c2.tsc.txt hors du clone) — une fuite de la référence doit-elle rougir le candidat ? décider et tester. cadence-run plus rapide (1365 s contre 1952 s) et moins de tokens."
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-20
     started: 2026-11-20
-    review: { date: 2026-11-20, verdict: "non conforme : 1 majeur (fuite de la référence non bloquante même quand elle a joué avant le candidat)", commit: 2d352787bf8cbfadebb96bab00d4d4f3a282ec53 }
+    review: { date: 2026-11-20, verdict: "compliant (r2, tmp/revue-L798-r2.md)", commit: dda267976424df5784a194e7febe2ed4b5291413 }
+    finished: 2026-11-20
+  - id: L799
+    title: "Banc : quand la référence joue en premier, son clone ../c1/ reste lisible par le candidat (note hors périmètre de la revue r2 de L798) — isoler les clones des bras"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-20
+  - id: L800
+    title: "Test orchestrate-reponse-notee-l670 sensible au minutage : rouge une fois dans la suite complète le 20-11 (run L798 correction 2), vert seul — le rendre déterministe"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-20
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

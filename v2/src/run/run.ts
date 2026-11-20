@@ -20,6 +20,7 @@ import { briefRegistre, entreeCommitee, preparerRegistre, registreOuvert, regist
 import { fichiersNonCommites, nommerFichiers, PLAN_EN_ATTENTE } from '../../../scripts/arbre-non-commite.mjs'; // L722 : même lecture que src/repo-held.ts
 import { environnementPerime, ignorerPerime, lignesPerime } from '../../../scripts/environnement-porte.mjs'; // L764 : même lecture que src/verify-gate.ts
 import { regenerer, retirerRegenerations, TRAILER_REGENERATION } from './regenerer.js';
+import { commandesNommees, interditsPourSpec, leverPourSpec } from '../../../scripts/commandes-du-brief.mjs'; // L792 : commandes du projet nommées au brief
 import { noterVerdict } from '../../../scripts/verdicts-porte.mjs'; // L786 : même écriture que src/gate-verdict.ts (verify --gate)
 import { lireEtapes } from '../../../scripts/etapes-porte.mjs'; // L786 (revue r1, M1) : mêmes étapes que verify --gate
 import { debutProcessus, inscrireCreneau, occupantVivant, prendreVerrou, rendreVerrou, roleVerrou } from '../verrou.js';
@@ -47,7 +48,7 @@ export interface Etat extends EtatRapport { id: string; repo: string; branche: s
   /** L745 (clore.ts) : la tête du worktree à la fin d'un run non intégré (archivée par --clore, lue par --liste quand la branche est retirée) ; `clos` : posé par
    * --clore, avec ses archives et ce qui est resté (worktree non propre, branche) ; `force` : un état clos avant la 5e passe, sans preuve d'intégration. */
   tete?: string; /** Revue L764 r1 (M3) : la porte lue au commit du run quand elle diffère de celle de la cible, reprise au détail de l'état integre. */
-  porte_changee?: string; clos?: { date: string; cible: string; tete: string; integre?: boolean; archives?: string[]; restes?: string[]; force?: true } }
+  porte_changee?: string; /** L792 : le brief nomme `cadence spec check` (scripts/commandes-du-brief.mjs) ; la session peut la lancer, reprises comprises. */ spec_check?: boolean; clos?: { date: string; cible: string; tete: string; integre?: boolean; archives?: string[]; restes?: string[]; force?: true } }
 /** `maintenant` et `attendre` : l'horloge et l'attente du quota (D-15), simulées par les tests ; `attendre: null` rend la main sans attendre la remise à zéro. */
 interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null }
 
@@ -169,7 +170,8 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false, sujet?: string
   // L699 : le modèle est celui du lancement, gardé dans l'état (une reprise par --reponse ne le change pas) ; un état d'avant L699 n'en a pas : opus.
   // orchestrate.prodAccess (comme les vagues de la v1) : sans lui, ni kubectl, ni helm, ni KUBECONFIG ; avec lui, la session joue le banc du projet
   const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !LIEN_HOTE.test(k) && k !== 'CADENCE_RUN_JOURNAL' && k !== 'CADENCE_RUN_ID')), CADENCE_CLONE: e.worktree, CADENCE_PIECES: JSON.stringify(e.pieces), CADENCE_BANC_RACINE: dossierRuns(e.repo), ...(e.acces_cluster ? {} : { KUBECONFIG: '/dev/null' }) };
-  const interdits = e.acces_cluster ? OUTILS_INTERDITS.filter((x) => !/kubectl|helm/.test(x)) : OUTILS_INTERDITS;
+  const coupes = e.acces_cluster ? OUTILS_INTERDITS.filter((x) => !/kubectl|helm/.test(x)) : OUTILS_INTERDITS;
+  const interdits = e.spec_check ? interditsPourSpec(coupes) : coupes; // L792 : cadence spec check, nommée par le brief, reste permise
   e.passes = [...(e.passes ?? []), { quoi: quoiPasse(e, neuve, sujet), modele: e.modele ?? 'opus', raison: e.modele_raison ?? (e.modele ? 'choisi au lancement' : 'par défaut') }]; // L726
   sauver(e);
   const bras = { ...(e.mode === 'leger' ? BRAS_LEGER : BRAS_COMPLET), modele: e.modele ?? 'opus' }; // L763 : ses hooks s'ajoutent à ceux du socle
@@ -408,8 +410,9 @@ export function executerRun(a: { id?: string; repo: string; demande: string; pie
   git(repo, 'worktree', 'add', '-q', '-b', `cadence/run-${id}`, worktree, 'HEAD');
   copierDeps(repo, worktree);
   const aig = aiguiller(a.demande, worktree, a.pieces ?? [], a.complet);
+  const nommees = commandesNommees(worktree, orchestrate(worktree), a.demande); // L792 : lues au commit du run, comme sa porte
   const e: Etat = { id, repo, branche: `cadence/run-${id}`, cible, base: git(worktree, 'rev-parse', 'HEAD'), worktree, fichier: join(runs, `${basename(repo)}-${id}.json`),
-    demande: a.demande, pieces: aig.pieces.map((p) => chemin(worktree, p)), taille: a.taille ?? 'fonction', mode: aig.mode, modele, acces_cluster: orchestrate(worktree).prodAccess === true, registre: a.registre, ...(a.lot ? { lot: a.lot } : {}),
+    demande: a.demande, pieces: aig.pieces.map((p) => chemin(worktree, p)), taille: a.taille ?? 'fonction', mode: aig.mode, modele, acces_cluster: orchestrate(worktree).prodAccess === true, registre: a.registre, ...(a.lot ? { lot: a.lot } : {}), ...(nommees.nommeSpec ? { spec_check: true } : {}),
     modele_raison: depart.raison, ...(depart.correctionRevue ? { correction_revue: true } : {}), ...(depart.correctionsAvant ? { corrections_avant: depart.correctionsAvant } : {}),
     ...(depart.revue ? { revue: depart.revue } : {}), ...(a.journal ? { journal: a.journal } : {}), session: crypto.randomUUID(), cout_usd: 0, etat: 'en-cours', detail: '', debut: new Date().toISOString() };
   sauver(e);
@@ -418,9 +421,10 @@ export function executerRun(a: { id?: string; repo: string; demande: string; pie
   if (sales.length) a.out(`cadence run ${id} : l'arbre principal a des modifications non commitées (hors plan en attente) : ${nommerFichiers(sales)} — le run part de `
     + `${e.base.slice(0, 7)} sans elles ; les commiter sur ${cible} est refusé pendant le run, et un fichier que le run change aussi fera échouer l'intégration`);
   // La ligne « Taille » du brief sert au banc (taille déclarée) ; dans un vrai dépôt, elle casserait commitlint : retirée.
-  const demande = `${a.demande}\n\n${a.lot ? `Lot du plan : ${a.lot}. Cite-le dans chaque message de commit, selon les conventions de commit du dépôt (par exemple feat(${a.lot}): …).\n\n` : ''}`
+  const demande = `${a.demande}\n\n${a.lot ? `Lot du plan : ${a.lot}. Cite-le dans chaque message de commit, selon les conventions de commit du dépôt (par exemple feat(${a.lot}): …).\n\n` : ''}${nommees.texte}`
     + preparerRegistre(worktree, a.registre, { demande: a.demande, lot: a.lot, run: id }); // L701 : la demande de l'humain seule entre au registre
-  const brief = briefRegistre(a.registre)(readFileSync(aig.bras.brief, 'utf8')).split('\n').filter((l) => !l.startsWith('- Taille fixée par le gardien')).join('\n').replaceAll('{{DEMANDE}}', demande).replaceAll('{{CLONE}}', worktree)
+  const brut = readFileSync(aig.bras.brief, 'utf8');
+  const brief = briefRegistre(a.registre)(nommees.nommeSpec ? leverPourSpec(brut) : brut).split('\n').filter((l) => !l.startsWith('- Taille fixée par le gardien')).join('\n').replaceAll('{{DEMANDE}}', demande).replaceAll('{{CLONE}}', worktree)
     .replaceAll('{{QUESTION}}', `${worktree}.question.md`).replaceAll('{{BASE}}', e.base).replaceAll('{{TAILLE}}', e.taille);
   const o = { exec: a.exec, out: a.out, sansPorte: a.sansPorte, raf: a.raf, maintenant: a.maintenant, attendre: a.attendre };
   try { return attendreQuota(tenu(e, o, () => (session(e, brief, o, true) ? suite(e, o) : fin(e, o))), o); } finally { rendreVerrou(fichierVerrou(e.fichier)); }

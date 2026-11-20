@@ -82,6 +82,7 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // L784 : run 1156 (+4) : la porte du run note son verdict pour le hook pre-push (scripts/verdicts-porte.mjs, le fichier de verify --gate, L786), sans ligne tassée.
   // L784 (revue r1) : run 1174 (+18) : la porte du run joue les étapes de verify --gate (scripts/etapes-porte.mjs : build puis test, parties comprises) et ne note un verdict
   // que pour un arbre égal au commit avant et après la porte, au même HEAD (M1, M2), sans ligne tassée.
+  // L792 : run 1178 (+4) : le brief nomme les commandes de vérification du projet quand il a des fiches (scripts/commandes-du-brief.mjs), cadence spec check permise.
   // L775 : bench 1609 (+21), sequence 717 (+2), mesure 2326 : le détecteur de fuites ignore les appels refusés par le hook du bras (refusParHook, partagé
   // avec lectureReferences), sans ligne tassée.
   // L777 : bench 1672 (+63), mesure 2389 : « tests d'origine verts » compte les tests d'origine réussis par bras (testsReussis, cachesReussis, lus dans les

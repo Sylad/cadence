@@ -4011,10 +4011,12 @@ lots:
     created: 2026-11-20
   - id: L794
     title: "cadence run : un lot visible rendu sans entrée Nouveautés (finance L182 et warhammer L67 le 20-11, 2e occurrence) — le brief bras-A.md:8 dit d'ignorer les « Nouveautés imposées par l'outil », lu par certaines sessions comme « pas d'entrée ». Le brief demande l'entrée (fichier docs/nouveautes/*.md écrit à la main, sans commande cadence, regenerer.ts rejoue le build) pour un lot visible, et la fin du run signale « Nouveautés manquante » (état ou ligne du rapport) quand le lot visible n'en a pas ; test qui le prouve"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-20
     started: 2026-11-20
+    review: { date: 2026-11-20, verdict: "conforme r1 (20-11, 3b16d5b) : 5 tests sur 8 échouent sans le correctif, tsc et eslint propres ; mineurs → L797", commit: 3b16d5bcf2a93929703f6069185e60df5724f6cd }
+    finished: 2026-11-20
   - id: L795
     title: "cadence perf ne voit rien des lots faits par cadence run : toutes les lignes en n/d, seul « livrés » compte (alerte −37 % sans explication) — issue #69 du compte pro"
     status: todo
@@ -4022,6 +4024,11 @@ lots:
     created: 2026-11-20
   - id: L796
     title: "cadence run tient toute la branche : verrou des fichiers touchés, intégration par rebase quand main a bougé sur des fichiers disjoints, raf start commité par le run (lot rendu refus-integration par son propre raf start non commité, ~50 min) — issue #70 du compte pro, voisine de #66"
+    status: todo
+    estimate: 1
+    created: 2026-11-20
+  - id: L797
+    title: "Suites de L794 (revue r1) : test que bras-sequence-v2d.md ne réintroduit pas l'interdiction des Nouveautés ; « Nouveautés manquante » seulement à la fin définitive du run (pas en attente, échec, quota, run.ts:396) ; pas de consigne « fichier daté du jour » quand une entrée cite déjà le lot (run.ts:338, doublon en correction) ; dossier des Nouveautés en dur (news.dir commun à news, lead et run)"
     status: todo
     estimate: 1
     created: 2026-11-20

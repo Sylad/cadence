@@ -19,10 +19,11 @@ import { cheminWorktree, HOOKS, PORTE_MS, reglagesRun } from '../socle.js';
 import { briefRegistre, entreeCommitee, preparerRegistre, registreOuvert, registreTouche } from '../registre.js';
 import { fichiersNonCommites, nommerFichiers, PLAN_EN_ATTENTE } from '../../../scripts/arbre-non-commite.mjs'; // L722 : même lecture que src/repo-held.ts
 import { environnementPerime, ignorerPerime, lignesPerime } from '../../../scripts/environnement-porte.mjs'; // L764 : même lecture que src/verify-gate.ts
-import { regenerer, retirerRegenerations, TRAILER_REGENERATION } from './regenerer.js';
+import { commandesDeRegeneration, regenerer, retirerRegenerations, TRAILER_REGENERATION } from './regenerer.js';
 import { avecRefusCadence, commandesNommees, interditsPourSpec, leverPourSpec } from '../../../scripts/commandes-du-brief.mjs'; // L792 : commandes du projet nommées au brief
 import { noterVerdict } from '../../../scripts/verdicts-porte.mjs'; // L786 : même écriture que src/gate-verdict.ts (verify --gate)
 import { lireEtapes } from '../../../scripts/etapes-porte.mjs'; // L786 (revue r1, M1) : mêmes étapes que verify --gate
+import { consigneNouveautes, entreesQuiCitent, ligneNouveautes, lotVisible } from '../../../scripts/nouveautes-du-run.mjs'; // L794 : entrée Nouveautés d'un lot visible
 import { debutProcessus, inscrireCreneau, occupantVivant, prendreVerrou, rendreVerrou, roleVerrou } from '../verrou.js';
 
 /** D-15 : le run reprend une minute après l'heure de remise à zéro annoncée, relit son état au plus tard toutes les 10 min (une reprise par --reponse arrête
@@ -51,6 +52,8 @@ export interface Etat extends EtatRapport { id: string; repo: string; branche: s
   porte_changee?: string;
   /** L792 : le brief nomme `cadence spec check` (scripts/commandes-du-brief.mjs) ; la session peut la lancer, reprises comprises. */
   spec_check?: boolean;
+  /** L794 : le lot du plan est visible (scripts/nouveautes-du-run.mjs) ; `nouveautes` : à la fin, les entrées du commit du run qui le citent (null : git illisible). */
+  lot_visible?: boolean; nouveautes?: { entrees: string[] | null; manquante: boolean };
   clos?: { date: string; cible: string; tete: string; integre?: boolean; archives?: string[]; restes?: string[]; force?: true } }
 /** `maintenant` et `attendre` : l'horloge et l'attente du quota (D-15), simulées par les tests ; `attendre: null` rend la main sans attendre la remise à zéro. */
 interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null }
@@ -365,8 +368,18 @@ function suite(e: Etat, o: Opts): Etat {
     ...(e.conflits ?? []).filter((c) => c.resolu).map((c) => conflitResolu(e, c)), ...(e.corrections ?? []).filter((c) => c.verte).map(correctionFaite),
     ...(regenere.length ? [`fichiers générés régénérés par le run avant la porte (run.regenerate, L781) : commit ${regenere.join(', ')}`] : [])].join('\n');
   const registre = registreOuvert(e.worktree);
+  noterNouveautes(e);
   retirerRun(e);
   return fin(e, o, registre);
+}
+
+/** L794 : run.regenerate déclarée (la consigne dit alors de ne pas régénérer) ; une clé mal formée n'est pas lue ici, la régénération la rendra. */
+const aRegenerer = (wt: string) => { try { return commandesDeRegeneration(wt).length > 0; } catch { return false; } };
+/** L794 : les entrées Nouveautés qui citent le lot visible, lues au commit du run ; « manquante » ne bloque pas l'intégration, la fin du run le dit. */
+function noterNouveautes(e: Etat): void {
+  if (!e.lot_visible || !e.lot || !existsSync(e.worktree)) return;
+  const entrees = entreesQuiCitent(e.worktree, e.lot);
+  e.nouveautes = { entrees, manquante: entrees?.length === 0 };
 }
 
 /** Les réglages de session d'un worktree retiré (aussi par --clore, clore.ts). */
@@ -380,12 +393,13 @@ function retirerRun(e: Etat): void {
 }
 
 function fin(e: Etat, o: Opts, registre = registreOuvert(e.worktree)): Etat {
-  if (e.etat !== 'integre' && existsSync(e.worktree)) e.tete = essaiGit(e.worktree, 'rev-parse', 'HEAD').stdout.trim() || e.tete;
+  if (e.etat !== 'integre' && existsSync(e.worktree)) { e.tete = essaiGit(e.worktree, 'rev-parse', 'HEAD').stdout.trim() || e.tete; noterNouveautes(e); }
   rendre(e, o);
   const duree = Math.round((Date.now() - Date.parse(e.debut)) / 1000);
   const ou = e.integre ? ` (${e.cible} = ${e.integre})` : '', rapport = e.rapport_tour ? ` · ${origineRapport(e)}` : '';
   o.out(`cadence run ${e.id} : ${e.etat}${ou} · ${duree} s · ${e.cout_usd.toFixed(2)} $${rapport}${e.detail ? `\n${e.detail}` : ''}`);
   if (e.passes?.length) o.out(lignePasses(e.passes)); // L726 : quel modèle a joué chaque passe, et pourquoi
+  if (e.lot && e.nouveautes) o.out(ligneNouveautes(e.lot, e.nouveautes.entrees)); // L794 : « Nouveautés manquante » pour un lot visible sans entrée
   for (const r of registre) o.out(`registre : ${r}`);
   if (e.etat !== 'integre') o.out(`worktree gardé : ${e.worktree} (état : ${e.fichier})`);
   sauver(e); // L773 : l'état final après les lignes de fin : qui le voit (--liste, le lead) lit un journal --fond complet
@@ -416,9 +430,10 @@ export function executerRun(a: { id?: string; repo: string; demande: string; pie
   copierDeps(repo, worktree);
   const aig = aiguiller(a.demande, worktree, a.pieces ?? [], a.complet);
   const nommees = commandesNommees(worktree, orchestrate(worktree), a.demande, a.lot); // L792 : lues au commit du run, comme sa porte
+  const visible = lotVisible(worktree, a.lot); // L794 : visible: true ou screen dans le plan du run
   const e: Etat = { id, repo, branche: `cadence/run-${id}`, cible, base: git(worktree, 'rev-parse', 'HEAD'), worktree, fichier: join(runs, `${basename(repo)}-${id}.json`),
     demande: a.demande, pieces: aig.pieces.map((p) => chemin(worktree, p)), taille: a.taille ?? 'fonction', mode: aig.mode, modele, acces_cluster: orchestrate(worktree).prodAccess === true, registre: a.registre, ...(a.lot ? { lot: a.lot } : {}),
-    ...(nommees.nommeSpec ? { spec_check: true } : {}),
+    ...(nommees.nommeSpec ? { spec_check: true } : {}), ...(visible ? { lot_visible: true } : {}),
     modele_raison: depart.raison, ...(depart.correctionRevue ? { correction_revue: true } : {}), ...(depart.correctionsAvant ? { corrections_avant: depart.correctionsAvant } : {}),
     ...(depart.revue ? { revue: depart.revue } : {}), ...(a.journal ? { journal: a.journal } : {}), session: crypto.randomUUID(), cout_usd: 0, etat: 'en-cours', detail: '', debut: new Date().toISOString() };
   sauver(e);
@@ -427,7 +442,8 @@ export function executerRun(a: { id?: string; repo: string; demande: string; pie
   if (sales.length) a.out(`cadence run ${id} : l'arbre principal a des modifications non commitées (hors plan en attente) : ${nommerFichiers(sales)} — le run part de `
     + `${e.base.slice(0, 7)} sans elles ; les commiter sur ${cible} est refusé pendant le run, et un fichier que le run change aussi fera échouer l'intégration`);
   // La ligne « Taille » du brief sert au banc (taille déclarée) ; dans un vrai dépôt, elle casserait commitlint : retirée.
-  const demande = `${a.demande}\n\n${a.lot ? `Lot du plan : ${a.lot}. Cite-le dans chaque message de commit, selon les conventions de commit du dépôt (par exemple feat(${a.lot}): …).\n\n` : ''}${nommees.texte}`
+  const nouveautes = a.lot && visible ? consigneNouveautes(a.lot, { maintenant: (a.maintenant ?? (() => new Date()))(), regenere: aRegenerer(worktree) }) : '';
+  const demande = `${a.demande}\n\n${a.lot ? `Lot du plan : ${a.lot}. Cite-le dans chaque message de commit, selon les conventions de commit du dépôt (par exemple feat(${a.lot}): …).\n\n` : ''}${nommees.texte}${nouveautes}`
     + preparerRegistre(worktree, a.registre, { demande: a.demande, lot: a.lot, run: id }); // L701 : la demande de l'humain seule entre au registre
   const brut = readFileSync(aig.bras.brief, 'utf8');
   const brief = briefRegistre(a.registre)(nommees.nommeSpec ? leverPourSpec(brut) : brut).split('\n').filter((l) => !l.startsWith('- Taille fixée par le gardien')).join('\n').replaceAll('{{DEMANDE}}', demande).replaceAll('{{CLONE}}', worktree)

@@ -24,6 +24,7 @@ export const AIDE_RUN = `  cadence run "<demande>" [--piece chemin]… [--lot L1
                                          « integre a la main » : run fini sans intégration dont la tête de branche est un ancêtre de la cible (L745) ; sinon son état
                                          et une ligne « commits absents de la cible : N » ; L767 : un run interrompu, en attente ou en quota sans processus
                                          dont la tête est sur la cible le dit, avec la commande --clore
+                                         « Nouveautés manquante » (L794) : le lot du run est visible dans le plan et aucune entrée Nouveautés ne le cite
   cadence run --clore <id>               clôt un run fini, intégré ou non : archive la tête de sa branche et le HEAD de son worktree (refs/cadence/archive/), puis
                                          retire la branche, et le dossier du worktree seulement s'il est propre (sinon il reste, et la commande le dit)
                                          L767 : un run interrompu, en attente ou en quota sans processus, dont la tête est sur la cible, se clôt aussi
@@ -55,7 +56,8 @@ export async function cmdRun(a: string[], io: Io, exec?: Executeur): Promise<num
       for (const e of etats) {
         const vu = etatVu(e), interrompu = vu === 'interrompu', l = etatListe(e);
         const notes = [e.etat === 'quota' && e.quota ? quotaListe(e, e.quota) : '', e.rapport_tour ? origineRapport(e) : '',
-          vu === 'en-cours' ? noteBloquee(e, occupantRun(e.fichier)?.pid, { seuilMin, env: io.env }) : ''].filter(Boolean);
+          vu === 'en-cours' ? noteBloquee(e, occupantRun(e.fichier)?.pid, { seuilMin, env: io.env }) : '',
+          e.nouveautes?.manquante ? `Nouveautés manquante (lot visible ${e.lot})` : ''].filter(Boolean); // L794
         out(`${e.id}  ${l.etat}${interrompu ? ` (reprendre : cadence run --reponse ${e.id} "reprends")` : ''}  ${e.demande.split('\n')[0].slice(0, 80)}`
           + `${notes.map((n) => `  · ${n}`).join('')}${interrompu ? causeListe(e.journal) : ''}`);
         if (l.absents) out(`    commits absents de la cible : ${l.absents} — ${e.cible} ; clore en archivant son travail : cadence run --clore ${e.id}`);

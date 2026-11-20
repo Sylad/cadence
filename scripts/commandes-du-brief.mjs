@@ -8,8 +8,8 @@
 // JavaScript, comme scripts/etapes-porte.mjs : v2 l'importe hors de son rootDir.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
-import { parse } from 'yaml';
 import { lireEtapes } from './etapes-porte.mjs';
+import { lotDuPlan } from './nouveautes-du-run.mjs';
 
 /** Les outils de bin/cadence.js qu'une session de run ne lance jamais ; `spec` n'y est pas : ses verbes autres que check|qa sont refusés par le hook. */
 export const OUTILS_CADENCE = ['run', 'sondes', 'raf', 'news', 'session', 'deliver', 'verify', 'eval', 'skills', 'orchestrate', 'lead', 'corrections', 'perf',
@@ -30,20 +30,11 @@ const plat = (t) => t.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 export const demandeToucheFiches = (demande) => /fiches? (d['’]ecrans?|back|mixtes?|valides?)|fiche\.yaml|spec check/.test(plat(demande));
 const code = (cs) => cs.map((c) => `\`${c}\``).join(', puis ');
 
-/** Revue r1 (m1) : le lot du plan (`lot`, sous-tâche comprise) a la spec (`spec: true`) ou un écran (`screen: page`, qui l'implique). Plan : `plan` de
- * cadence.yaml, sinon .cadence/raf.yaml (PLAN_DEFAULT de src/config.ts) ; un plan absent ou illisible vaut non. */
+/** Revue r1 (m1) : le lot du plan (`lot`, sous-tâche comprise) a la spec (`spec: true`) ou un écran (`screen: page`, qui l'implique). Plan lu par
+ * lotDuPlan (scripts/nouveautes-du-run.mjs, L794) ; un plan absent ou illisible vaut non. */
 export function lotAFiches(repo, lot) {
-  if (!lot) return false;
-  try {
-    const cfg = existsSync(join(repo, 'cadence.yaml')) ? parse(readFileSync(join(repo, 'cadence.yaml'), 'utf8')) ?? {} : {};
-    const nomme = typeof cfg.plan === 'string' ? cfg.plan : typeof cfg.plan?.path === 'string' ? cfg.plan.path : undefined;
-    const fichier = join(repo, nomme ?? '.cadence/raf.yaml');
-    const lots = (existsSync(fichier) ? parse(readFileSync(fichier, 'utf8'))?.lots : undefined) ?? [];
-    const trouve = lots.flatMap((l) => [l, ...(Array.isArray(l?.tasks) ? l.tasks : [])]).find((l) => String(l?.id) === lot);
-    return trouve?.spec === true || trouve?.screen === 'page';
-  } catch {
-    return false;
-  }
+  const trouve = lotDuPlan(repo, lot);
+  return trouve?.spec === true || trouve?.screen === 'page';
 }
 
 /**

@@ -39,6 +39,8 @@
     "scripts/etapes-porte.d.mts",
     "scripts/commandes-du-brief.mjs",
     "scripts/commandes-du-brief.d.mts",
+    "scripts/nouveautes-du-run.mjs",
+    "scripts/nouveautes-du-run.d.mts",
     "scripts/sondes-interaction.mjs",
     "scripts/sondes-interaction.d.mts",
     "scripts/sondes-garde.mjs",

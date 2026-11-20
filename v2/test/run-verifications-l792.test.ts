@@ -23,8 +23,8 @@ function avec(repo: string, fichiers: Record<string, string>): string {
 const reglages = (a: string[]) => JSON.parse(readFileSync(a[a.indexOf('--settings') + 1], 'utf8')) as { hooks?: { PreToolUse?: unknown[] } };
 const HOOK = join(HOOKS, 'seul-spec-check.mjs');
 /** Le code de sortie et l'erreur du hook pour une commande Bash, comme Claude Code l'appelle (entrée JSON sur stdin). */
-function hook(command: string): { code: number | null; err: string } {
-  const r = spawnSync('node', [HOOK], { input: JSON.stringify({ tool_name: 'Bash', tool_input: { command } }), encoding: 'utf8' });
+function hook(command: string, cwd?: string): { code: number | null; err: string } {
+  const r = spawnSync('node', [HOOK], { input: JSON.stringify({ tool_name: 'Bash', tool_input: { command }, ...(cwd ? { cwd } : {}) }), encoding: 'utf8' });
   return { code: r.status, err: r.stderr };
 }
 const YAML = 'orchestrate:\n  build: test -d docs\n  test: test -f fait.txt\n  accept: npx vitest run -c vitest.acceptation.config.ts\n';
@@ -88,6 +88,52 @@ describe('L792 : vérifications nommées dans le brief de cadence run', () => {
     for (const c of ['cadence spec check docs/specs/a/fiche.yaml', 'cadence spec qa docs/specs/a/fiche.yaml > /tmp/qa.md', 'npx cadence spec check a/fiche.yaml',
       'for f in docs/specs/*/fiche.yaml; do cadence spec check "$f"; done', 'node bin/cadence.js spec check a/fiche.yaml', 'npx vitest run',
       'git commit -m "fix: cadence spec L1 on refusé"', "grep -n 'cadence spec green' docs/x.md", 'echo raf', 'ls cadence']) expect(hook(c).code, c).toBe(0);
+  });
+
+  it('m1 (revue r2) : node …/dist/cli.js de cadence (ou de son v2) est refusé, celui d un autre projet passe', () => {
+    const racine = join(import.meta.dirname, '..', '..'), autre = avec(depot(), { 'package.json': '{ "name": "autre" }\n' });
+    for (const [c, cwd] of [['node dist/cli.js spec L1 on', racine], ['node ./dist/cli.js spec L1 on', racine], ['node v2/dist/cli.js run --liste', racine],
+      ['node ../dist/cli.js spec L1 on', join(racine, 'v2')], [`node ${join(racine, 'dist', 'cli.js')} start L1`, autre],
+      ['node node_modules/@sylad/cadence/dist/cli.js spec L9 on', autre], ['cd x && node dist/cli.js spec L1 on', racine]] as const) {
+      expect(hook(c, cwd).code, c).toBe(2);
+    }
+    for (const c of ['node dist/cli.js spec L1 on', 'node dist/cli.js', 'node src/cli.js spec L1 on']) expect(hook(c, autre).code, c).toBe(0);
+  });
+
+  it('m1 (revue r2) : node bin/raf.js, raf.js par chemin et raf.mjs sont refusés', () => {
+    for (const c of ['node bin/raf.js start L1', 'node ./node_modules/@sylad/cadence/bin/raf.js done L1', '/x/bin/raf.js add "t"', 'node bin/raf.mjs list']) {
+      expect(hook(c).code, c).toBe(2);
+    }
+  });
+
+  it('m1 (revue r2) : /usr/bin/env cadence et env avec options sont refusés, env cadence spec check passe', () => {
+    for (const c of ['/usr/bin/env cadence spec L1 on', 'env cadence spec L1 on', 'env -i cadence spec L1 on', 'env -u HOME cadence spec L1 on',
+      '/usr/bin/env -C /tmp raf start L1', 'env FOO=1 raf start L1', '/usr/bin/nohup cadence run --liste']) expect(hook(c).code, c).toBe(2);
+    for (const c of ['/usr/bin/env cadence spec check a/fiche.yaml', 'env -u HOME node x.js', '/usr/bin/env python3 x.py']) expect(hook(c).code, c).toBe(0);
+  });
+
+  it('m1 (revue r2) : npx cadence@<version> et @sylad/cadence@<version> sont refusés, leur spec check passe', () => {
+    for (const c of ['npx cadence@latest spec L1 on', 'npx --yes cadence@latest spec L1 on', 'npx cadence@2.0.12 spec L1 off', 'npx -y @sylad/cadence@2.0.12 spec L1 on',
+      'pnpm dlx @sylad/cadence@latest raf done L1', 'npx raf@1 start L1']) expect(hook(c).code, c).toBe(2);
+    for (const c of ['npx cadence@latest spec check a/fiche.yaml', 'npx -y @sylad/cadence@2.0.12 spec qa a/fiche.yaml', 'npx vitest@3 run']) {
+      expect(hook(c).code, c).toBe(0);
+    }
+  });
+
+  it('m1 (revue r2) : sudo -u x cadence et ses options à valeur sont refusés', () => {
+    for (const c of ['sudo -u x cadence spec L1 on', 'sudo -u x -g y raf start L1', 'sudo --user x cadence spec L1 on', 'sudo --user=x cadence spec L1 on',
+      'sudo -E -u x /usr/local/bin/cadence spec L1 on', '/usr/bin/sudo -n cadence run --liste']) expect(hook(c).code, c).toBe(2);
+    for (const c of ['sudo -u x cadence spec check a/fiche.yaml', 'sudo -u cadence ls', 'sudo -u raf whoami']) expect(hook(c).code, c).toBe(0);
+  });
+
+  it('m2 (revue r2) : le texte d un heredoc n est pas une commande ; ce qui suit sa ligne de fin est lu', () => {
+    const corps = 'fix(L1): x\n\ncadence spec L1 on\n- raf add "x"\nraf start L1\n';
+    for (const c of [`git commit -F - <<'EOF'\n${corps}EOF`, `git commit -F - <<EOF\n${corps}EOF\n`, `git commit -F - <<"EOF"\n${corps}EOF`,
+      `cat > notes.md <<'FIN'\n- raf add "x"\ncadence run --liste\nFIN`, `cat <<-EOF > n.md\n\tcadence spec L1 on\n\tEOF`, `cat <<\\EOF\nraf start L1\nEOF`,
+      `cat <<A <<B\ncadence run\nA\nraf start\nB\necho fini`, `cat <<EOF | tee x\nraf done L1\nEOF`, 'cat <<< "raf start L1"',
+      `cat <<EOF\nEOFX\nraf start L1`]) expect(hook(c).code, c).toBe(0); // le dernier : heredoc jamais fermé, tout le reste est son texte
+    for (const c of [`cat <<'EOF' > x\ncadence spec L1 on\nEOF\ncadence spec L1 on`, `cat <<EOF && raf start L1\ntexte\nEOF`,
+      `git commit -F - <<'EOF'\nraf\nEOF\nraf start L1`, `cat <<-EOF\n\tx\n\tEOF\nraf start L1`, 'cat <<<"x"; raf start L1']) expect(hook(c).code, c).toBe(2);
   });
 
   it('M1 (revue r1) : la commande refusée par le hook écrirait bien le plan', async () => {

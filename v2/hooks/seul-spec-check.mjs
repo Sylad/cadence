@@ -7,7 +7,7 @@ import { cadenceHorsSpecCheck } from '../../scripts/commandes-du-brief.mjs';
 
 let entree;
 try { entree = JSON.parse(readFileSync(0, 'utf8')); } catch { process.exit(0); }
-const refus = entree?.tool_name === 'Bash' ? cadenceHorsSpecCheck(entree.tool_input?.command ?? '') : null;
+const refus = entree?.tool_name === 'Bash' ? cadenceHorsSpecCheck(entree.tool_input?.command ?? '', entree.cwd) : null;
 if (refus) {
   process.stderr.write(`Refusé par cadence run : \`${refus}\` — dans cette session, la seule commande cadence permise est \`cadence spec check|qa <fiche.yaml>\`, `
     + 'qui lit une fiche sans rien écrire ; le plan, les vagues et les autres outils de cadence et de raf restent au lead.\n');

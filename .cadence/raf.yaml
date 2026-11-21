@@ -4055,11 +4055,12 @@ lots:
     finished: 2026-11-21
   - id: L801
     title: "D-23 : étape « analyse » générique dans la porte de cadence run (v2) — clé analyse: de cadence.yaml, une commande par techno (ESLint typé + tsc --noEmit pour TS, ruff pour Python, Checkstyle + PMD (+ SpotBugs) par Maven pour Java, analyseurs .NET pour C#) ; l'existant est gelé par un cliquet générique (ligne de base par outil, versionnée ; seules les nouvelles violations font échouer ; une baisse s'écrit, une hausse jamais) ; rien de propre à nos dépôts (sert le compte pro) ; s'appuie sur docs/qualite.md et scripts/qualite.mjs (L462) sans les dupliquer ; doc et recette par techno ; mesure : aucune nouvelle violation ne passe la porte, violations gelées en baisse par semaine"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-21
     started: 2026-11-21
-    review: { date: 2026-11-21, verdict: "non conforme r4 (tmp/revue-L801-r4.md) : r3 M1/M2/M3 et r1/r2 corrigés ; MAJEUR analyse.mjs:291,347,407 (318) — une base est « neuve » si son fichier est absent au départ, sans regarder quel outil la lisait : un fichier orphelin (outil retiré) ou déposé par un lot ordinaire, repris par un lot config: true, n'est ni mesuré ni signalé", commit: 51a6ef7404ba113659fa0f842cf38b601a7b62b0 }
+    review: { date: 2026-11-21, verdict: "conforme r5 conforme : M1 r4 corrigé et testé, aucun contournement nouveau (tmp/revue-L801-r5.md)", commit: 9f1d942c796d389c3b56463a9f4669220f5bd2cc }
+    finished: 2026-11-21
   - id: L802
     title: "D-30 : la barre (bandeau du lead) doit dire d'un coup d'œil si l'on peut fermer — séparer ce qui tourne (run vivant, sous-agent actif) de l'historique (run intégré, interrompu, rendu) ; compter les agents vivants seulement ; un hold échu sans session vivante le dit ; les créneaux affichés suivent le plafond appliqué ; une ligne « rien ne tourne, tu peux fermer » quand c'est le cas — capture réelle avant/après"
     status: todo

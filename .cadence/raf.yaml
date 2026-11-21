@@ -4058,6 +4058,11 @@ lots:
     status: todo
     estimate: 1
     created: 2026-11-21
+  - id: L802
+    title: "D-30 : la barre (bandeau du lead) doit dire d'un coup d'œil si l'on peut fermer — séparer ce qui tourne (run vivant, sous-agent actif) de l'historique (run intégré, interrompu, rendu) ; compter les agents vivants seulement ; un hold échu sans session vivante le dit ; les créneaux affichés suivent le plafond appliqué ; une ligne « rien ne tourne, tu peux fermer » quand c'est le cas — capture réelle avant/après"
+    status: todo
+    estimate: 1
+    created: 2026-11-21
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

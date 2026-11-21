@@ -131,8 +131,8 @@ exists, create the baseline with `cadence analyse --init` (no `--contre`).
 
 ## Changing a config without a native plan
 
-Rule 4 lets a `config: true` lot change a tool's config, and only the native plan (`.cadence/raf.yaml`,
-`docs/plan/raf.yaml`) can declare one. A project whose plan is kept elsewhere (`plan:` of `cadence.yaml`: Jira, a CSV)
+Rule 4 lets a `config: true` lot change a tool's config, and only the native plan (`.cadence/raf.yaml`, or
+the same file at its location before `raf migrate`) can declare one. A project whose plan is kept elsewhere (`plan:` of `cadence.yaml`: Jira, a CSV)
 or that has no plan would never touch `tsconfig.json` again once it is in `configs`. There, and only there (no native
 plan at the start of the lot), **a commit of the lot declares the change** on a line of its message:
 

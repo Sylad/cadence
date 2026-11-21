@@ -10,10 +10,14 @@ export function jugerOutil(racine: string, outil: OutilAnalyse, mode: 'verifier'
 export function commandePorte(cible: string): string;
 export function main(argv: string[], io: { cwd: string; out: (l: string) => void; err: (l: string) => void }): Promise<number>;
 export function etapeAnalyse(valeur: unknown, cible: string): { commandes: string[]; refus?: string };
-/** Les adoptions déclarées par les commits du lot (`Analyse-adoption: <outil>` dans un message, `contre..HEAD`) : nom d'outil → sha court. */
-export function adoptionsDeclarees(racine: string, contre: string): Map<string, string>;
+/** Ce que les commits du lot déclarent (`contre..HEAD`), nom d'outil → sha court : `Analyse-adoption: <outil>` et `Analyse-config: <outil>` (sans plan natif). */
+export interface Declarations { adoptions?: Map<string, string>; configs?: Map<string, string> }
+export function declarationsDuLot(racine: string, contre: string): Required<Declarations>;
 /**
  * La garde de l'analyse contre le départ du lot : un outil retiré ou modifié sous `analyse:` ou une `configs` changée hors d'un lot `config: true`, une base
- * née sans lot `config: true` ni adoption déclarée. `neuves` : les bases nées dans le lot et ce qui les autorise (à afficher).
+ * née sans lot `config: true` ni adoption déclarée. À afficher : `neuves`, les bases nées dans le lot et ce qui les autorise ; `configs`, les outils dont la
+ * config a changé par un changement déclaré (projet sans plan natif).
  */
-export function gardeIdentite(racine: string, ref: import('./qualite.mjs').Ref, outils: OutilAnalyse[], parse: (texte: string) => unknown, declarees?: Map<string, string>): { refus: { code: number; texte: string } | null; neuves: string[] };
+export function gardeIdentite(racine: string, ref: import('./qualite.mjs').Ref, outils: OutilAnalyse[], parse: (texte: string) => unknown, declare?: Declarations): { refus: { code: number; texte: string } | null; neuves: string[]; configs: string[] };
+/** Les lignes d'une porte verte à relire (« analyse : ligne de base neuve : … », « analyse : config changée : … »), que cadence run reprend à son journal. */
+export function lignesARelire(sortie: string): string[];

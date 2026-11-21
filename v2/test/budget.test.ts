@@ -89,6 +89,8 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // scripts/nouveautes-du-run.mjs), sans ligne tassée.
   // L801 : run 1205 (+3) : l'étape analyse (clé analyse:, scripts/analyse.mjs) jouée entre le build et les tests de la porte, contre la cible du run,
   // sans ligne tassée (le cliquet et les lecteurs vivent dans scripts/analyse.mjs).
+  // L801 (revue r3, M2) : run 1209 (+4) : la porte verte reprend au journal et au détail de l'état integre ce que l'analyse dit à relire (ligne de base
+  // neuve, config changée par déclaration : lignesARelire de scripts/analyse.mjs), sans ligne tassée.
   // L775 : bench 1609 (+21), sequence 717 (+2), mesure 2326 : le détecteur de fuites ignore les appels refusés par le hook du bras (refusParHook, partagé
   // avec lectureReferences), sans ligne tassée.
   // L777 : bench 1672 (+63), mesure 2389 : « tests d'origine verts » compte les tests d'origine réussis par bras (testsReussis, cachesReussis, lus dans les

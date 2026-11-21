@@ -61,6 +61,8 @@ way the tool itself recognises its directive, whatever the layout of the comment
   (`/*⏎ eslint-disable⏎*/`, `/** eslint-disable */`); the inline config `/* eslint <rule>: off */` counts as `eslint-config`
   (any rule set inline, a raised threshold, a quoted rule name, on several lines too), and `/* global x */`,
   `/* globals x */`, `/* exported x */` as `eslint-global` (they switch `no-undef` or `no-unused-vars` off for a name).
+  ESLint honours `/* exported */` only with `sourceType: "script"` (ESLint 9 reads a `.js` as a module); the pattern
+  cannot know the source type, so it is counted everywhere: too much rather than too little.
 - `tsc`: `@ts-ignore`, `@ts-expect-error` and `@ts-nocheck` count after `//` or `/*`, and at the start of any line after
   blanks, `/` and `*`: tsc honours the directive on the **last line** of a block comment whatever the lines before say
   (`/* why⏎ @ts-ignore */`).
@@ -84,8 +86,15 @@ way the tool itself recognises its directive, whatever the layout of the comment
    `config: true`**: an entry of `analyse:` removed or changed (name, command, format, dir, report, baseline, configs), or a
    file of `configs` that differs from the start, is refused unless every commit that touches it cites only such lots, or the
    run is on the branch of such a lot (which then touches nothing but configs, baselines and tests). The rule and its reading
-   of the plan are shared with [qualite.md](qualite.md) (`scripts/lot-de-config.mjs`). **A baseline is born only declared**
-   ([Adopting a tool](#adopting-a-tool)), and the gate says so each time.
+   of the plan are shared with [qualite.md](qualite.md) (`scripts/lot-de-config.mjs`). A project **without a native plan**
+   has no such lot: there a config changes by a declared change
+   ([Changing a config without a native plan](#changing-a-config-without-a-native-plan)). **A baseline is born only
+   declared** ([Adopting a tool](#adopting-a-tool)), the gate says so each time, and **a new baseline is its measure**:
+   absent at the start of the lot, it must equal what the tool measures at the judged commit — no key above its measure,
+   no key the measure does not have (a file that does not exist, a rule never broken). A baseline written or raised by
+   hand is refused (« ligne de base neuve … différente de la mesure », the keys named), adopted or not: it would pass
+   the adoption, then let the next lots add violations up to the invented ceiling. `cadence analyse --init --outil <name>
+   --contre <ref>` measures it again.
 5. **Moving or splitting a file** makes new keys: `cadence analyse --migrer --contre main` rewrites the baseline only if no
    file that existed went up, no total went up, and each new file is credited by its source (the file it takes at least
    50 % of its lines from), as `--migrer` in [qualite.md](qualite.md#the-ratchet). A copy that leaves its source intact is refused.
@@ -94,9 +103,12 @@ way the tool itself recognises its directive, whatever the layout of the comment
 
 ## Adopting a tool
 
-A baseline absent at the start of the lot is a fresh, free measure: whatever it freezes passes. So it never appears
-silently, and it never replaces a judge that existed. Two ways, both printed by the gate
-(« analyse : ligne de base neuve : tsc (.cadence/analyse/tsc.json) — … »):
+A baseline absent at the start of the lot is a fresh measure: whatever the code holds that day is frozen. So it never
+appears silently, it never replaces a judge that existed, and it holds nothing but the measure (rule 4). Two ways, both
+printed by the gate (« analyse : ligne de base neuve : tsc (.cadence/analyse/tsc.json) — … ») and both kept by
+`cadence run` when the gate is green: the line goes to the run's log, once, and to the detail of the `integre` state
+(« … — à relire »), on the run's last line and in its state file — a run that adopts a tool never ends as a plain
+`integre`:
 
 - **A declared adoption, in an ordinary lot.** A commit of the lot carries, on a line of its message,
   `Analyse-adoption: <name>[, <name>…]`. The gate accepts for each named tool an entry of `analyse:` that did not exist at
@@ -117,8 +129,38 @@ that adopts, where the review reads it; a run integrates by fast-forward, so it 
 and names the line to write, so a baseline is never born by accident (a typo in `name`, an entry moved). Before the commit
 exists, create the baseline with `cadence analyse --init` (no `--contre`).
 
+## Changing a config without a native plan
+
+Rule 4 lets a `config: true` lot change a tool's config, and only the native plan (`.cadence/raf.yaml`,
+`docs/plan/raf.yaml`) can declare one. A project whose plan is kept elsewhere (`plan:` of `cadence.yaml`: Jira, a CSV)
+or that has no plan would never touch `tsconfig.json` again once it is in `configs`. There, and only there (no native
+plan at the start of the lot), **a commit of the lot declares the change** on a line of its message:
+
+```
+Analyse-config: tsc[, <name>…]
+```
+
+For each named tool the gate then accepts, in an ordinary lot that is otherwise free (a TypeScript upgrade touches
+`package.json` too):
+
+- the files of its `configs`, changed, added or removed — except a file another tool of the start also declares, until
+  that tool is named as well;
+- its entry of `analyse:` changed under the same `name` and the same `baseline` path (`command`, `format`, `dir`,
+  `report`, the `configs` list).
+
+The gate prints each change with the commit that declares it, and `cadence run` keeps the line in its log and in the
+detail of the `integre` state, like a new baseline:
+« analyse : config changée : tsc — tsconfig.json (modifié) — changement déclaré par le commit 1a2b3c4 (Analyse-config: tsc) ».
+Without the line the gate refuses and names it; `git log --grep '^Analyse-config:'` lists every declared change.
+
+What stays refused, declared or not: removing a tool, renaming it, moving its baseline — each would free a baseline. In
+such a project that is a decision of the lead, integrated by `cadence run --sans-porte`. The ratchet still judges the
+lot: the baseline does not go up, so a config that brings existing files into the measure (a folder added to `include`)
+passes only once what it finds there is fixed. With a native plan the line is ignored and the refusal stays: the plan
+of the start decides, not the lot.
+
 **Do not declare a dependency manifest in `configs`** (`package.json`, `pom.xml`, `pyproject.toml`): every later lot that
-adds a dependency would be refused. Keep thresholds and exclusions in a file of their own (`eslint.config.mjs`,
+adds a dependency would be refused (with a native plan; without one, each would need its `Analyse-config` line). Keep thresholds and exclusions in a file of their own (`eslint.config.mjs`,
 `ruff.toml`, `checkstyle.xml`, `pmd-ruleset.xml`) and name it on the command line of the entry where the tool allows it:
 the command is part of the identity, so pointing it at another ruleset is refused.
 
@@ -178,6 +220,9 @@ git add -A
 git commit -q -m "chore: adopt eslint and tsc" -m "Analyse-adoption: eslint, tsc"
 npx cadence analyse --contre main
 ```
+
+`tsconfig.json` is in `configs`: a later lot that changes it is a `config: true` lot of the native plan, or, without a
+native plan, a lot whose commit says `Analyse-config: tsc` (the test plays both the refusal and the declared change).
 
 Set `linterOptions.noInlineConfig` if you want `eslint-disable` refused by ESLint as well as counted. In a monorepo, one
 entry per workspace (`dir`).

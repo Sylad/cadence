@@ -7,6 +7,9 @@ import { join } from 'node:path';
 // Les plans que cadence lit par défaut (un plan tenu par un autre outil, `plan:` de cadence.yaml, n'est pas cherché : le lot n'y est pas de config).
 const PLANS = ['.cadence/raf.yaml', 'docs/plan/raf.yaml'];
 
+/** Vrai si le départ a un plan natif (l'un de PLANS) : sans lui aucun lot ne peut être `config: true`, et scripts/analyse.mjs ouvre sa voie déclarée (L801 r3, M3). */
+export const planNatif = (config) => PLANS.some((f) => config(f) !== null);
+
 /**
  * Les ids des lots que le plan du point de départ déclare `config: true`. Lu au départ, pas dans l'arbre : un lot ne se déclare pas lui-même
  * exempté. Vide sans plan.

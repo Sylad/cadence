@@ -6,3 +6,4 @@ export function fichiersDifferents(racine: string, ref: Ref, fichiers: string[])
 export function lotsDeConfig(config: (chemin: string) => string | null): Set<string>;
 export function lireSiPresent(racine: string, fichier: string): string | null;
 export function differences(couples: [string, string | null, string | null][]): string[];
+export function planNatif(config: (chemin: string) => string | null): boolean;

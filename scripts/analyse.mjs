@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, posix, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { configChangee, differences, fichiersDifferents } from './lot-de-config.mjs';
+import { configChangee, differences, fichiersDifferents, planNatif } from './lot-de-config.mjs';
 import { comparer, comparerMigration, creerLien, ligne, lireEslint, lireRef, neufsAuDessus, remontees, retardSurBranche, serialiser } from './qualite.mjs';
 
 /** Le chemin de ce script : la porte de cadence run le lance par lui (`node <script> --contre <cible>`). */
@@ -247,20 +247,25 @@ const lireJson = (f) => JSON.parse(readFileSync(f, 'utf8'));
 const ecrire = (f, m) => { mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, serialiser(m)); };
 
 /**
- * Les adoptions que les commits du lot déclarent (revue L801 r2, M1') : une ligne `Analyse-adoption: <outil>[, <outil>…]` dans le message d'un commit
- * depuis le départ (`contre..HEAD`). Rend nom d'outil → sha court du commit qui le déclare. Le message reste dans l'historique (un run intègre en
- * fast-forward) : `git log --grep '^Analyse-adoption:'` liste toutes les adoptions d'un dépôt.
+ * Ce que les commits du lot déclarent par une ligne `<cle>: <outil>[, <outil>…]` de leur message, depuis le départ (`contre..HEAD`) : nom d'outil → sha court
+ * du commit qui le déclare. Le message reste dans l'historique (un run intègre en fast-forward) : `git log --grep '^Analyse-adoption:'` liste les adoptions
+ * d'un dépôt, `--grep '^Analyse-config:'` ses changements de config déclarés.
  */
-export function adoptionsDeclarees(racine, contre) {
+function declarations(racine, contre, cle) {
   const r = spawnSync('git', ['log', '--format=%h%x00%B%x01', `${contre}..HEAD`], { cwd: racine, encoding: 'utf8', maxBuffer: 64 << 20 });
   if (r.status !== 0) throw new Error(`git log ${contre}..HEAD a échoué : ${r.stderr?.trim() || r.error?.message}`);
   const m = new Map();
   for (const bloc of r.stdout.split('\x01')) {
     const [sha, message = ''] = bloc.trim().split('\0');
-    for (const [, noms] of message.matchAll(/^Analyse-adoption:[ \t]*(.+)$/gim)) for (const n of noms.split(/[\s,]+/).filter(Boolean)) if (!m.has(n)) m.set(n, sha);
+    for (const [, noms] of message.matchAll(new RegExp(`^${cle}:[ \\t]*(.+)$`, 'gim'))) for (const n of noms.split(/[\s,]+/).filter(Boolean)) if (!m.has(n)) m.set(n, sha);
   }
   return m;
 }
+/**
+ * Ce que les commits du lot déclarent : `adoptions` (revue L801 r2, M1' : `Analyse-adoption: <outil>`, une ligne de base qui naît dans un lot ordinaire) et
+ * `configs` (revue L801 r3, M3 : `Analyse-config: <outil>`, la voie d'un projet sans plan natif, où aucun lot n'est `config: true`).
+ */
+export const declarationsDuLot = (racine, contre) => ({ adoptions: declarations(racine, contre, 'Analyse-adoption'), configs: declarations(racine, contre, 'Analyse-config') });
 
 /**
  * Ce que l'analyse juge au départ du lot, pour configChangee de scripts/lot-de-config.mjs (L586 : la même règle « config: true », la même lecture des commits) :
@@ -268,33 +273,50 @@ export function adoptionsDeclarees(racine, contre) {
  * `configs` ne changent pas hors d'un lot déclaré `config: true`. Sans cette garde, renommer l'outil (ou sa base) donnerait une base « neuve », donc libre, et
  * la hausse passerait. `departs` : les outils de cadence.yaml au départ.
  * Une ligne de base qui NAÎT (absente au départ) passe par deux voies, toutes deux dites par la porte (`neuves`) : le lot `config: true`, ou l'ADOPTION
- * déclarée (`declarees`, adoptionsDeclarees) d'un lot ordinaire, qui touche ce qu'il veut (manifeste de dépendances compris) et ne dépend d'aucun plan.
+ * déclarée (`declare.adoptions`, declarationsDuLot) d'un lot ordinaire, qui touche ce qu'il veut (manifeste de dépendances compris) et ne dépend d'aucun plan.
  * Une adoption est un ajout pur : l'outil n'existait pas au départ (ou y était sans base, entrée inchangée), sa base n'est celle d'aucun outil du départ ;
  * ses `configs` sont libres dans ce lot, sauf celles qu'un outil du départ déclare déjà. Rien de ce que le départ jugeait n'y perd son juge : retirer ou
  * modifier un outil reste refusé, donc renommer (tsc → tsc2 : « tsc » retiré) aussi, adoption déclarée ou non.
+ * SANS PLAN NATIF au départ (revue L801 r3, M3 : aucun lot ne peut y être `config: true`), un outil du départ change de config par un CHANGEMENT DÉCLARÉ
+ * (`declare.configs` : la ligne `Analyse-config: <outil>` d'un commit du lot) : son entrée peut être modifiée (même nom, même chemin de base : ni
+ * retrait, ni renommage, ni base déplacée — jamais une base neuve) et ses fichiers de `configs` (ceux du départ et ceux d'aujourd'hui) changer, sauf un
+ * fichier qu'un autre outil du départ, non déclaré, lit aussi. La porte dit chaque changement (`dites`). Avec un plan natif la ligne ne vaut rien : seul le
+ * lot `config: true`, que le plan du départ déclare, change une config.
  */
-function jeuAnalyse(racine, ref, outils, departs, declarees) {
+function jeuAnalyse(racine, ref, outils, departs, { adoptions: declarees = new Map(), configs = new Map() }) {
   const tous = [...departs, ...outils];
   const auDepart = (n) => departs.find((o) => o.name === n);
+  const actuel = (n) => outils.find((o) => o.name === n);
   const identite = (o) => (o ? JSON.stringify(o) : null);
   const neuve = (o) => ref.config(o.baseline) === null;
   const adoptable = (o) => neuve(o) && (!auDepart(o.name) || identite(auDepart(o.name)) === identite(o)) && !departs.some((d) => d.name !== o.name && d.baseline === o.baseline);
   const adoptes = outils.filter((o) => adoptable(o) && declarees.has(o.name));
   const aDeclarer = outils.filter((o) => adoptable(o) && !declarees.has(o.name)).map((o) => o.name);
+  // sans plan natif : les outils du départ gardés sous leur nom et leur base, dont la config peut changer par déclaration
+  const declarables = planNatif(ref.config) ? [] : departs.filter((d) => actuel(d.name)?.baseline === d.baseline);
+  const declares = declarables.filter((d) => configs.has(d.name));
+  const fichiersDe = (d) => [...new Set([...d.configs, ...actuel(d.name).configs])];
+  const tenues = new Set(departs.filter((d) => !declares.includes(d)).flatMap((o) => o.configs));
   const figees = new Set(departs.flatMap((o) => o.configs));
-  const libres = new Set(adoptes.flatMap((o) => o.configs).filter((c) => !figees.has(c)));
-  const configs = new Set(tous.flatMap((o) => o.configs));
+  const libres = new Set([...adoptes.flatMap((o) => o.configs).filter((c) => !figees.has(c)), ...declares.flatMap(fichiersDe).filter((c) => !tenues.has(c))]);
+  const toutes = new Set(tous.flatMap((o) => o.configs));
   const bases = new Set(tous.map((o) => o.baseline));
+  const exemptes = new Set([...adoptes, ...declares].map((o) => o.name));
   const changees = () => [
-    ...differences([...new Set(tous.map((o) => o.name))].filter((n) => !adoptes.some((o) => o.name === n)).map((n) => [`cadence.yaml#analyse.${n}`, identite(auDepart(n)), identite(outils.find((o) => o.name === n))])),
+    ...differences([...new Set(tous.map((o) => o.name))].filter((n) => !exemptes.has(n)).map((n) => [`cadence.yaml#analyse.${n}`, identite(auDepart(n)), identite(actuel(n))])),
     ...outils.filter((o) => neuve(o) && !adoptes.includes(o)).map((o) => `${o.baseline} (nouveau)`),
-    ...fichiersDifferents(racine, ref, [...configs].filter((c) => !libres.has(c))),
+    ...fichiersDifferents(racine, ref, [...toutes].filter((c) => !libres.has(c))),
   ];
+  // ce qu'un outil du départ a changé : son entrée, ses fichiers de configs
+  const change = (d) => [...differences([[`cadence.yaml#analyse.${d.name}`, identite(d), identite(actuel(d.name))]]), ...fichiersDifferents(racine, ref, fichiersDe(d))];
+  const aDire = declarables.filter((d) => !declares.includes(d) && change(d).length).map((d) => d.name);
   const adoption = aDeclarer.length ? ` ; un outil neuf s'adopte dans un lot ordinaire, par la ligne « Analyse-adoption: ${aDeclarer.join(', ')} » dans le message d'un commit du lot (docs/analyse.md)` : '';
+  const config = aDire.length ? ` ; ce dépôt n'a pas de plan natif : la config d'un outil s'y change par la ligne « Analyse-config: ${aDire.join(', ')} » dans le message d'un commit du lot, que la porte affiche (docs/analyse.md)` : '';
   return {
-    actif: true, changees, estConfig: (f) => f === 'cadence.yaml' || configs.has(f) || bases.has(f),
-    raison: `l'identité d'un outil (nom, commande, format, dossier, rapport, chemin, configs), un seuil ou une exclusion ne se change pas hors d'un lot « config: true » du plan, livré seul (corriger le code, pas l'outil), et une ligne de base ne naît pas sans être déclarée${adoption}`,
+    actif: true, changees, estConfig: (f) => f === 'cadence.yaml' || toutes.has(f) || bases.has(f),
+    raison: `l'identité d'un outil (nom, commande, format, dossier, rapport, chemin, configs), un seuil ou une exclusion ne se change pas hors d'un lot « config: true » du plan, livré seul (corriger le code, pas l'outil), et une ligne de base ne naît pas sans être déclarée${adoption}${config}`,
     neuves: outils.filter(neuve).map((o) => `${o.name} (${o.baseline}) — ${adoptes.includes(o) ? `adoption déclarée par le commit ${declarees.get(o.name)} (Analyse-adoption: ${o.name})` : 'lot « config: true » du plan'}`),
+    dites: declares.filter((d) => change(d).length).map((d) => `${d.name} — ${change(d).join(', ')} — changement déclaré par le commit ${configs.get(d.name)} (Analyse-config: ${d.name})`),
   };
 }
 
@@ -306,12 +328,13 @@ function outilsAuDepart(ref, parse) {
 
 /**
  * La garde d'identité, de naissance et de configs de l'analyse (jeuAnalyse) contre le départ du lot : `refus` ({ code: 1, texte } ou null) et, sans refus,
- * `neuves` — chaque ligne de base née dans le lot avec ce qui l'autorise, que la porte affiche (jamais une base neuve en silence).
+ * ce que la porte affiche (jamais en silence) : `neuves` — chaque ligne de base née dans le lot avec ce qui l'autorise — et `configs` — chaque outil dont la
+ * config a changé par un changement déclaré (projet sans plan natif). `declare` : declarationsDuLot.
  */
-export function gardeIdentite(racine, ref, outils, parse, declarees = new Map()) {
-  const jeu = jeuAnalyse(racine, ref, outils, outilsAuDepart(ref, parse), declarees);
+export function gardeIdentite(racine, ref, outils, parse, declare = {}) {
+  const jeu = jeuAnalyse(racine, ref, outils, outilsAuDepart(ref, parse), declare);
   const refus = configChangee(racine, ref, jeu);
-  return { refus, neuves: refus ? [] : jeu.neuves };
+  return { refus, neuves: refus ? [] : jeu.neuves, configs: refus ? [] : jeu.dites };
 }
 
 /**
@@ -330,6 +353,17 @@ export function jugerOutil(racine, outil, mode, mesure, ref = null) {
   const connus = new Set(Object.keys(j.baseDepart ?? j.base).map((k) => k.split('|')[0]));
   j.existe = (c) => connus.has(c) || ref.existe(c);
   return remonte(j) ?? (mode === 'migrer' ? migrer(j) : comparerBase(j, mode));
+}
+
+/**
+ * Revue L801 r3, M1 : une base absente au départ du lot (adoptée, ou née dans un lot `config: true`) n'a rien au-dessus d'elle à ne pas dépasser ; elle est
+ * donc tenue à la mesure du commit jugé — aucune clé au-dessus de sa mesure, aucune clé que la mesure n'a pas (un fichier absent, une règle jamais violée).
+ * Sinon une base gonflée à la main s'adopterait, et la hausse passerait aux lots suivants jusqu'au plafond inventé. `comparer` a déjà refusé ce qui dépasse.
+ */
+function neuveHorsMesure({ base, mesure, nom, outil, ref }) {
+  const hors = Object.entries(base).filter(([k, n]) => !Object.hasOwn(mesure, k) || n > mesure[k]).map(([cle, avant]) => ({ cle, avant, apres: mesure[cle] ?? 0 }));
+  if (!hors.length) return null;
+  return { code: 1, texte: `${nom} : ligne de base neuve (absente de ${ref.nom}) différente de la mesure : ${hors.length} clé(s) au-dessus de la mesure ou absente(s) d'elle. Une base neuve est la mesure, rien de plus : « cadence analyse --init --outil ${outil.name} --contre ${ref.nom.split(' ')[0]} » la re-mesure (ne pas l'écrire à la main).\n${hors.map(ligne).join('\n')}` };
 }
 
 /** `--init` : la base absente (ou, avec --contre, absente au départ du lot : re-mesurée après un rebase) est écrite. */
@@ -364,11 +398,14 @@ function migrer(j) {
  * La mesure contre la base : ce qui empire refuse ; en mode 'ecrire', une baisse est écrite. À la porte (`--contre`), une clé d'un fichier neuf au-dessus
  * de sa mesure est refusée (L707, neufsAuDessus) : intégrée, elle deviendrait au lot suivant la clé d'un fichier « qui existait » et le laisserait regrossir.
  */
-function comparerBase({ base, mesure, fichier, nom, baseDepart, existe, ref }, mode) {
+function comparerBase(j, mode) {
+  const { base, mesure, fichier, nom, baseDepart, existe, ref } = j;
   const { pires, mieux } = comparer(base, mesure);
   if (pires.length) return { code: 1, texte: `${nom} : ${pires.length} mesure(s) empirent (seules les violations gelées passent ; corriger le code, jamais la base) :\n${pires.map(ligne).join('\n')}` };
   const hautes = mode === 'verifier' && baseDepart ? neufsAuDessus(versQualite(base), versQualite(mesure), existe) : [];
   if (hautes.length) return { code: 1, texte: `${nom} : ${hautes.length} clé(s) de fichier neuf au-dessus de la mesure (gain non figé) : un fichier neuf entre dans ${ref.nom} à sa mesure. Figer : « cadence analyse --ecrire » (ou --migrer --contre si des fichiers ont été déplacés).\n${lignes(hautes)}` };
+  const gonflee = mode === 'verifier' && ref && !baseDepart ? neuveHorsMesure(j) : null;
+  if (gonflee) return gonflee;
   if (mode === 'ecrire') { ecrire(fichier, mesure); return { code: 0, texte: `${nom} baissée : ${total(base)} → ${total(mesure)} violation(s) gelée(s).` }; }
   const reste = mieux.length ? ` ; ${mieux.length} mesure(s) ont baissé : « cadence analyse --ecrire » fige le gain` : '';
   return { code: 0, texte: `${nom} : rien n'empire (${total(mesure)} violation(s), ${total(base)} gelée(s))${reste}.` };
@@ -384,6 +421,12 @@ export const commandePorte = (cible) => [process.execPath, SCRIPT, '--contre', c
 export function etapeAnalyse(valeur, cible) {
   try { return { commandes: lireAnalyse(valeur, 'cadence.yaml').length ? [commandePorte(cible)] : [] }; } catch (e) { return { commandes: [], refus: e.message }; }
 }
+
+// Ce que l'analyse dit d'une porte VERTE et qui se relit : une base née dans le lot, une config changée par déclaration. La porte de cadence run reprend ces
+// lignes au journal et au détail de l'état integre (revue L801 r3, M2 : elle ne gardait que la sortie d'une porte rouge).
+const A_RELIRE = ['analyse : ligne de base neuve : ', 'analyse : config changée : '];
+/** Les lignes à relire de la sortie d'une commande de porte (vide pour toute autre commande que l'analyse). */
+export const lignesARelire = (sortie) => sortie.split('\n').filter((l) => A_RELIRE.some((p) => l.startsWith(p)));
 
 const USAGE = 'usage : cadence analyse [--init | --ecrire | --migrer] [--contre <ref>] [--outil <nom>] (clé analyse: de cadence.yaml, docs/analyse.md)';
 
@@ -421,14 +464,21 @@ export async function main(argv, io) {
   }
 }
 
+/** La garde d'identité contre le départ : faux, refus dit ; vrai, et chaque base neuve et chaque config changée par déclaration est dite (A_RELIRE). */
+function garder(io, o, tous, parse, ref) {
+  const garde = gardeIdentite(io.cwd, ref, tous, parse, declarationsDuLot(io.cwd, o.contre));
+  if (garde.refus) { io.err(`analyse : ${garde.refus.texte}`); return false; }
+  for (const n of garde.neuves) io.out(`${A_RELIRE[0]}${n}`);
+  for (const n of garde.configs) io.out(`${A_RELIRE[1]}${n}`);
+  return true;
+}
+
 /** Contre le départ (`--contre`), d'abord l'identité de TOUS les outils déclarés (même avec --outil) et les bases neuves, dites ; puis chaque outil joué et jugé. */
 function jugerTout(io, o, tous, parse) {
   const retard = o.contre ? retardSurBranche(io.cwd, o.contre) : null;
   if (retard) { io.err(`analyse : ${retard.texte.replace('node scripts/qualite.mjs', 'cadence analyse')}`); return 1; }
   const ref = o.contre ? lireRef(resolve(io.cwd), o.contre) : null;
-  const garde = ref && gardeIdentite(io.cwd, ref, tous, parse, adoptionsDeclarees(io.cwd, o.contre));
-  if (garde?.refus) { io.err(`analyse : ${garde.refus.texte}`); return 1; }
-  for (const n of garde?.neuves ?? []) io.out(`analyse : ligne de base neuve : ${n}`);
+  if (ref && !garder(io, o, tous, parse, ref)) return 1;
   let code = 0;
   for (const outil of tous.filter((x) => !o.outil || x.name === o.outil)) {
     let r;

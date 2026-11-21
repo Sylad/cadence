@@ -23,7 +23,7 @@ import { commandesDeRegeneration, regenerer, retirerRegenerations, TRAILER_REGEN
 import { avecRefusCadence, commandesNommees, interditsPourSpec, leverPourSpec } from '../../../scripts/commandes-du-brief.mjs'; // L792 : commandes du projet nommées au brief
 import { noterVerdict } from '../../../scripts/verdicts-porte.mjs'; // L786 : même écriture que src/gate-verdict.ts (verify --gate)
 import { lireEtapes } from '../../../scripts/etapes-porte.mjs'; // L786 (revue r1, M1) : mêmes étapes que verify --gate
-import { etapeAnalyse } from '../../../scripts/analyse.mjs'; // L801 : l'étape analyse de la porte, cliquet par outil
+import { etapeAnalyse, lignesARelire } from '../../../scripts/analyse.mjs'; // L801 : l'étape analyse de la porte, cliquet par outil
 import { consigneNouveautes, entreesQuiCitent, ligneNouveautes, lotVisible } from '../../../scripts/nouveautes-du-run.mjs'; // L794 : entrée Nouveautés d'un lot visible
 import { debutProcessus, inscrireCreneau, occupantVivant, prendreVerrou, rendreVerrou, roleVerrou } from '../verrou.js';
 
@@ -50,7 +50,8 @@ export interface Etat extends EtatRapport { id: string; repo: string; branche: s
   /** L745 (clore.ts) : la tête du worktree à la fin d'un run non intégré (archivée par --clore, lue par --liste quand la branche est retirée) ; `clos` : posé par
    * --clore, avec ses archives et ce qui est resté (worktree non propre, branche) ; `force` : un état clos avant la 5e passe, sans preuve d'intégration. */
   tete?: string; /** Revue L764 r1 (M3) : la porte lue au commit du run quand elle diffère de celle de la cible, reprise au détail de l'état integre. */
-  porte_changee?: string;
+  porte_changee?: string; /** Revue L801 r3 (M2) : ce que l'analyse d'une porte verte dit à relire (ligne de base neuve, config changée par déclaration). */
+  analyse_dite?: string[];
   /** L792 : le brief nomme `cadence spec check` (scripts/commandes-du-brief.mjs) ; la session peut la lancer, reprises comprises. */
   spec_check?: boolean;
   /** L794 : le lot du plan est visible (scripts/nouveautes-du-run.mjs) ; `nouveautes` : à la fin, les entrées du commit du run qui le citent (null : git illisible). */
@@ -152,14 +153,17 @@ function perime(e: Etat, out: (l: string) => void): string | null {
 }
 /** L786 (revue r1, M2) : les fichiers du worktree hors du commit (modifiés, indexés, non suivis même cachés ; les ignorés exceptés), '' s'il est propre ; git muet : sale. */
 const horsCommit = (cwd: string) => (fichiersNonCommites(cwd, { tous: true }) ?? ['(git status illisible)']).join('\n');
-function jouerPorte(cmds: string[], cwd: string, out: (l: string) => void): { ok: boolean; sortie: string } {
+function jouerPorte(cmds: string[], e: Etat, out: (l: string) => void): { ok: boolean; sortie: string } {
   // L786 (revue r1, M2) : le sha lu AVANT la porte ; un verdict n'est noté que pour un arbre égal à ce commit avant et après, au même HEAD.
-  const sha = git(cwd, 'rev-parse', 'HEAD'), avant = horsCommit(cwd);
+  const cwd = e.worktree, sha = git(cwd, 'rev-parse', 'HEAD'), avant = horsCommit(cwd), dites: string[] = [];
   let p = { ok: true, sortie: '' };
   for (const c of cmds) {
     const r = spawnSync('bash', ['-c', c], { cwd, encoding: 'utf8', timeout: PORTE_MS, maxBuffer: 64 << 20 });
     if (r.status !== 0) { p = { ok: false, sortie: `$ ${c}\n${`${r.stdout ?? ''}${r.stderr ?? ''}`.slice(-4000)}${r.error ? `\n${r.error.message}` : ''}` }; break; }
+    dites.push(...lignesARelire(r.stdout ?? ''));
   }
+  // Revue L801 r3 (M2) : une porte verte n'est pas muette — dit une fois par changement (comme porte_changee), gardé pour le détail de l'état integre.
+  if (p.ok && cmds.length) { for (const l of dites) if (!e.analyse_dite?.includes(l)) out(l); e.analyse_dite = dites.length ? dites : undefined; }
   if (!cmds.length) return p; // --sans-porte : aucune porte n'a jugé, rien n'est noté
   const apres = horsCommit(cwd), tete = git(cwd, 'rev-parse', 'HEAD');
   const pourquoi = [...(avant ? [`avant la porte, l'arbre portait des fichiers hors du commit (${avant.split('\n').length})`] : []),
@@ -345,7 +349,7 @@ function suite(e: Etat, o: Opts): Etat {
       const vieux = r ? null : perime(e, o.out);
       if (vieux) { e.etat = 'environnement-perime'; e.detail = vieux; return fin(e, o); } // L764 : pas de rouge trompeur, pas de correction demandée à la session
       const g = r ? null : regenererRun(e, o.out); // L781 : avant la porte, qui juge le commit intégré, données générées comprises
-      const p = r ? { ok: false, sortie: r } : g && !g.ok ? g : jouerPorte(cmds, e.worktree, o.out);
+      const p = r ? { ok: false, sortie: r } : g && !g.ok ? g : jouerPorte(cmds, e, o.out);
       const c = e.corrections?.at(-1), attendue = c?.verte === undefined ? c : undefined;
       if (p.ok) {
         if (attendue) { attendue.verte = true; sauver(e); o.out(correctionFaite(attendue)); }
@@ -367,7 +371,7 @@ function suite(e: Etat, o: Opts): Etat {
   e.integre = git(e.repo, 'rev-parse', '--short', e.cible); e.etat = 'integre';
   const regenere = regenerations(e);
   // L723 : intégré, mais une fusion écrite par la session est à relire ; L724 : de même pour une correction après porte rouge
-  e.detail = [...(e.porte_changee ? [`${e.porte_changee} — à relire : la porte qui a jugé le run est la sienne`] : []),
+  e.detail = [...(e.porte_changee ? [`${e.porte_changee} — à relire : la porte qui a jugé le run est la sienne`] : []), ...(e.analyse_dite ?? []).map((l) => `${l} — à relire`),
     ...(e.conflits ?? []).filter((c) => c.resolu).map((c) => conflitResolu(e, c)), ...(e.corrections ?? []).filter((c) => c.verte).map(correctionFaite),
     ...(regenere.length ? [`fichiers générés régénérés par le run avant la porte (run.regenerate, L781) : commit ${regenere.join(', ')}`] : [])].join('\n');
   const registre = registreOuvert(e.worktree);

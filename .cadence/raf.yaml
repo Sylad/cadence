@@ -4047,10 +4047,12 @@ lots:
     created: 2026-11-20
   - id: L800
     title: "Test orchestrate-reponse-notee-l670 sensible au minutage : rouge une fois dans la suite complète le 20-11 (run L798 correction 2), vert seul — le rendre déterministe"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-20
     started: 2026-11-20
+    review: { date: 2026-11-21, verdict: "conforme : test seul, horloge simulée restaurée par afterEach, 5/5 verts, 2 mutants tués, aucune assertion affaiblie (tmp/revue-L800.md)", commit: 797144cdb359203ee3f9b15c2d07bab1422521c1 }
+    finished: 2026-11-21
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

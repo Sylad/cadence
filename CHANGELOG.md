@@ -81,6 +81,58 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [2.0.18] - 2026-11-21
+
+### Added
+
+- `cadence analyse` and the `analyse:` key of `cadence.yaml` (L801, D-23, [docs/analyse.md](docs/analyse.md)): static analysis per
+  technology — one command per tool (ESLint, `tsc --noEmit`, ruff, Checkstyle, PMD, CPD, SpotBugs, SARIF of the .NET analyzers),
+  its report read by format into violations per file and rule, judged by a ratchet with one versioned baseline per tool
+  (`.cadence/analyse/<name>.json`): only new violations fail, suppression comments count as violations, `--ecrire` writes a
+  decrease, `--contre <ref>` refuses a baseline raised above the start of the lot, a key of a new file above its measure
+  (the L707 guard of `scripts/qualite.mjs`, reused), and outside a `config: true` lot a tool whose entry was removed or
+  changed (renamed, new command, baseline path, configs: never a fresh, free baseline) or a declared config changed;
+  `--migrer` credits moved files by their source. A tool without a readable report exits 2, never « zero ».
+- Adopting a tool is an ordinary lot, with or without a native plan: a commit of the lot declares it on a line of its
+  message, `Analyse-adoption: <name>[, <name>…]`; the gate then accepts the new entry and its new baseline (a pure
+  addition: removing, renaming or changing an existing tool stays refused, declared or not), lets the lot touch anything
+  else (`package.json`, lockfiles, `pom.xml`), and prints each new baseline with the commit that declares it
+  (« analyse : ligne de base neuve : … »); without the line the gate refuses and names it. The TypeScript recipe of
+  [docs/analyse.md](docs/analyse.md#recipe-per-technology) is played as written by a test, against the real ESLint and tsc;
+  the recipes no longer put a dependency manifest in `configs`.
+- Suppressions are counted the way each tool recognises them, whatever the layout of the comment: `eslint-disable` and
+  the inline config (`/* eslint rule: off */`, quoted rule names) after `/*` and any blanks, line breaks or `*`;
+  `/* global */` and `/* exported */` (`eslint-global`); `@ts-ignore`, `@ts-expect-error`, `@ts-nocheck` on the last
+  line of a block comment; `# flake8: noqa` and `# ruff: disable[…]`; `NOPMD` in any comment; `@SuppressWarnings("all")`
+  in any case. A JSDoc form the tool does not honour is counted too.
+- The rule of `config: true` lots (L586) moves to `scripts/lot-de-config.mjs`, shared by `scripts/qualite.mjs` and
+  `scripts/analyse.mjs`.
+- The gate of `cadence run` plays the analysis between `orchestrate.build` and `orchestrate.test`, against the run's target
+  branch; a malformed `analyse:` key is refused by the run (`sans-porte`) and by the check of `cadence.yaml`.
+- A new baseline is its measure (review r3): a baseline absent at the start of the lot, adopted or born in a
+  `config: true` lot, must equal what the tool measures at the judged commit — a key above its measure or absent from it
+  (a file that does not exist) is refused and named, so a baseline inflated by hand can no longer be adopted and leave
+  room for the next lots; `cadence analyse --init --outil <name> --contre <ref>` measures it again.
+- A green gate of `cadence run` is no longer silent about the analysis: « analyse : ligne de base neuve : … » and
+  « analyse : config changée : … » go to the run's log (once) and to the detail of the `integre` state (« — à relire »).
+- A project without a native plan changes a tool's config by a declared change: the line `Analyse-config: <name>` in a
+  commit of the lot lets it change the files of that tool's `configs` and its entry (same name, same baseline path); the
+  gate prints what changed and the commit that declares it, refuses and names the line without it, and still refuses a
+  removal, a rename or a moved baseline. With a native plan the line is ignored: only a `config: true` lot changes a config.
+- A baseline is new by its tool, not by its file (review r4): a baseline that was not the baseline of the same tool
+  (same name, same path) at the start of the lot — an orphan file left by a removed tool, a file an ordinary lot put
+  there — and that a lot takes up (`config: true`, `Analyse-adoption`) must equal its measure and is printed by the gate
+  (« ligne de base neuve : … — fichier repris de main … ») ; `--init --outil <name> --contre <ref>` measures it again.
+  A refused rename no longer suggests an `Analyse-adoption` line that stays refused, and a declared change of an entry
+  (`Analyse-config`) prints each changed field with its old and new value (the command included).
+- `docs/analyse.md` says that `/* exported */` is honoured by ESLint only with `sourceType: "script"` and is counted everywhere.
+
+### Fixed
+
+- The mechanical bench no longer turns red for a test whose result follows the arm's write path, nor for a harmless leak of the reference (L798, [docs/v2/banc.md](docs/v2/banc.md)). On 20-11, bench 3 counted 31 against 32 original tests: the only test that differed (« résultats de la ligue en échec (HTTP 503) : le tracé existant est conservé ») fails on its precondition when the arm no longer writes the tracker through `getCurrentStandings`, whatever it does on a 503; it is now left out of the count of both arms, named with its reason (`TESTS_HORS_COMPTE`), and every other test still counts one by one (L777); a test whose file never ran in the log counts as unknown, never as passed. A certain leak of the reference that stays in the bench's folder, outside the candidate's clone and its files, when the reference played after the candidate (A, played second, wrote `../c2.tsc.txt` next to its own clone at bench 7), is reported as « fuites de la référence sans effet sur le candidat », not blocking; played before the candidate, the same write stays blocking (the candidate could read it with a glob or `grep -r ..`); any other leak, and every leak of the candidate, still turns the run red.
+- `cadence run` asks for the News entry of a visible lot, and says when it is missing (L794, [docs/v2/2026-11-09-cadence-run.md](docs/v2/2026-11-09-cadence-run.md)): two visible lots were handed back without a News entry on 20-11, the light brief telling the session to ignore « Nouveautés imposées par l'outil ». When the run's lot is visible in the plan (`visible: true` or a `screen:`, sub-task and mapped plan formats included), the rendered brief now asks for the entry written by hand in `docs/nouveautes/`, in the format of the neighbouring entries, with its capture (or `nocapture:`), committed with the lot, without any `cadence` command; the light brief's line no longer reads as « no entry ». At the end of the run, integrated or not, a line « Nouveautés manquante » is written when no entry of the run's commit cites the lot (otherwise the entries are named); the state keeps `lot_visible` and `nouveautes`, and `cadence run --liste` shows the note. Integration is never blocked.
+- The brief of `cadence run` now names the project's verification commands when the work touches screen sheets (L792, issue #68, [docs/v2/2026-11-09-cadence-run.md](docs/v2/2026-11-09-cadence-run.md)): when the sheet folder (`orchestrate.spec.dir`) holds a `fiche.yaml` or the request speaks of sheets, the rendered brief names `cadence spec check <fiche.yaml>` and the `orchestrate.build`, `orchestrate.test` and `orchestrate.accept` commands that `cadence.yaml` declares, and the session may run `cadence spec check` (every other `cadence` tool stays denied, `spec green` and `spec reseal` included; a PreToolUse hook, `v2/hooks/seul-spec-check.mjs`, refuses any other `cadence` or `raf` call, `cadence spec <lot> on|off` included, which wrote the plan). A lot of the plan with `spec: true` or `screen: page` also gets the paragraph. A session asked to bring sheets to « fiche valide » never ran the check and believed it had 0 gaps while 97 remained. The hook also recognizes `node …/dist/cli.js` of the cadence package (or its v2), `node bin/raf.js`, `/usr/bin/env cadence`, `npx cadence@<version>` and `sudo -u x cadence`; the body of a heredoc (`git commit -F - <<'EOF'`) is text, no longer refused when one of its lines starts with `cadence …` or `- raf …`; variables, `eval`, `xargs` and `sh -c` are not read, as the doc now says (review r2).
+
 ## [2.0.17] - 2026-11-19
 
 ### Fixed

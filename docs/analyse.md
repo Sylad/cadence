@@ -53,11 +53,21 @@ command did not write (it is deleted before each run, so an old one never counts
 most of them exit 1 when they find something.
 
 **Suppression comments count as violations.** Per format, the files git tracks under `dir` are read and each directive is
-counted per file under `directive:<name>`: `eslint-disable` in a `//`, `/*` or `/**` comment, and the inline config
-`/* eslint <rule>: off */` (`eslint-config`, any rule set inline, a raised threshold too) (eslint-json); `@ts-ignore`,
-`@ts-nocheck`, `@ts-expect-error` (tsc); `# noqa` (ruff); `CHECKSTYLE:OFF` and `@SuppressWarnings("checkstyle:…")`,
-`// NOPMD` and `@SuppressWarnings("PMD…")`, and `@SuppressWarnings("all")` for both; `CPD-OFF`, `@SuppressFBWarnings`,
-`#pragma warning disable` and `[SuppressMessage]` (.cs, .vb). Adding one makes the measure go up like a new finding.
+counted per file under `directive:<name>`; adding one makes the measure go up like a new finding. Each pattern follows the
+way the tool itself recognises its directive, whatever the layout of the comment, and counts too much rather than too little:
+
+- `eslint-json`: ESLint reads a directive at the start of a comment once leading blanks and line breaks are removed, so
+  `eslint-disable` (`-line`, `-next-line`) counts after `//`, and after `/*` followed by any blanks, line breaks or `*`
+  (`/*⏎ eslint-disable⏎*/`, `/** eslint-disable */`); the inline config `/* eslint <rule>: off */` counts as `eslint-config`
+  (any rule set inline, a raised threshold, a quoted rule name, on several lines too), and `/* global x */`,
+  `/* globals x */`, `/* exported x */` as `eslint-global` (they switch `no-undef` or `no-unused-vars` off for a name).
+- `tsc`: `@ts-ignore`, `@ts-expect-error` and `@ts-nocheck` count after `//` or `/*`, and at the start of any line after
+  blanks, `/` and `*`: tsc honours the directive on the **last line** of a block comment whatever the lines before say
+  (`/* why⏎ @ts-ignore */`).
+- `ruff-json`: `# noqa`, `# ruff: noqa`, `# flake8: noqa`, `# ruff: disable[…]`.
+- Java: `CHECKSTYLE:OFF` and `@SuppressWarnings("checkstyle:…")`; `NOPMD` and `@SuppressWarnings("PMD…")`;
+  `@SuppressWarnings("all")` for both; `CPD-OFF`; `@SuppressFBWarnings`.
+- `sarif` (.cs, .vb): `#pragma warning disable` and `[SuppressMessage]`.
 
 ## The ratchet
 
@@ -70,17 +80,47 @@ counted per file under `directive:<name>`: `eslint-disable` in a `//`, `/*` or `
 4. `--contre <ref>` (what the run's gate passes: its target branch) also judges the baseline of the lot against the one at
    the start of the lot (merge-base with `<ref>`), with the guards of `scripts/qualite.mjs`: a key raised by hand is refused
    (« remonte par rapport à main »), and so is a key of a new file above its measure (a moved file whose baseline was edited
-   up: it would leave room to grow back in the next lot). **A baseline is born, and a tool changes identity, only in a lot
-   the plan declares `config: true`**: an entry of `analyse:` added, removed or changed (name, command, format, dir, report,
-   baseline, configs), a baseline absent at the start of the lot, or a file of `configs` that differs from the start is
-   refused unless every commit that touches it cites only such lots, or the run is on the branch of such a lot (which then
-   touches nothing but configs, baselines and tests). Renaming a tool never gives a fresh, free baseline. The rule and its
-   reading of the plan are shared with [qualite.md](qualite.md) (`scripts/lot-de-config.mjs`).
+   up: it would leave room to grow back in the next lot). **A tool changes identity only in a lot the plan declares
+   `config: true`**: an entry of `analyse:` removed or changed (name, command, format, dir, report, baseline, configs), or a
+   file of `configs` that differs from the start, is refused unless every commit that touches it cites only such lots, or the
+   run is on the branch of such a lot (which then touches nothing but configs, baselines and tests). The rule and its reading
+   of the plan are shared with [qualite.md](qualite.md) (`scripts/lot-de-config.mjs`). **A baseline is born only declared**
+   ([Adopting a tool](#adopting-a-tool)), and the gate says so each time.
 5. **Moving or splitting a file** makes new keys: `cadence analyse --migrer --contre main` rewrites the baseline only if no
    file that existed went up, no total went up, and each new file is credited by its source (the file it takes at least
    50 % of its lines from), as `--migrer` in [qualite.md](qualite.md#the-ratchet). A copy that leaves its source intact is refused.
 
 `--outil <name>` plays one tool. Exit codes: 0 green, 1 refused, 2 a tool or the command could not run.
+
+## Adopting a tool
+
+A baseline absent at the start of the lot is a fresh, free measure: whatever it freezes passes. So it never appears
+silently, and it never replaces a judge that existed. Two ways, both printed by the gate
+(« analyse : ligne de base neuve : tsc (.cadence/analyse/tsc.json) — … »):
+
+- **A declared adoption, in an ordinary lot.** A commit of the lot carries, on a line of its message,
+  `Analyse-adoption: <name>[, <name>…]`. The gate accepts for each named tool an entry of `analyse:` that did not exist at
+  the start (or existed unchanged without its baseline) and its new baseline, and lets the lot change the `configs` of that
+  tool, except a file a tool of the start already declares. The lot is otherwise free: it installs the tool (`package.json`
+  and its lockfile, `pom.xml`, `pyproject.toml`), fixes code, and needs no plan at all — a project whose plan is kept by
+  another tool (`plan:` of `cadence.yaml`) adopts the same way.
+- **A `config: true` lot** of a native plan, as for any change of identity (rule 4); it touches only configs, baselines
+  and tests, so it cannot install anything: use it to rename a tool or change a threshold, not to adopt.
+
+**An adoption is a pure addition.** Nothing the start of the lot judged loses its judge: removing or changing an existing
+entry stays refused with or without the declaration, so renaming `tsc` to `tsc2` (« tsc (supprimé) »), a new `command` or a
+new `baseline` path are still `config: true` matters, and a new tool cannot take the baseline path of an existing one.
+
+Why a line in the commit, checked by the gate: it needs no plan and no file that stays behind; it is written in the lot
+that adopts, where the review reads it; a run integrates by fast-forward, so it stays in the history and
+`git log --grep '^Analyse-adoption:'` lists every adoption of a repository with its commit; and without it the gate refuses
+and names the line to write, so a baseline is never born by accident (a typo in `name`, an entry moved). Before the commit
+exists, create the baseline with `cadence analyse --init` (no `--contre`).
+
+**Do not declare a dependency manifest in `configs`** (`package.json`, `pom.xml`, `pyproject.toml`): every later lot that
+adds a dependency would be refused. Keep thresholds and exclusions in a file of their own (`eslint.config.mjs`,
+`ruff.toml`, `checkstyle.xml`, `pmd-ruleset.xml`) and name it on the command line of the entry where the tool allows it:
+the command is part of the identity, so pointing it at another ruleset is refused.
 
 ## Where it runs
 
@@ -94,28 +134,70 @@ counted per file under `directive:<name>`: `eslint-disable` in a `//`, `/*` or `
 
 ## Recipe per technology
 
-Do it in one lot per project, declared `config: true` in the plan: install the tools, declare them, `cadence analyse --init`,
-commit the baselines.
+One ordinary lot per project: install the tools, declare them, `cadence analyse --init`, commit with the adoption line.
+`test/analyse-adoption-l801.test.ts` plays the TypeScript recipe below as written, against the real ESLint and tsc.
 
-**TypeScript / JavaScript.** `npm i -D eslint typescript-eslint`; a typed config (`tseslint.configs.recommendedTypeChecked`
-with `parserOptions.projectService: true`) plus the size rules of [qualite.md](qualite.md#the-four-tools-and-what-each-one-is-for);
-two entries, `eslint-json` and `tsc`. Set `linterOptions.noInlineConfig` if you want `eslint-disable` refused by ESLint as well
-as counted. In a monorepo, one entry per workspace (`dir`).
+**TypeScript / JavaScript.**
 
-**Python.** `pip install ruff`; thresholds in `pyproject.toml` (`[tool.ruff.lint] select = ["E", "F", "B", "C901", "PLR"]`,
-`[tool.ruff.lint.mccabe] max-complexity = 15`); entry `command: ruff check --output-format json --exit-zero`, `format: ruff-json`,
-`configs: [pyproject.toml]`.
+```sh
+npm i -D eslint typescript-eslint typescript
+```
+
+A typed config, to which the size rules of [qualite.md](qualite.md#the-four-tools-and-what-each-one-is-for) are added:
+
+```js
+// eslint.config.mjs
+import tseslint from 'typescript-eslint';
+
+export default tseslint.config(
+  { ignores: ['node_modules/', 'dist/', 'eslint.config.mjs'] },
+  ...tseslint.configs.recommendedTypeChecked,
+  { languageOptions: { parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname } } },
+);
+```
+
+Two entries in `cadence.yaml`:
+
+```yaml
+analyse:
+  - name: eslint
+    command: npx eslint -f json .
+    format: eslint-json
+    configs: [eslint.config.mjs]
+  - name: tsc
+    command: npx tsc --noEmit --pretty false
+    format: tsc
+    configs: [tsconfig.json]
+```
+
+Then freeze, commit with the adoption line, and check what the gate will play:
+
+```sh
+npx cadence analyse --init
+git add -A
+git commit -q -m "chore: adopt eslint and tsc" -m "Analyse-adoption: eslint, tsc"
+npx cadence analyse --contre main
+```
+
+Set `linterOptions.noInlineConfig` if you want `eslint-disable` refused by ESLint as well as counted. In a monorepo, one
+entry per workspace (`dir`).
+
+**Python.** `pip install ruff`; thresholds in a `ruff.toml` (`[lint] select = ["E", "F", "B", "C901", "PLR"]`,
+`[lint.mccabe] max-complexity = 15`); entry `command: ruff check --config ruff.toml --output-format json --exit-zero`,
+`format: ruff-json`, `configs: [ruff.toml]`; commit with `Analyse-adoption: ruff`.
 
 **Java (Maven).** Declare `maven-checkstyle-plugin`, `maven-pmd-plugin` and `spotbugs-maven-plugin` in the `pom.xml` with
 `failOnViolation`/`failsOnError` false (the ratchet judges, not the plugin), then one entry per report:
-`mvn -q -B checkstyle:checkstyle` (`checkstyle-xml`, `target/checkstyle-result.xml`), `mvn -q -B pmd:pmd pmd:cpd`
-(`pmd-xml`, `target/pmd.xml`; and `cpd-xml`, `target/cpd.xml`), `mvn -q -B compile spotbugs:spotbugs` (`spotbugs-xml`,
-`target/spotbugsXml.xml`). Rulesets: [qualite.md](qualite.md#java-maven). `configs: [pom.xml, checkstyle.xml, pmd-ruleset.xml]`.
+`mvn -q -B checkstyle:checkstyle -Dcheckstyle.config.location=checkstyle.xml` (`checkstyle-xml`,
+`target/checkstyle-result.xml`), `mvn -q -B pmd:pmd pmd:cpd` (`pmd-xml`, `target/pmd.xml`; and `cpd-xml`, `target/cpd.xml`),
+`mvn -q -B compile spotbugs:spotbugs` (`spotbugs-xml`, `target/spotbugsXml.xml`). Rulesets: [qualite.md](qualite.md#java-maven).
+`configs: [checkstyle.xml, pmd-ruleset.xml]`, not the `pom.xml` (above): an exclusion written in the plugin's section of the
+`pom.xml` is then not frozen, keep them in the rulesets. Commit with `Analyse-adoption: checkstyle, pmd, cpd, spotbugs`.
 
 **C# (.NET).** Analyzers are on in the SDK: `<AnalysisLevel>latest-recommended</AnalysisLevel>` and
 `<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>` in `Directory.Build.props`; entry
 `command: dotnet build -p:ErrorLog=build.sarif%2Cversion=2.1 --no-incremental`, `report: build.sarif`, `format: sarif`,
-`configs: [.editorconfig, Directory.Build.props]`.
+`configs: [.editorconfig, Directory.Build.props]` (package versions in `Directory.Packages.props` or the `.csproj`).
 
 **Anything else** that writes SARIF or the Checkstyle format (Semgrep, detekt, ktlint, golangci-lint `--out-format checkstyle`)
 joins the same way; another format is a reader to add to `scripts/analyse.mjs` (`LECTEURS`).

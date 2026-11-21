@@ -258,7 +258,7 @@ describe('L801 — --contre : la base du lot contre celle de son départ', () =>
     expect(await cadence(r, '--contre', 'main')).toMatchObject({ code: 0 });
   });
 
-  it('une base ne naît que dans un lot config: true : refusée ailleurs ; sur la branche du lot de config, --init --contre la crée et la re-mesure', async () => {
+  it('une base ne naît pas sans être déclarée (lot config: true ici ; adoption : analyse-adoption-l801.test.ts) : refusée ailleurs ; sur la branche du lot de config, --init --contre la crée et la re-mesure', async () => {
     const plan = 'project: p\nlots:\n  - id: L5\n    title: adopter lint\n    config: true\n';
     const r = await depot({ base: false, plan });
     const refus = await cadence(r, '--init', '--contre', 'main');

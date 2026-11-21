@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, posix, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { configChangee, fichiersDifferents } from './lot-de-config.mjs';
+import { configChangee, differences, fichiersDifferents } from './lot-de-config.mjs';
 import { comparer, comparerMigration, creerLien, ligne, lireEslint, lireRef, neufsAuDessus, remontees, retardSurBranche, serialiser } from './qualite.mjs';
 
 /** Le chemin de ce script : la porte de cadence run le lance par lui (`node <script> --contre <cible>`). */
@@ -173,16 +173,31 @@ export const LECTEURS = {
 
 const JS = /\.(?:[cm]?[jt]sx?)$/;
 const JAVA = /\.java$/;
-/** Par format : les fichiers lus (git ls-files sous le dossier de l'outil, filtrés par extension) et les motifs comptés, chacun sous `directive:<nom>`. */
 // `@SuppressWarnings("all")` éteint toutes les règles de PMD et de Checkstyle (SuppressWarningsHolder) : il compte pour l'un comme pour l'autre
-const TOUT = String.raw`@SuppressWarnings\([^)]*"all"`;
+const TOUT = String.raw`@SuppressWarnings\([^)]*"[aA][lL][lL]"`;
+/**
+ * Par format : les fichiers lus (git ls-files sous le dossier de l'outil, filtrés par extension) et les motifs comptés, chacun sous `directive:<nom>`.
+ * Chaque motif suit la façon dont l'outil lui-même reconnaît sa directive, quelle que soit la mise en forme du commentaire (revue L801 r2, M3'), et compte
+ * plutôt trop que pas assez (un `/** … *\/` que l'outil n'honore pas compte aussi) :
+ * - ESLint (shared/directives.js, plugin-kit parseDirective) : le texte du commentaire, blancs et sauts de ligne de tête ôtés, commence par la directive ;
+ *   sous `//`, seules -line et -next-line valent. Donc `/*`, puis blancs, sauts de ligne ou `*`, puis la directive.
+ * - tsc (scanner : commentDirectiveRegExSingleLine et …MultiLine) : `//` puis la directive, ou la DERNIÈRE ligne d'un commentaire bloc, qui commence par elle
+ *   après des `/`, des `*` et des blancs — quel que soit le texte des lignes d'avant. Donc toute ligne qui commence ainsi, et tout `//` ou `/*` qui la porte.
+ */
 const DIRECTIVES = {
-  // la désactivation sous `//`, `/*` ou `/**` ; et la config en ligne, `/* eslint règle: off */` (ou un seuil relevé), qui éteint une règle sans le dire
-  'eslint-json': [JS, { 'eslint-disable': /\/(?:\/|\*+)[ \t]*eslint-disable/g, 'eslint-config': /\/\*+\s*eslint\s+[\w@/-]+\s*:/g }],
-  tsc: [JS, { 'ts-ignore': /\/(?:\/|\*+)[ \t]*@ts-(?:ignore|nocheck|expect-error)/g }],
-  'ruff-json': [/\.pyi?$/, { noqa: /#[ \t]*(?:noqa|ruff:[ \t]*noqa)\b/gi }],
+  'eslint-json': [JS, {
+    'eslint-disable': /\/(?:\/[ \t]*|\*[\s*]*)eslint-disable/g,
+    // la config en ligne, `/* eslint règle: off */` (ou un seuil relevé, un nom de règle entre guillemets), éteint une règle sans dire « disable »
+    'eslint-config': /\/\*[\s*]*eslint\s+[^\s*]/g,
+    // `/* global x */` éteint no-undef pour x, `/* exported x */` no-unused-vars : des extinctions par déclaration
+    'eslint-global': /\/\*[\s*]*(?:globals?|exported)\s+[^\s*]/g,
+  }],
+  tsc: [JS, { 'ts-ignore': /(?:^|\/[/*])[\s/*]*@ts-(?:ignore|nocheck|expect-error)/gm }],
+  // `# noqa`, et les formes de fichier ou de plage : `# ruff: noqa`, `# flake8: noqa` (que ruff honore), `# ruff: disable[…]`
+  'ruff-json': [/\.pyi?$/, { noqa: /#[ \t]*(?:noqa|(?:ruff|flake8):[ \t]*(?:noqa|disable))\b/gi }],
   'checkstyle-xml': [JAVA, { 'checkstyle-off': new RegExp(String.raw`CHECKSTYLE[ \t]*:?[ \t]*OFF|@SuppressWarnings\([^)]*checkstyle:|${TOUT}`, 'gi') }],
-  'pmd-xml': [JAVA, { nopmd: new RegExp(String.raw`\/\/[ \t]*NOPMD|@SuppressWarnings\([^)]*PMD|${TOUT}`, 'g') }],
+  // NOPMD : le marqueur de PMD, dans un commentaire `//` ou `/* */`, où qu'il soit sur la ligne
+  'pmd-xml': [JAVA, { nopmd: new RegExp(String.raw`\bNOPMD\b|@SuppressWarnings\([^)]*PMD|${TOUT}`, 'g') }],
   'cpd-xml': [JAVA, { 'cpd-off': /CPD-OFF/g }],
   'spotbugs-xml': [JAVA, { 'suppress-fb': /@SuppressFBWarnings\b/g }],
   sarif: [/\.(?:cs|vb)$/, { 'pragma-warning': /#pragma[ \t]+warning[ \t]+disable|\[(?:assembly:[ \t]*)?SuppressMessage\b/g }],
@@ -232,25 +247,54 @@ const lireJson = (f) => JSON.parse(readFileSync(f, 'utf8'));
 const ecrire = (f, m) => { mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, serialiser(m)); };
 
 /**
- * Ce que l'analyse juge au départ du lot, pour configChangee de scripts/qualite.mjs (L586 : la même règle « config: true », la même lecture des commits) :
- * une ligne de base ne naît (base absente au départ) ni ne change d'identité (l'entrée de l'outil sous `analyse:` : nom, commande, format, dossier,
- * rapport, chemin de la base, configs — apparue, retirée ou modifiée) hors d'un lot déclaré `config: true`, et ses `configs` non plus. Sans cette garde,
- * renommer l'outil (ou sa base) donnerait une base « neuve », donc libre, et la hausse passerait. `departs` : les outils de cadence.yaml au départ.
+ * Les adoptions que les commits du lot déclarent (revue L801 r2, M1') : une ligne `Analyse-adoption: <outil>[, <outil>…]` dans le message d'un commit
+ * depuis le départ (`contre..HEAD`). Rend nom d'outil → sha court du commit qui le déclare. Le message reste dans l'historique (un run intègre en
+ * fast-forward) : `git log --grep '^Analyse-adoption:'` liste toutes les adoptions d'un dépôt.
  */
-function jeuAnalyse(racine, ref, outils, departs) {
+export function adoptionsDeclarees(racine, contre) {
+  const r = spawnSync('git', ['log', '--format=%h%x00%B%x01', `${contre}..HEAD`], { cwd: racine, encoding: 'utf8', maxBuffer: 64 << 20 });
+  if (r.status !== 0) throw new Error(`git log ${contre}..HEAD a échoué : ${r.stderr?.trim() || r.error?.message}`);
+  const m = new Map();
+  for (const bloc of r.stdout.split('\x01')) {
+    const [sha, message = ''] = bloc.trim().split('\0');
+    for (const [, noms] of message.matchAll(/^Analyse-adoption:[ \t]*(.+)$/gim)) for (const n of noms.split(/[\s,]+/).filter(Boolean)) if (!m.has(n)) m.set(n, sha);
+  }
+  return m;
+}
+
+/**
+ * Ce que l'analyse juge au départ du lot, pour configChangee de scripts/lot-de-config.mjs (L586 : la même règle « config: true », la même lecture des commits) :
+ * l'identité d'un outil (son entrée sous `analyse:` : nom, commande, format, dossier, rapport, chemin de la base, configs — retirée ou modifiée) et ses
+ * `configs` ne changent pas hors d'un lot déclaré `config: true`. Sans cette garde, renommer l'outil (ou sa base) donnerait une base « neuve », donc libre, et
+ * la hausse passerait. `departs` : les outils de cadence.yaml au départ.
+ * Une ligne de base qui NAÎT (absente au départ) passe par deux voies, toutes deux dites par la porte (`neuves`) : le lot `config: true`, ou l'ADOPTION
+ * déclarée (`declarees`, adoptionsDeclarees) d'un lot ordinaire, qui touche ce qu'il veut (manifeste de dépendances compris) et ne dépend d'aucun plan.
+ * Une adoption est un ajout pur : l'outil n'existait pas au départ (ou y était sans base, entrée inchangée), sa base n'est celle d'aucun outil du départ ;
+ * ses `configs` sont libres dans ce lot, sauf celles qu'un outil du départ déclare déjà. Rien de ce que le départ jugeait n'y perd son juge : retirer ou
+ * modifier un outil reste refusé, donc renommer (tsc → tsc2 : « tsc » retiré) aussi, adoption déclarée ou non.
+ */
+function jeuAnalyse(racine, ref, outils, departs, declarees) {
   const tous = [...departs, ...outils];
+  const auDepart = (n) => departs.find((o) => o.name === n);
+  const identite = (o) => (o ? JSON.stringify(o) : null);
+  const neuve = (o) => ref.config(o.baseline) === null;
+  const adoptable = (o) => neuve(o) && (!auDepart(o.name) || identite(auDepart(o.name)) === identite(o)) && !departs.some((d) => d.name !== o.name && d.baseline === o.baseline);
+  const adoptes = outils.filter((o) => adoptable(o) && declarees.has(o.name));
+  const aDeclarer = outils.filter((o) => adoptable(o) && !declarees.has(o.name)).map((o) => o.name);
+  const figees = new Set(departs.flatMap((o) => o.configs));
+  const libres = new Set(adoptes.flatMap((o) => o.configs).filter((c) => !figees.has(c)));
   const configs = new Set(tous.flatMap((o) => o.configs));
   const bases = new Set(tous.map((o) => o.baseline));
-  const identite = (o) => (o ? JSON.stringify(o) : null);
   const changees = () => [
-    ...[...new Set(tous.map((o) => o.name))].map((n) => [`cadence.yaml#analyse.${n}`, identite(departs.find((o) => o.name === n)), identite(outils.find((o) => o.name === n))])
-      .filter(([, d, a]) => d !== a).map(([l, d, a]) => `${l} (${d === null ? 'nouveau' : a === null ? 'supprimé' : 'modifié'})`),
-    ...outils.filter((o) => ref.config(o.baseline) === null).map((o) => `${o.baseline} (nouveau)`),
-    ...fichiersDifferents(racine, ref, [...configs]),
+    ...differences([...new Set(tous.map((o) => o.name))].filter((n) => !adoptes.some((o) => o.name === n)).map((n) => [`cadence.yaml#analyse.${n}`, identite(auDepart(n)), identite(outils.find((o) => o.name === n))])),
+    ...outils.filter((o) => neuve(o) && !adoptes.includes(o)).map((o) => `${o.baseline} (nouveau)`),
+    ...fichiersDifferents(racine, ref, [...configs].filter((c) => !libres.has(c))),
   ];
+  const adoption = aDeclarer.length ? ` ; un outil neuf s'adopte dans un lot ordinaire, par la ligne « Analyse-adoption: ${aDeclarer.join(', ')} » dans le message d'un commit du lot (docs/analyse.md)` : '';
   return {
     actif: true, changees, estConfig: (f) => f === 'cadence.yaml' || configs.has(f) || bases.has(f),
-    raison: 'une ligne de base ne naît ni ne change d\'identité (nom, commande, format, dossier, rapport, chemin, configs), et un seuil ou une exclusion ne se change pas, hors d\'un lot « config: true » du plan, livré seul (corriger le code, pas l\'outil)',
+    raison: `l'identité d'un outil (nom, commande, format, dossier, rapport, chemin, configs), un seuil ou une exclusion ne se change pas hors d'un lot « config: true » du plan, livré seul (corriger le code, pas l'outil), et une ligne de base ne naît pas sans être déclarée${adoption}`,
+    neuves: outils.filter(neuve).map((o) => `${o.name} (${o.baseline}) — ${adoptes.includes(o) ? `adoption déclarée par le commit ${declarees.get(o.name)} (Analyse-adoption: ${o.name})` : 'lot « config: true » du plan'}`),
   };
 }
 
@@ -260,14 +304,21 @@ function outilsAuDepart(ref, parse) {
   try { return t === null ? [] : lireAnalyse(parse(t)?.analyse, 'cadence.yaml'); } catch { return []; }
 }
 
-/** La garde d'identité et de configs de l'analyse (jeuAnalyse) contre le départ du lot : { code: 1, texte } ou null. */
-export const identiteChangee = (racine, ref, outils, parse) => configChangee(racine, ref, jeuAnalyse(racine, ref, outils, outilsAuDepart(ref, parse)));
+/**
+ * La garde d'identité, de naissance et de configs de l'analyse (jeuAnalyse) contre le départ du lot : `refus` ({ code: 1, texte } ou null) et, sans refus,
+ * `neuves` — chaque ligne de base née dans le lot avec ce qui l'autorise, que la porte affiche (jamais une base neuve en silence).
+ */
+export function gardeIdentite(racine, ref, outils, parse, declarees = new Map()) {
+  const jeu = jeuAnalyse(racine, ref, outils, outilsAuDepart(ref, parse), declarees);
+  const refus = configChangee(racine, ref, jeu);
+  return { refus, neuves: refus ? [] : jeu.neuves };
+}
 
 /**
  * Juge un outil. mode : 'verifier' (la porte), 'init' (crée la base absente), 'ecrire' (fige une baisse, refuse si quoi que ce soit empire) ou 'migrer'
  * (fichiers déplacés ou découpés, exige `ref` : comparerMigration de scripts/qualite.mjs). `ref` (lireRef) : le départ du lot — sa base de l'outil ne peut pas
  * être dépassée par celle du lot (remontees, neufsAuDessus : les gardes de scripts/qualite.mjs). L'identité de l'outil et ses `configs` se jugent avant, pour
- * tous les outils (identiteChangee). Rend { code, texte } : 0 vert, 1 refus, 2 erreur.
+ * tous les outils (gardeIdentite). Rend { code, texte } : 0 vert, 1 refus, 2 erreur.
  */
 export function jugerOutil(racine, outil, mode, mesure, ref = null) {
   const depart = ref ? ref.config(outil.baseline) : null;
@@ -370,13 +421,14 @@ export async function main(argv, io) {
   }
 }
 
-/** Contre le départ (`--contre`), d'abord l'identité de TOUS les outils déclarés (même avec --outil), puis chaque outil joué et jugé. */
+/** Contre le départ (`--contre`), d'abord l'identité de TOUS les outils déclarés (même avec --outil) et les bases neuves, dites ; puis chaque outil joué et jugé. */
 function jugerTout(io, o, tous, parse) {
   const retard = o.contre ? retardSurBranche(io.cwd, o.contre) : null;
   if (retard) { io.err(`analyse : ${retard.texte.replace('node scripts/qualite.mjs', 'cadence analyse')}`); return 1; }
   const ref = o.contre ? lireRef(resolve(io.cwd), o.contre) : null;
-  const identite = ref && identiteChangee(io.cwd, ref, tous, parse);
-  if (identite) { io.err(`analyse : ${identite.texte}`); return 1; }
+  const garde = ref && gardeIdentite(io.cwd, ref, tous, parse, adoptionsDeclarees(io.cwd, o.contre));
+  if (garde?.refus) { io.err(`analyse : ${garde.refus.texte}`); return 1; }
+  for (const n of garde?.neuves ?? []) io.out(`analyse : ligne de base neuve : ${n}`);
   let code = 0;
   for (const outil of tous.filter((x) => !o.outil || x.name === o.outil)) {
     let r;

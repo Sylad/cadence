@@ -10,5 +10,10 @@ export function jugerOutil(racine: string, outil: OutilAnalyse, mode: 'verifier'
 export function commandePorte(cible: string): string;
 export function main(argv: string[], io: { cwd: string; out: (l: string) => void; err: (l: string) => void }): Promise<number>;
 export function etapeAnalyse(valeur: unknown, cible: string): { commandes: string[]; refus?: string };
-/** La garde d'identité de l'analyse contre le départ du lot : un outil apparu, retiré ou modifié sous `analyse:`, une base absente au départ ou une `configs` changée, hors d'un lot `config: true`. */
-export function identiteChangee(racine: string, ref: import('./qualite.mjs').Ref, outils: OutilAnalyse[], parse: (texte: string) => unknown): { code: number; texte: string } | null;
+/** Les adoptions déclarées par les commits du lot (`Analyse-adoption: <outil>` dans un message, `contre..HEAD`) : nom d'outil → sha court. */
+export function adoptionsDeclarees(racine: string, contre: string): Map<string, string>;
+/**
+ * La garde de l'analyse contre le départ du lot : un outil retiré ou modifié sous `analyse:` ou une `configs` changée hors d'un lot `config: true`, une base
+ * née sans lot `config: true` ni adoption déclarée. `neuves` : les bases nées dans le lot et ce qui les autorise (à afficher).
+ */
+export function gardeIdentite(racine: string, ref: import('./qualite.mjs').Ref, outils: OutilAnalyse[], parse: (texte: string) => unknown, declarees?: Map<string, string>): { refus: { code: number; texte: string } | null; neuves: string[] };

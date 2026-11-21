@@ -1,4 +1,4 @@
-// (revue r3, en fin de fichier et dans la recette : M1, une base neuve est sa mesure ; M3, Analyse-config sans plan natif ; mineur, /* exported */.)
+// (revue r4, en fin de fichier : une base orpheline ou déposée, reprise, est neuve ; revue r3, avant elle et dans la recette : M1, une base neuve est sa mesure ; M3, Analyse-config sans plan natif ; mineur, /* exported */.)
 // L801, revue r2 — M1' : adopter un outil dans un lot ordinaire (manifeste de dépendances compris, sans plan natif), par une adoption déclarée dans un commit
 // que la porte vérifie et affiche ; la recette de docs/analyse.md est jouée telle qu'écrite, avec le vrai ESLint 9 et le vrai tsc. M3' : toute directive que
 // l'outil honore est comptée, quelle que soit la mise en forme du commentaire — vérifié contre les vrais outils, pas contre nos motifs.
@@ -372,7 +372,7 @@ describe('L801 r3 M3 — sans plan natif, la config d\'un outil adopté change p
     git(r, 'add', '-A'); git(r, 'commit', '-qm', 'feat: commande');
     const porte = await cadence(r, '--contre', 'main');
     expect(porte.code).toBe(0);
-    expect(porte.sortie).toContain('analyse : config changée : lint — cadence.yaml#analyse.lint (modifié), seuils.json (nouveau), autres.json (nouveau) — changement déclaré par le commit');
+    expect(porte.sortie).toContain('analyse : config changée : lint — cadence.yaml#analyse.lint (modifié : command « node outil.mjs » → « node ./outil.mjs » ; configs « seuils.json » → « seuils.json, autres.json »), seuils.json (nouveau), autres.json (nouveau) — changement déclaré par le commit');
   });
 
   it.each([
@@ -532,5 +532,195 @@ describe('L801 r2 M3\' — les extinctions sont comptées quelle que soit la mis
     expect(lireDirectives(r, '.', 'ruff-json')).toEqual({ 'm.py|directive:noqa': 4 });
     expect(lireDirectives(r, '.', 'pmd-xml')).toEqual({ 'A.java|directive:nopmd': 3 });
     expect(lireDirectives(r, '.', 'checkstyle-xml')).toEqual({ 'A.java|directive:checkstyle-off': 1 });
+  });
+});
+
+// ── revue r4 — M1 : une base est neuve quand elle n'était pas celle du MÊME outil au départ (fichier orphelin ou déposé), pas seulement absente ──────────
+
+describe('L801 r4 M1 — une ligne de base orpheline ou déposée, reprise par un lot, est neuve : tenue à sa mesure et dite par la porte', () => {
+  const base = (r: string) => join(r, '.cadence/analyse/lint.json');
+  const PLAN = 'project: p\nlots:\n  - id: L1\n    title: du code\n  - id: L5\n    title: config\n    config: true\n  - id: L6\n    title: nettoyer\n  - id: L7\n    title: remettre lint\n    config: true\n  - id: L8\n    title: suite\n';
+  const REPRISE = /^analyse : ligne de base neuve : lint \(\.cadence\/analyse\/lint\.json\) — lot « config: true » du plan — fichier repris de main \([0-9a-f]{7}\), où il n'était pas la base de cet outil : tenu à sa mesure$/m;
+  /** Un dépôt à plan natif (L5 et L7 `config: true`) ; main porte src/a.js (4 TODO) et, avec `outil`, `lint` et sa base à 4. */
+  async function natif(outil: boolean): Promise<string> {
+    const r = tempDir();
+    git(r, 'init', '-q', '-b', 'main');
+    mkdirSync(join(r, 'src')); mkdirSync(join(r, '.cadence'));
+    writeFileSync(join(r, 'outil.mjs'), OUTIL);
+    writeFileSync(join(r, 'src/a.js'), '// TODO\n// TODO\n// TODO\n// TODO\n');
+    writeFileSync(join(r, '.cadence/raf.yaml'), PLAN);
+    writeFileSync(join(r, 'cadence.yaml'), outil ? `analyse:\n${ENTREE('lint')}` : 'project: p\n');
+    if (outil) expect((await cadence(r, '--init')).code).toBe(0);
+    git(r, 'add', '-A'); git(r, 'commit', '-qm', 'base');
+    return r;
+  }
+  /** Ouvre la branche du lot depuis main ; `integrer` la fond dans main (fast-forward, comme un run). */
+  const lot = (r: string, id: string) => { git(r, 'checkout', '-q', 'main'); git(r, 'checkout', '-qb', `cadence/run--${id}`); };
+  const integrer = (r: string, id: string) => { git(r, 'checkout', '-q', 'main'); git(r, 'merge', '-q', '--ff-only', `cadence/run--${id}`); };
+
+  it('le scénario de la revue : L5 (config) retire lint et laisse sa base à 4, L6 nettoie, L7 (config) remet lint — la base doit valoir la mesure, et la porte le dit', async () => {
+    const r = await natif(true);
+    lot(r, 'L5');
+    writeFileSync(join(r, 'cadence.yaml'), 'project: p\n');
+    git(r, 'commit', '-qam', 'chore(L5): retire lint'); integrer(r, 'L5');
+    expect(JSON.parse(readFileSync(base(r), 'utf8'))).toMatchObject({ 'src/a.js|no-todo': 4 }); // la base orpheline reste dans main
+    lot(r, 'L6');
+    writeFileSync(join(r, 'src/a.js'), 'propre\n');
+    git(r, 'commit', '-qam', 'feat(L6): nettoie'); integrer(r, 'L6');
+    lot(r, 'L7');
+    writeFileSync(join(r, 'cadence.yaml'), `analyse:\n${ENTREE('lint')}`);
+    git(r, 'commit', '-qam', 'chore(L7): remet lint');
+    const refus = await cadence(r, '--contre', 'main');
+    expect(refus.code).toBe(1);
+    expect(refus.sortie).toMatch(REPRISE);
+    expect(refus.sortie).toMatch(/lint \(\.cadence\/analyse\/lint\.json\) : ligne de base neuve \(dans main \([0-9a-f]{7}\), ce fichier n'était pas la base de l'outil « lint »\) différente de la mesure/);
+    expect(refus.sortie).toContain('src/a.js|no-todo : 4 → 0');
+    expect(refus.sortie).not.toContain('rien n\'empire');
+    // la voie dite par le refus : la base orpheline est re-mesurée (elle existe dans main, mais n'y était la base d'aucun outil)
+    expect(refus.sortie).toContain('« cadence analyse --init --outil lint --contre main »');
+    expect((await cadence(r, '--init', '--outil', 'lint', '--contre', 'main')).code).toBe(0);
+    expect(JSON.parse(readFileSync(base(r), 'utf8'))).toEqual({});
+    git(r, 'commit', '-qam', 'chore(L7): la mesure');
+    const porte = await cadence(r, '--contre', 'main');
+    expect(porte.code).toBe(0);
+    expect(porte.sortie).toMatch(REPRISE);
+    expect(porte.sortie).toContain('rien n\'empire (0 violation(s), 0 gelée(s))');
+    // intégrée : le lot suivant ne retrouve pas les 4 places de l'ancienne base, et la base n'est plus neuve
+    integrer(r, 'L7'); lot(r, 'L8');
+    writeFileSync(join(r, 'src/a.js'), 'propre // TODO\n');
+    git(r, 'commit', '-qam', 'feat(L8): suite');
+    const suite = await cadence(r, '--contre', 'main');
+    expect(suite.code).toBe(1);
+    expect(suite.sortie).toContain('src/a.js|no-todo : 0 → 1');
+    expect(suite.sortie).not.toContain('ligne de base neuve');
+  });
+
+  it('un lot ordinaire dépose une base à 40, puis un lot « config: true » ajoute lint : refusé (40 → 4), jusqu\'à ce que la base soit la mesure', async () => {
+    const r = await natif(false);
+    lot(r, 'L1');
+    mkdirSync(dirname(base(r)), { recursive: true });
+    writeFileSync(base(r), JSON.stringify({ 'src/a.js|no-todo': 40, 'src/a.js|no-todo|total': 40 }));
+    git(r, 'add', '-A'); git(r, 'commit', '-qm', 'feat(L1): du code, et un fichier'); integrer(r, 'L1');
+    lot(r, 'L5');
+    writeFileSync(join(r, 'cadence.yaml'), `analyse:\n${ENTREE('lint')}`);
+    git(r, 'commit', '-qam', 'chore(L5): ajoute lint');
+    const refus = await cadence(r, '--contre', 'main');
+    expect(refus.code).toBe(1);
+    expect(refus.sortie).toMatch(REPRISE);
+    expect(refus.sortie).toContain('src/a.js|no-todo : 40 → 4');
+    expect((await cadence(r, '--init', '--outil', 'lint', '--contre', 'main')).code).toBe(0);
+    git(r, 'commit', '-qam', 'chore(L5): la mesure');
+    expect((await cadence(r, '--contre', 'main')).code).toBe(0);
+    integrer(r, 'L5'); lot(r, 'L6');
+    writeFileSync(join(r, 'src/a.js'), '// TODO\n'.repeat(14));
+    git(r, 'commit', '-qam', 'feat(L6): dix de plus');
+    expect((await cadence(r, '--contre', 'main')).sortie).toContain('src/a.js|no-todo : 4 → 14');
+  });
+
+  it('un outil gardé sous son nom dont un lot « config: true » déplace la base vers un fichier déposé : neuve aussi, tenue à la mesure', async () => {
+    const r = await natif(true);
+    lot(r, 'L1');
+    writeFileSync(join(r, 'large.json'), JSON.stringify({ 'src/a.js|no-todo': 40, 'src/a.js|no-todo|total': 40 }));
+    git(r, 'add', '-A'); git(r, 'commit', '-qm', 'feat(L1): un fichier'); integrer(r, 'L1');
+    lot(r, 'L5');
+    writeFileSync(join(r, 'cadence.yaml'), `analyse:\n${ENTREE('lint', '    baseline: large.json\n')}`);
+    git(r, 'commit', '-qam', 'chore(L5): base déplacée');
+    const refus = await cadence(r, '--contre', 'main');
+    expect(refus.code).toBe(1);
+    expect(refus.sortie).toContain('analyse : ligne de base neuve : lint (large.json) — lot « config: true » du plan — fichier repris de main');
+    expect(refus.sortie).toContain('src/a.js|no-todo : 40 → 4');
+  });
+
+  it('sans plan natif : une base déposée par un lot ordinaire se reprend par une adoption déclarée — gonflée refusée, égale à la mesure acceptée et dite', async () => {
+    const r = await depot();
+    mkdirSync(dirname(base(r)), { recursive: true });
+    writeFileSync(base(r), JSON.stringify({ 'src/a.js|no-todo': 40, 'src/a.js|no-todo|total': 40 }));
+    git(r, 'add', '-A'); git(r, 'commit', '-qm', 'feat: un fichier');
+    git(r, 'checkout', '-q', 'main'); git(r, 'merge', '-q', '--ff-only', 'cadence/run-20261121-1'); git(r, 'checkout', '-qb', 'cadence/run-20261122-2');
+    ajouter(r, `analyse:\n${ENTREE('lint')}`);
+    git(r, 'commit', '-qam', 'chore: adopte lint');
+    const sans = await cadence(r, '--contre', 'main');
+    expect(sans.code).toBe(1);
+    expect(sans.sortie).toContain('cadence.yaml#analyse.lint (nouveau) diffère(nt) de main');
+    expect(sans.sortie).toContain('« Analyse-adoption: lint »');
+    git(r, 'commit', '-q', '--amend', '-m', 'chore: adopte lint', '-m', 'Analyse-adoption: lint');
+    const gonflee = await cadence(r, '--contre', 'main');
+    expect(gonflee.code).toBe(1);
+    expect(gonflee.sortie).toContain('ce fichier n\'était pas la base de l\'outil « lint »');
+    expect(gonflee.sortie).toContain('src/a.js|no-todo : 40 → 2');
+    expect((await cadence(r, '--init', '--outil', 'lint', '--contre', 'main')).code).toBe(0);
+    git(r, 'commit', '-qam', 'chore: la mesure');
+    const porte = await cadence(r, '--contre', 'main');
+    expect(porte.code).toBe(0);
+    expect(porte.sortie).toMatch(/^analyse : ligne de base neuve : lint \(\.cadence\/analyse\/lint\.json\) — adoption déclarée par le commit [0-9a-f]{7,} \(Analyse-adoption: lint\) — fichier repris de main \([0-9a-f]{7}\), où il n'était pas la base de cet outil : tenu à sa mesure$/m);
+  });
+
+  it('vrais ESLint 9 et tsc : deux bases déposées à 40 puis adoptées sont refusées, clés nommées ; re-mesurées, elles valent la mesure des outils', { timeout: 300_000 }, () => {
+    const r = tempDir();
+    const sh = (texte: string) => spawnSync('bash', ['-e', '-o', 'pipefail', '-c', texte], { cwd: r, encoding: 'utf8' });
+    const analyse = (...a: string[]) => spawnSync(process.execPath, [SCRIPT, ...a], { cwd: r, encoding: 'utf8' });
+    expect(JSON.parse(readFileSync(join(VRAI('eslint'), 'package.json'), 'utf8')).version).toMatch(/^9\./);
+    git(r, 'init', '-q', '-b', 'main');
+    mkdirSync(join(r, 'src')); mkdirSync(join(r, '.cadence/analyse'), { recursive: true });
+    symlinkSync(join(CADENCE, 'node_modules'), join(r, 'node_modules'));
+    writeFileSync(join(r, '.gitignore'), 'node_modules\n');
+    writeFileSync(join(r, 'package.json'), '{ "name": "projet", "private": true, "type": "module" }\n');
+    writeFileSync(join(r, 'tsconfig.json'), '{ "compilerOptions": { "strict": true, "noEmit": true, "module": "nodenext", "target": "es2022", "skipLibCheck": true, "types": [] }, "include": ["src/*.ts"] }\n');
+    writeFileSync(join(r, 'eslint.config.mjs'), 'export default [{ rules: { "no-console": "error" } }];\n');
+    writeFileSync(join(r, 'src/a.ts'), 'export const a: number = \'un\';\n');
+    writeFileSync(join(r, 'src/b.js'), 'console.log(1);\n');
+    writeFileSync(join(r, 'cadence.yaml'), 'plan: { file: jira.csv, format: csv }\n');
+    // déposées d'avance par un lot ordinaire : aucun outil ne les lit, la porte n'en dit rien
+    writeFileSync(join(r, '.cadence/analyse/eslint.json'), JSON.stringify({ 'src/b.js|no-console': 40, 'src/b.js|no-console|total': 40, 'src/futur.js|no-console': 30, 'src/futur.js|no-console|total': 30 }));
+    writeFileSync(join(r, '.cadence/analyse/tsc.json'), JSON.stringify({ 'src/a.ts|TS2322': 40 }));
+    git(r, 'add', '-A'); git(r, 'commit', '-qm', 'projet');
+    git(r, 'checkout', '-qb', 'cadence/run-20261121-adoption');
+    writeFileSync(join(r, 'cadence.yaml'), `plan: { file: jira.csv, format: csv }\nanalyse:\n  - name: eslint\n    command: node node_modules/eslint/bin/eslint.js -f json .\n    format: eslint-json\n    configs: [eslint.config.mjs]\n  - name: tsc\n    command: node node_modules/typescript/bin/tsc --noEmit --pretty false\n    format: tsc\n    configs: [tsconfig.json]\n`);
+    expect(sh('git -c user.email=t@t -c user.name=t commit -qam "chore: adopt eslint and tsc" -m "Analyse-adoption: eslint, tsc"').status).toBe(0);
+    const refus = analyse('--contre', 'main');
+    expect(refus.status).toBe(1);
+    expect(refus.stdout.match(/^analyse : ligne de base neuve : (eslint|tsc) .* — fichier repris de main/gm)).toHaveLength(2);
+    expect(refus.stderr).toContain('src/b.js|no-console : 40 → 1');
+    expect(refus.stderr).toContain('src/futur.js|no-console : 30 → 0');
+    expect(refus.stderr).toContain('src/a.ts|TS2322 : 40 → 1');
+    expect(refus.stdout).not.toContain('rien n\'empire');
+    expect(analyse('--init', '--contre', 'main').status).toBe(0);
+    expect(JSON.parse(readFileSync(join(r, '.cadence/analyse/tsc.json'), 'utf8'))).toEqual({ 'src/a.ts|TS2322': 1 });
+    expect(JSON.parse(readFileSync(join(r, '.cadence/analyse/eslint.json'), 'utf8'))).toEqual({ 'src/b.js|no-console': 1, 'src/b.js|no-console|total': 1 });
+    expect(sh('git -c user.email=t@t -c user.name=t commit -qam "chore: la mesure"').status).toBe(0);
+    const porte = analyse('--contre', 'main');
+    expect(porte.status, `${porte.stdout}\n${porte.stderr}`).toBe(0);
+    expect(porte.stdout.match(/ligne de base neuve/g)).toHaveLength(2);
+    // un console.log et une erreur de type de plus : refusés, sans la place des bases déposées
+    writeFileSync(join(r, 'src/b.js'), 'console.log(1);\nconsole.log(2);\n');
+    writeFileSync(join(r, 'src/c.ts'), 'export const c: string = 3;\n');
+    git(r, 'add', '-A');
+    const pire = analyse('--contre', 'main');
+    expect(pire.status).toBe(1);
+    expect(pire.stderr).toContain('src/b.js|no-console : 1 → 2');
+    expect(pire.stderr).toContain('src/c.ts|TS2322 : 0 → 1');
+  });
+});
+
+describe('L801 r4, notes — un refus ne propose que ce qui ouvre, et un changement déclaré dit l\'ancienne et la nouvelle valeur', () => {
+  it('renommer lint → lint2 : le refus ne propose plus « Analyse-adoption: lint2 », qui resterait refusé ; il dit que le retrait ne s\'ouvre pas', async () => {
+    const r = await depot(ENTREE('lint'));
+    writeFileSync(join(r, 'cadence.yaml'), readFileSync(join(r, 'cadence.yaml'), 'utf8').replace('name: lint', 'name: lint2'));
+    await cadence(r, '--init');
+    git(r, 'add', '-A'); git(r, 'commit', '-qm', 'feat: renomme');
+    const refus = await cadence(r, '--contre', 'main');
+    expect(refus.code).toBe(1);
+    expect(refus.sortie).toContain('cadence.yaml#analyse.lint (supprimé)');
+    expect(refus.sortie).not.toContain('Analyse-adoption');
+    expect(refus.sortie).toContain('« lint » : retirer ou renommer un outil du départ n\'est pas une adoption, aucune déclaration ne l\'ouvre');
+  });
+
+  it('Analyse-config dans un lot de code qui change la commande : la porte dit l\'ancienne et la nouvelle commande', async () => {
+    const r = await depot(ENTREE('lint'));
+    writeFileSync(join(r, 'cadence.yaml'), readFileSync(join(r, 'cadence.yaml'), 'utf8').replace('command: node outil.mjs', 'command: echo []'));
+    writeFileSync(join(r, 'src/b.js'), '// TODO\n');
+    git(r, 'add', '-A'); git(r, 'commit', '-qm', 'feat: du code\n\nAnalyse-config: lint');
+    const porte = await cadence(r, '--contre', 'main');
+    expect(porte.sortie).toContain(`analyse : config changée : lint — cadence.yaml#analyse.lint (modifié : command « node outil.mjs » → « echo [] ») — changement déclaré par le commit ${git(r, 'rev-parse', '--short', 'HEAD')} (Analyse-config: lint)`);
   });
 });

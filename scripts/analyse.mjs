@@ -272,7 +272,9 @@ export const declarationsDuLot = (racine, contre) => ({ adoptions: declarations(
  * l'identité d'un outil (son entrée sous `analyse:` : nom, commande, format, dossier, rapport, chemin de la base, configs — retirée ou modifiée) et ses
  * `configs` ne changent pas hors d'un lot déclaré `config: true`. Sans cette garde, renommer l'outil (ou sa base) donnerait une base « neuve », donc libre, et
  * la hausse passerait. `departs` : les outils de cadence.yaml au départ.
- * Une ligne de base qui NAÎT (absente au départ) passe par deux voies, toutes deux dites par la porte (`neuves`) : le lot `config: true`, ou l'ADOPTION
+ * Une ligne de base est NEUVE quand elle n'était pas celle du MÊME outil au départ (baseNeuve, revue L801 r4 : même nom, même chemin, fichier présent) : un
+ * fichier absent, mais aussi un fichier orphelin laissé par un outil retiré, ou déposé d'avance par un lot ordinaire, que personne ne jugeait. Elle est tenue
+ * à sa mesure (jugerOutil) et passe par deux voies, toutes deux dites par la porte (`neuves`) : le lot `config: true`, ou l'ADOPTION
  * déclarée (`declare.adoptions`, declarationsDuLot) d'un lot ordinaire, qui touche ce qu'il veut (manifeste de dépendances compris) et ne dépend d'aucun plan.
  * Une adoption est un ajout pur : l'outil n'existait pas au départ (ou y était sans base, entrée inchangée), sa base n'est celle d'aucun outil du départ ;
  * ses `configs` sont libres dans ce lot, sauf celles qu'un outil du départ déclare déjà. Rien de ce que le départ jugeait n'y perd son juge : retirer ou
@@ -283,12 +285,26 @@ export const declarationsDuLot = (racine, contre) => ({ adoptions: declarations(
  * fichier qu'un autre outil du départ, non déclaré, lit aussi. La porte dit chaque changement (`dites`). Avec un plan natif la ligne ne vaut rien : seul le
  * lot `config: true`, que le plan du départ déclare, change une config.
  */
+/**
+ * Revue L801 r4, M1 : une ligne de base est NEUVE quand elle n'était pas celle du même outil au départ du lot — pas d'outil de ce nom au départ, ou sous un
+ * autre chemin de base, ou fichier absent. Un fichier présent au départ ne suffit pas : orphelin (outil retiré, base laissée) ou déposé par un lot ordinaire,
+ * aucun cliquet ne le jugeait, et son contenu n'est pas un plafond. `departs` : les outils de cadence.yaml au départ (outilsAuDepart).
+ */
+export function baseNeuve(ref, departs, outil) {
+  return !departs.some((d) => d.name === outil.name && d.baseline === outil.baseline) || ref.config(outil.baseline) === null;
+}
+
+const valeurDe = (v) => (v === undefined || (Array.isArray(v) && !v.length) ? '(rien)' : `« ${Array.isArray(v) ? v.join(', ') : v} »`);
+/** Les champs d'une entrée d'outil qui diffèrent, ancienne et nouvelle valeur : `command « a » → « b » ; configs …` (une commande neutralisée se lit à la porte). */
+const champsChanges = (depart, actuel) => CLES.filter((k) => JSON.stringify(depart[k]) !== JSON.stringify(actuel[k])).map((k) => `${k} ${valeurDe(depart[k])} → ${valeurDe(actuel[k])}`).join(' ; ');
+
 function jeuAnalyse(racine, ref, outils, departs, { adoptions: declarees = new Map(), configs = new Map() }) {
   const tous = [...departs, ...outils];
   const auDepart = (n) => departs.find((o) => o.name === n);
   const actuel = (n) => outils.find((o) => o.name === n);
   const identite = (o) => (o ? JSON.stringify(o) : null);
-  const neuve = (o) => ref.config(o.baseline) === null;
+  const neuve = (o) => baseNeuve(ref, departs, o);
+  const absente = (o) => ref.config(o.baseline) === null;
   const adoptable = (o) => neuve(o) && (!auDepart(o.name) || identite(auDepart(o.name)) === identite(o)) && !departs.some((d) => d.name !== o.name && d.baseline === o.baseline);
   const adoptes = outils.filter((o) => adoptable(o) && declarees.has(o.name));
   const aDeclarer = outils.filter((o) => adoptable(o) && !declarees.has(o.name)).map((o) => o.name);
@@ -304,24 +320,29 @@ function jeuAnalyse(racine, ref, outils, departs, { adoptions: declarees = new M
   const exemptes = new Set([...adoptes, ...declares].map((o) => o.name));
   const changees = () => [
     ...differences([...new Set(tous.map((o) => o.name))].filter((n) => !exemptes.has(n)).map((n) => [`cadence.yaml#analyse.${n}`, identite(auDepart(n)), identite(actuel(n))])),
-    ...outils.filter((o) => neuve(o) && !adoptes.includes(o)).map((o) => `${o.baseline} (nouveau)`),
+    // une base reprise (fichier présent au départ) vient toujours avec une entrée d'outil nouvelle ou modifiée, déjà dite ci-dessus
+    ...outils.filter((o) => absente(o) && !adoptes.includes(o)).map((o) => `${o.baseline} (nouveau)`),
     ...fichiersDifferents(racine, ref, [...toutes].filter((c) => !libres.has(c))),
   ];
   // ce qu'un outil du départ a changé : son entrée, ses fichiers de configs
-  const change = (d) => [...differences([[`cadence.yaml#analyse.${d.name}`, identite(d), identite(actuel(d.name))]]), ...fichiersDifferents(racine, ref, fichiersDe(d))];
+  const entree = (d) => (identite(d) === identite(actuel(d.name)) ? [] : [`cadence.yaml#analyse.${d.name} (modifié : ${champsChanges(d, actuel(d.name))})`]);
+  const change = (d) => [...entree(d), ...fichiersDifferents(racine, ref, fichiersDe(d))];
   const aDire = declarables.filter((d) => !declares.includes(d) && change(d).length).map((d) => d.name);
-  const adoption = aDeclarer.length ? ` ; un outil neuf s'adopte dans un lot ordinaire, par la ligne « Analyse-adoption: ${aDeclarer.join(', ')} » dans le message d'un commit du lot (docs/analyse.md)` : '';
+  // un outil du départ retiré (un renommage : lint → lint2) reste refusé quoi qu'on déclare : ne pas proposer une adoption qui n'y changerait rien
+  const retires = departs.filter((d) => !actuel(d.name)).map((d) => d.name);
+  const retrait = retires.length ? ` ; ${retires.map((n) => `« ${n} »`).join(', ')} : retirer ou renommer un outil du départ n'est pas une adoption, aucune déclaration ne l'ouvre` : '';
+  const adoption = retires.length ? retrait : aDeclarer.length ? ` ; un outil neuf s'adopte dans un lot ordinaire, par la ligne « Analyse-adoption: ${aDeclarer.join(', ')} » dans le message d'un commit du lot (docs/analyse.md)` : '';
   const config = aDire.length ? ` ; ce dépôt n'a pas de plan natif : la config d'un outil s'y change par la ligne « Analyse-config: ${aDire.join(', ')} » dans le message d'un commit du lot, que la porte affiche (docs/analyse.md)` : '';
   return {
     actif: true, changees, estConfig: (f) => f === 'cadence.yaml' || toutes.has(f) || bases.has(f),
     raison: `l'identité d'un outil (nom, commande, format, dossier, rapport, chemin, configs), un seuil ou une exclusion ne se change pas hors d'un lot « config: true » du plan, livré seul (corriger le code, pas l'outil), et une ligne de base ne naît pas sans être déclarée${adoption}${config}`,
-    neuves: outils.filter(neuve).map((o) => `${o.name} (${o.baseline}) — ${adoptes.includes(o) ? `adoption déclarée par le commit ${declarees.get(o.name)} (Analyse-adoption: ${o.name})` : 'lot « config: true » du plan'}`),
+    neuves: outils.filter(neuve).map((o) => `${o.name} (${o.baseline}) — ${adoptes.includes(o) ? `adoption déclarée par le commit ${declarees.get(o.name)} (Analyse-adoption: ${o.name})` : 'lot « config: true » du plan'}${absente(o) ? '' : ` — fichier repris de ${ref.nom}, où il n'était pas la base de cet outil : tenu à sa mesure`}`),
     dites: declares.filter((d) => change(d).length).map((d) => `${d.name} — ${change(d).join(', ')} — changement déclaré par le commit ${configs.get(d.name)} (Analyse-config: ${d.name})`),
   };
 }
 
 /** Les outils de cadence.yaml au départ du lot ; vide sans fichier ou sans clé, et pour une clé mal formée (chaque outil d'aujourd'hui y est alors « nouveau »). */
-function outilsAuDepart(ref, parse) {
+export function outilsAuDepart(ref, parse) {
   const t = ref.config('cadence.yaml');
   try { return t === null ? [] : lireAnalyse(parse(t)?.analyse, 'cadence.yaml'); } catch { return []; }
 }
@@ -342,10 +363,13 @@ export function gardeIdentite(racine, ref, outils, parse, declare = {}) {
  * (fichiers déplacés ou découpés, exige `ref` : comparerMigration de scripts/qualite.mjs). `ref` (lireRef) : le départ du lot — sa base de l'outil ne peut pas
  * être dépassée par celle du lot (remontees, neufsAuDessus : les gardes de scripts/qualite.mjs). L'identité de l'outil et ses `configs` se jugent avant, pour
  * tous les outils (gardeIdentite). Rend { code, texte } : 0 vert, 1 refus, 2 erreur.
+ * `ref.analyse` : les outils de cadence.yaml au départ (outilsAuDepart). La base du départ n'est un plafond que si elle y était celle du même outil
+ * (baseNeuve) ; sinon elle est neuve, tenue à la mesure, et `--init --contre` la re-mesure. Sans `ref.analyse`, toute base est neuve : le défaut est le plus strict.
  */
 export function jugerOutil(racine, outil, mode, mesure, ref = null) {
-  const depart = ref ? ref.config(outil.baseline) : null;
-  const j = { racine, outil, mesure, ref, fichier: join(racine, outil.baseline), baseDepart: depart === null ? null : JSON.parse(depart), nom: `${outil.name} (${outil.baseline})` };
+  const fichierDepart = ref ? ref.config(outil.baseline) : null;
+  const depart = ref && baseNeuve(ref, ref.analyse ?? [], outil) ? null : fichierDepart;
+  const j = { racine, outil, mesure, ref, fichier: join(racine, outil.baseline), baseDepart: depart === null ? null : JSON.parse(depart), reprise: fichierDepart !== null && depart === null, nom: `${outil.name} (${outil.baseline})` };
   if (mode === 'init') return initialiser(j);
   if (!existsSync(j.fichier)) return { code: 2, texte: `${j.nom} absente : lancer « cadence analyse --init --outil ${outil.name} » une fois, puis la versionner.` };
   j.base = lireJson(j.fichier);
@@ -356,17 +380,17 @@ export function jugerOutil(racine, outil, mode, mesure, ref = null) {
 }
 
 /**
- * Revue L801 r3, M1 : une base absente au départ du lot (adoptée, ou née dans un lot `config: true`) n'a rien au-dessus d'elle à ne pas dépasser ; elle est
+ * Revue L801 r3, M1, et r4, M1 : une base neuve (baseNeuve : absente au départ du lot, ou fichier qui n'y était pas la base de cet outil) n'a rien au-dessus d'elle à ne pas dépasser ; elle est
  * donc tenue à la mesure du commit jugé — aucune clé au-dessus de sa mesure, aucune clé que la mesure n'a pas (un fichier absent, une règle jamais violée).
  * Sinon une base gonflée à la main s'adopterait, et la hausse passerait aux lots suivants jusqu'au plafond inventé. `comparer` a déjà refusé ce qui dépasse.
  */
-function neuveHorsMesure({ base, mesure, nom, outil, ref }) {
+function neuveHorsMesure({ base, mesure, nom, outil, ref, reprise }) {
   const hors = Object.entries(base).filter(([k, n]) => !Object.hasOwn(mesure, k) || n > mesure[k]).map(([cle, avant]) => ({ cle, avant, apres: mesure[cle] ?? 0 }));
   if (!hors.length) return null;
-  return { code: 1, texte: `${nom} : ligne de base neuve (absente de ${ref.nom}) différente de la mesure : ${hors.length} clé(s) au-dessus de la mesure ou absente(s) d'elle. Une base neuve est la mesure, rien de plus : « cadence analyse --init --outil ${outil.name} --contre ${ref.nom.split(' ')[0]} » la re-mesure (ne pas l'écrire à la main).\n${hors.map(ligne).join('\n')}` };
+  return { code: 1, texte: `${nom} : ligne de base neuve (${reprise ? `dans ${ref.nom}, ce fichier n'était pas la base de l'outil « ${outil.name} »` : `absente de ${ref.nom}`}) différente de la mesure : ${hors.length} clé(s) au-dessus de la mesure ou absente(s) d'elle. Une base neuve est la mesure, rien de plus : « cadence analyse --init --outil ${outil.name} --contre ${ref.nom.split(' ')[0]} » la re-mesure (ne pas l'écrire à la main).\n${hors.map(ligne).join('\n')}` };
 }
 
-/** `--init` : la base absente (ou, avec --contre, absente au départ du lot : re-mesurée après un rebase) est écrite. */
+/** `--init` : la base absente (ou, avec --contre, neuve au départ du lot : re-mesurée après un rebase, ou à la reprise d'un fichier orphelin) est écrite. */
 function initialiser({ fichier, baseDepart, nom, ref, mesure }) {
   if (baseDepart) return { code: 2, texte: `${nom} existe déjà dans ${ref.nom} : --init ne la recrée pas (elle ne peut que baisser : --ecrire).` };
   if (existsSync(fichier) && !ref) return { code: 2, texte: `${nom} existe déjà : --init ne la recrée pas (elle ne peut que baisser : --ecrire).` };
@@ -479,10 +503,11 @@ function jugerTout(io, o, tous, parse) {
   if (retard) { io.err(`analyse : ${retard.texte.replace('node scripts/qualite.mjs', 'cadence analyse')}`); return 1; }
   const ref = o.contre ? lireRef(resolve(io.cwd), o.contre) : null;
   if (ref && !garder(io, o, tous, parse, ref)) return 1;
+  const depart = ref && { ...ref, analyse: outilsAuDepart(ref, parse) };
   let code = 0;
   for (const outil of tous.filter((x) => !o.outil || x.name === o.outil)) {
     let r;
-    try { r = jugerOutil(io.cwd, outil, o.mode, mesurerOutil(io.cwd, outil), ref); } catch (e) { r = { code: 2, texte: e.message }; }
+    try { r = jugerOutil(io.cwd, outil, o.mode, mesurerOutil(io.cwd, outil), depart); } catch (e) { r = { code: 2, texte: e.message }; }
     (r.code ? io.err : io.out)(`analyse : ${r.texte}`);
     code = Math.max(code, r.code);
   }

@@ -89,12 +89,15 @@ way the tool itself recognises its directive, whatever the layout of the comment
    of the plan are shared with [qualite.md](qualite.md) (`scripts/lot-de-config.mjs`). A project **without a native plan**
    has no such lot: there a config changes by a declared change
    ([Changing a config without a native plan](#changing-a-config-without-a-native-plan)). **A baseline is born only
-   declared** ([Adopting a tool](#adopting-a-tool)), the gate says so each time, and **a new baseline is its measure**:
-   absent at the start of the lot, it must equal what the tool measures at the judged commit — no key above its measure,
-   no key the measure does not have (a file that does not exist, a rule never broken). A baseline written or raised by
-   hand is refused (« ligne de base neuve … différente de la mesure », the keys named), adopted or not: it would pass
-   the adoption, then let the next lots add violations up to the invented ceiling. `cadence analyse --init --outil <name>
-   --contre <ref>` measures it again.
+   declared** ([Adopting a tool](#adopting-a-tool)), the gate says so each time, and **a new baseline is its measure**.
+   A baseline is new when it was not the baseline of the **same tool** (same `name`, same path) at the start of the lot:
+   the file was absent, or it was there but no tool of that name read it — an orphan left behind by a tool that was
+   removed, a file an ordinary lot put there in advance. Its content was judged by nobody, so it is no ceiling: the
+   baseline must equal what the tool measures at the judged commit — no key above its measure, no key the measure does
+   not have (a file that does not exist, a rule never broken). A baseline written or raised by hand is refused
+   (« ligne de base neuve … différente de la mesure », the keys named), adopted or not: it would pass the adoption,
+   then let the next lots add violations up to the invented ceiling. `cadence analyse --init --outil <name>
+   --contre <ref>` measures it again, an orphan file included.
 5. **Moving or splitting a file** makes new keys: `cadence analyse --migrer --contre main` rewrites the baseline only if no
    file that existed went up, no total went up, and each new file is credited by its source (the file it takes at least
    50 % of its lines from), as `--migrer` in [qualite.md](qualite.md#the-ratchet). A copy that leaves its source intact is refused.
@@ -103,8 +106,11 @@ way the tool itself recognises its directive, whatever the layout of the comment
 
 ## Adopting a tool
 
-A baseline absent at the start of the lot is a fresh measure: whatever the code holds that day is frozen. So it never
-appears silently, it never replaces a judge that existed, and it holds nothing but the measure (rule 4). Two ways, both
+A baseline that was not the baseline of the same tool at the start of the lot is a fresh measure: whatever the code
+holds that day is frozen. So it never appears silently, it never replaces a judge that existed, and it holds nothing but
+the measure (rule 4). A tool removed and declared again later starts from its measure, not from the file it left: the
+gate then adds « — fichier repris de main (1a2b3c4), où il n'était pas la base de cet outil : tenu à sa mesure » to
+the line. Two ways, both
 printed by the gate (« analyse : ligne de base neuve : tsc (.cadence/analyse/tsc.json) — … ») and both kept by
 `cadence run` when the gate is green: the line goes to the run's log, once, and to the detail of the `integre` state
 (« … — à relire »), on the run's last line and in its state file — a run that adopts a tool never ends as a plain
@@ -122,6 +128,8 @@ printed by the gate (« analyse : ligne de base neuve : tsc (.cadence/analyse/ts
 **An adoption is a pure addition.** Nothing the start of the lot judged loses its judge: removing or changing an existing
 entry stays refused with or without the declaration, so renaming `tsc` to `tsc2` (« tsc (supprimé) »), a new `command` or a
 new `baseline` path are still `config: true` matters, and a new tool cannot take the baseline path of an existing one.
+When a tool of the start is gone, the refusal says so and no longer suggests an `Analyse-adoption` line that would
+change nothing.
 
 Why a line in the commit, checked by the gate: it needs no plan and no file that stays behind; it is written in the lot
 that adopts, where the review reads it; a run integrates by fast-forward, so it stays in the history and
@@ -151,6 +159,8 @@ For each named tool the gate then accepts, in an ordinary lot that is otherwise 
 The gate prints each change with the commit that declares it, and `cadence run` keeps the line in its log and in the
 detail of the `integre` state, like a new baseline:
 « analyse : config changée : tsc — tsconfig.json (modifié) — changement déclaré par le commit 1a2b3c4 (Analyse-config: tsc) ».
+A changed entry is printed field by field, old and new value, so a command switched off in a lot of code is read at
+the gate: « cadence.yaml#analyse.lint (modifié : command « npx eslint -f json . » → « echo [] ») ».
 Without the line the gate refuses and names it; `git log --grep '^Analyse-config:'` lists every declared change.
 
 What stays refused, declared or not: removing a tool, renaming it, moving its baseline — each would free a baseline. In

@@ -140,6 +140,10 @@ The baseline is also the project's list of cleanups: each cleanup lot is measure
 
 ## Recipe for another project
 
+The same ratchet, for any tool and without copying this script, is `cadence analyse` and the `analyse:` key of `cadence.yaml`
+(L801): one command per technology, a baseline per tool, played by the gate of `cadence run` — see [analyse.md](analyse.md).
+The recipe below stays the reference for the thresholds and the rulesets of each language.
+
 Do it in one lot per project: install, configure, `--init`, wire into the gate and the CI, commit the baseline.
 `scripts/qualite.mjs` is generic apart from its three readers (`lireEslint`, `lireKnip`, `lireJscpd`): copy it, and
 change `mesurer` to the tools of the project. Whatever the language, a tool joins the ratchet once its report is turned

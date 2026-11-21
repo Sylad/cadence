@@ -52,7 +52,7 @@ Details: [docs/skills.md](docs/skills.md) and [docs/cadence-hud.md](docs/cadence
 - [Brief grid and pre-check reading](docs/mesures/brief-implementation-enrichi-avant-apres.md): grid of the code-reviewer in the `implement` brief (L523).
 - [docs/deliver.md](docs/deliver.md): CI, deploy, verify, mark lots delivered (delivered ≠ finished); [remote gate](docs/remote-gate.md).
 - [docs/spec.md](docs/spec.md): sheets; [`cadence inspect`](docs/perf.md#inspection-of-a-wave-l627): wave time; [`cadence cost`](docs/cost.md) before a bench.
-- [docs/ref.md](docs/ref.md): reference documents (specs, norms, mock-ups) and the coverage of their elements by the lots.
+- [docs/ref.md](docs/ref.md): reference documents (specs, norms, mock-ups) and the coverage of their elements by the lots; [static analysis](docs/analyse.md).
 - [docs/lead.md](docs/lead.md): the lead workflow, the `livreur` agent, and [the memory index warning](docs/session.md#memory-index-size-l442) (L442).
 - [docs/overview.md](docs/overview.md): the longer introduction and the map of every page; [docs/fonctionnement.md](docs/fonctionnement.md): how it works.
 - [docs/stabilite.md](docs/stabilite.md): guaranteed, [English names, French messages](docs/stabilite.md#languages); [docs/qualite.md](docs/qualite.md).

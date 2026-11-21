@@ -12,7 +12,7 @@ import { lireEtapes } from './etapes-porte.mjs';
 import { lotDuPlan } from './nouveautes-du-run.mjs';
 
 /** Les outils de bin/cadence.js qu'une session de run ne lance jamais ; `spec` n'y est pas : ses verbes autres que check|qa sont refusés par le hook. */
-export const OUTILS_CADENCE = ['run', 'sondes', 'raf', 'news', 'session', 'deliver', 'verify', 'eval', 'skills', 'orchestrate', 'lead', 'corrections', 'perf',
+export const OUTILS_CADENCE = ['run', 'sondes', 'analyse', 'raf', 'news', 'session', 'deliver', 'verify', 'eval', 'skills', 'orchestrate', 'lead', 'corrections', 'perf',
   'cost', 'inspect', 'ref', 'config', 'release', 'local', 'claude-hook'];
 const SPEC_DU_LEAD = ['green', 'reseal'];
 

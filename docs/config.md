@@ -25,6 +25,7 @@ A gate is a check that sends a lot back instead of letting it through. It is dec
 | UX review | `uxSince`, written by `raf ux enable` | plan | `raf done` on a `--visible` lot with no UX review ([news](news.md)) |
 | Tests | `orchestrate.test` (with `testReplay`, `testRelated`) | cadence.yaml | a lot whose suite is red after a write step: it goes to a correction pass ([orchestrate](orchestrate-cycle.md)) |
 | Build | `orchestrate.build` | cadence.yaml | a lot whose build or typecheck is red, played before the tests |
+| Static analysis | `analyse` | cadence.yaml | a run whose code adds a violation to a declared tool (ESLint, tsc, ruff, Checkstyle, PMD, SpotBugs, SARIF) above its versioned baseline, or raises that baseline: played by the gate of `cadence run` between build and tests ([analyse](analyse.md)) |
 | Code without a test | `orchestrate.testGate` | cadence.yaml | code files changed with no test file touched: a correction pass before the review |
 | Documentation | `docs.sync` (with `docs.since`) | cadence.yaml | a lot that changes code without touching the documents the rule names; acknowledged by `raf docs-ok <lot> --reason` ([news](news.md)) |
 | Edge-case probe | `orchestrate.probe` | cadence.yaml | a lot whose diff a fresh session breaks with a red edge-case test ([orchestrate](orchestrate-gate.md#the-edge-case-probe-orchestrateprobe-l497)) |

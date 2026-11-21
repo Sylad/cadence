@@ -23,6 +23,7 @@ import { commandesDeRegeneration, regenerer, retirerRegenerations, TRAILER_REGEN
 import { avecRefusCadence, commandesNommees, interditsPourSpec, leverPourSpec } from '../../../scripts/commandes-du-brief.mjs'; // L792 : commandes du projet nommées au brief
 import { noterVerdict } from '../../../scripts/verdicts-porte.mjs'; // L786 : même écriture que src/gate-verdict.ts (verify --gate)
 import { lireEtapes } from '../../../scripts/etapes-porte.mjs'; // L786 (revue r1, M1) : mêmes étapes que verify --gate
+import { etapeAnalyse } from '../../../scripts/analyse.mjs'; // L801 : l'étape analyse de la porte, cliquet par outil
 import { consigneNouveautes, entreesQuiCitent, ligneNouveautes, lotVisible } from '../../../scripts/nouveautes-du-run.mjs'; // L794 : entrée Nouveautés d'un lot visible
 import { debutProcessus, inscrireCreneau, occupantVivant, prendreVerrou, rendreVerrou, roleVerrou } from '../verrou.js';
 
@@ -118,19 +119,21 @@ function copierDeps(repo: string, wt: string): void {
   }
 }
 
-const orchestrate = (repo: string): { prodAccess?: boolean } =>
-  existsSync(join(repo, 'cadence.yaml')) ? (parse(readFileSync(join(repo, 'cadence.yaml'), 'utf8')) as { orchestrate?: object } | null)?.orchestrate ?? {} : {};
+const cadenceYaml = (repo: string) => (existsSync(join(repo, 'cadence.yaml')) ? parse(readFileSync(join(repo, 'cadence.yaml'), 'utf8')) as { orchestrate?: object; analyse?: unknown } | null : null);
+const orchestrate = (repo: string): { prodAccess?: boolean } => cadenceYaml(repo)?.orchestrate ?? {};
 /** L786 (revue r1, M1) : les étapes de verify --gate (scripts/etapes-porte.mjs : build puis test, en chaîne ou en parties) ; `refus` : cadence.yaml que
- * verify --gate refuserait, rien n'est joué ni noté. */
-function etapesDeCadenceYaml(repo: string): { commandes: string[]; refus?: string } {
-  const p = lireEtapes(orchestrate(repo));
-  return p.refus !== undefined ? { commandes: [], refus: `orchestrate.${p.refus}` } : { commandes: p.etapes.flatMap((x) => x.commandes) };
+ * verify --gate refuserait, rien n'est joué ni noté. L801 : l'analyse (clé analyse:, scripts/analyse.mjs) après le build, avant les tests, contre `cible`. */
+function etapesDeCadenceYaml(repo: string, cible = 'main'): { commandes: string[]; refus?: string } {
+  const p = lireEtapes(orchestrate(repo)), a = etapeAnalyse(cadenceYaml(repo)?.analyse, cible);
+  if (p.refus !== undefined || a.refus !== undefined) return { commandes: [], refus: p.refus !== undefined ? `orchestrate.${p.refus}` : a.refus };
+  const [build, ...reste] = p.etapes, avant = build?.nom === 'build' ? build.commandes : [];
+  return { commandes: [...avant, ...a.commandes, ...(avant.length ? reste : p.etapes).flatMap((x) => x.commandes)] };
 }
-const commandesDeCadenceYaml = (repo: string): string[] => etapesDeCadenceYaml(repo).commandes;
+const commandesDeCadenceYaml = (repo: string, cible?: string): string[] => etapesDeCadenceYaml(repo, cible).commandes;
 /** L764 : la porte d'un run est lue dans cadence.yaml AU COMMIT DU RUN (le worktree, rebasé sur la cible) : un run qui corrige sa propre commande de porte est
  * jugé par elle. Quand elle diffère de celle de l'arbre principal, la sortie le dit (une porte affaiblie par le run se voit dans le journal et à la revue). */
 function commandesDuRun(e: Etat, out: (l: string) => void): string[] {
-  const cmds = commandesDeCadenceYaml(e.worktree), principal = commandesDeCadenceYaml(e.repo);
+  const cmds = commandesDeCadenceYaml(e.worktree, e.cible), principal = commandesDeCadenceYaml(e.repo, e.cible);
   const dit = cmds.join('\n') === principal.join('\n') ? undefined
     : `porte lue au commit du run (cadence.yaml changé par le run) : ${cmds.join(' puis ') || 'aucune commande'} — l'arbre principal (${e.cible}) aurait joué : ${principal.join(' puis ') || 'aucune commande'}`;
   // Revue L764 r1 : dite une fois par changement (m1, pas à chaque essai ni rebase), gardée pour le détail de l'état integre (M3, comme un conflit résolu, L723).
@@ -326,7 +329,7 @@ function suite(e: Etat, o: Opts): Etat {
   const arretSansCommande = () => {
     const refus = etapesDeCadenceYaml(e.worktree).refus; // L786 (revue r1, M1) : une porte que verify --gate refuserait n'est pas jouée à moitié
     e.etat = 'sans-porte';
-    e.detail = `${refus ? `cadence.yaml du run : ${refus}` : 'cadence.yaml du run ne déclare ni orchestrate.test ni orchestrate.build'} : relance avec --sans-porte pour intégrer quand même`;
+    e.detail = `${refus ? `cadence.yaml du run : ${refus}` : 'cadence.yaml du run ne déclare ni orchestrate.test, ni orchestrate.build, ni analyse'} : relance avec --sans-porte pour intégrer quand même`;
     return fin(e, o);
   };
   if (!commandesDeCadenceYaml(e.worktree).length && !o.sansPorte) return arretSansCommande();

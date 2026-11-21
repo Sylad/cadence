@@ -139,6 +139,21 @@ describe('L801 — les directives qui éteignent une règle sont comptées comme
     expect(lireDirectives(r, '.', 'spotbugs-xml')).toEqual({ 'A.java|directive:suppress-fb': 1 });
     expect(lireDirectives(r, 'app', 'eslint-json')).toEqual({});
   });
+
+  it('M3 — les extinctions sans « // eslint-disable » : config ESLint en ligne, JSDoc, @SuppressWarnings("all") pour PMD et Checkstyle', () => {
+    const r = tempDir();
+    git(r, 'init', '-q');
+    writeFileSync(join(r, 'a.ts'), [
+      '/* eslint no-console: "off" */', '/* eslint @typescript-eslint/no-explicit-any: off, max-lines: [2, 9999] */', '/** eslint-disable */',
+      '/** @ts-ignore */', '/* eslint-env node */', '// eslint est un linter : ce commentaire n\'éteint rien', '',
+    ].join('\n'));
+    writeFileSync(join(r, 'A.java'), '@SuppressWarnings("all") class A {}\n@SuppressWarnings({"unchecked", "all"}) class B {}\n@SuppressWarnings("checkstyle:MagicNumber") class C {}\n@SuppressWarnings("unchecked") class D {}\n');
+    git(r, 'add', '.');
+    expect(lireDirectives(r, '.', 'eslint-json')).toEqual({ 'a.ts|directive:eslint-config': 2, 'a.ts|directive:eslint-disable': 1 });
+    expect(lireDirectives(r, '.', 'tsc')).toEqual({ 'a.ts|directive:ts-ignore': 1 });
+    expect(lireDirectives(r, '.', 'pmd-xml')).toEqual({ 'A.java|directive:nopmd': 2 });
+    expect(lireDirectives(r, '.', 'checkstyle-xml')).toEqual({ 'A.java|directive:checkstyle-off': 3 });
+  });
 });
 
 describe('L801 — le cliquet de cadence analyse', () => {
@@ -208,7 +223,7 @@ describe('L801 — --contre : la base du lot contre celle de son départ', () =>
     writeFileSync(join(r, 'seuils.json'), '{"max":9}\n');
     const refus = await cadence(r, '--contre', 'main');
     expect(refus.code).toBe(1);
-    expect(refus.sortie).toContain('seuils.json diffère(nt) de main');
+    expect(refus.sortie).toContain('seuils.json (modifié) diffère(nt) de main');
     git(r, 'commit', '-qam', 'feat(L4): seuils relevés');
     expect((await cadence(r, '--contre', 'main')).code).toBe(1);
     git(r, 'reset', '-q', '--hard', 'main'); writeFileSync(join(r, 'seuils.json'), '{"max":9}\n');
@@ -243,11 +258,67 @@ describe('L801 — --contre : la base du lot contre celle de son départ', () =>
     expect(await cadence(r, '--contre', 'main')).toMatchObject({ code: 0 });
   });
 
-  it('le lot qui adopte l\'outil (aucune base au départ) l\'introduit librement ; --init --contre la re-mesure', async () => {
-    const r = await depot({ base: false });
+  it('une base ne naît que dans un lot config: true : refusée ailleurs ; sur la branche du lot de config, --init --contre la crée et la re-mesure', async () => {
+    const plan = 'project: p\nlots:\n  - id: L5\n    title: adopter lint\n    config: true\n';
+    const r = await depot({ base: false, plan });
+    const refus = await cadence(r, '--init', '--contre', 'main');
+    expect(refus.code).toBe(1);
+    expect(refus.sortie).toContain('.cadence/analyse/lint.json (nouveau) diffère(nt) de main');
+    expect(existsSync(join(r, '.cadence/analyse/lint.json'))).toBe(false);
+    git(r, 'checkout', '-q', 'main'); git(r, 'checkout', '-qb', 'cadence/run--L5');
     expect((await cadence(r, '--init', '--contre', 'main')).code).toBe(0);
     expect((await cadence(r, '--init', '--contre', 'main')).code).toBe(0);
     expect((await cadence(r, '--contre', 'main')).code).toBe(0);
+    writeFileSync(join(r, 'src/a.js'), 'x\n'); // un lot de config ne touche que les configs
+    expect((await cadence(r, '--contre', 'main')).sortie).toContain('src/a.js : un lot déclaré « config: true » au plan ne touche que les fichiers de config');
+  });
+
+  it.each([
+    ['le nom', 'name', 'lint2'],
+    ['la commande', 'command', 'node outil.mjs || true'],
+    ['le chemin de la base', 'baseline', 'autre/lint.json'],
+    ['le dossier', 'dir', 'src'],
+  ])('M1 — changer %s de l\'outil dans cadence.yaml ne donne pas une base neuve, donc libre : refusé hors lot config: true', async (_, cle, valeur) => {
+    const r = await depot();
+    writeFileSync(join(r, 'src/a.js'), 'x // TODO\ny // TODO\nz // TODO\n');
+    expect((await cadence(r, '--contre', 'main')).code).toBe(1);
+    const y = readFileSync(join(r, 'cadence.yaml'), 'utf8');
+    writeFileSync(join(r, 'cadence.yaml'), cle === 'name' ? y.replace('name: lint', 'name: lint2') : cle === 'command' ? y.replace('command: node outil.mjs', `command: ${valeur}`) : `${y}    ${cle}: ${valeur}\n`);
+    const init = await cadence(r, '--init', '--contre', 'main');
+    expect(init.code).toBe(1);
+    expect(init.sortie).toMatch(/cadence\.yaml#analyse\.lint2? \((nouveau|modifié|supprimé)\)/);
+    git(r, 'add', '-A'); git(r, 'commit', '-qm', 'feat(L4): outil changé');
+    expect((await cadence(r, '--init', '--contre', 'main')).code).toBe(1);
+    expect((await cadence(r, '--contre', 'main')).code).toBe(1);
+  });
+
+  it('M1 — renommer l\'outil dans un lot config: true (commits qui ne citent que lui) passe ; un commit d\'un autre lot sur cadence.yaml non', async () => {
+    const plan = 'project: p\nlots:\n  - id: L5\n    title: renommer\n    config: true\n';
+    const r = await depot({ plan });
+    writeFileSync(join(r, 'cadence.yaml'), readFileSync(join(r, 'cadence.yaml'), 'utf8').replace('name: lint', 'name: lint2'));
+    git(r, 'commit', '-qam', 'chore(L5): renomme l\'outil');
+    expect((await cadence(r, '--init', '--contre', 'main')).sortie).toContain('.cadence/analyse/lint2.json (nouveau)'); // base pas encore commitée
+    expect((await cadence(r, '--init')).code).toBe(0); // hors branche du lot de config : créée sans --contre, puis commitée par le lot de config
+    git(r, 'add', '-A'); git(r, 'commit', '-qm', 'chore(L5): base de lint2');
+    expect((await cadence(r, '--contre', 'main')).code).toBe(0);
+    writeFileSync(join(r, 'cadence.yaml'), readFileSync(join(r, 'cadence.yaml'), 'utf8').replace('node outil.mjs', 'node outil.mjs; true'));
+    git(r, 'commit', '-qam', 'feat(L4): commande');
+    expect((await cadence(r, '--contre', 'main')).code).toBe(1);
+  });
+
+  it('M2 — un fichier déplacé dont la base est relevée à la main au-dessus de sa mesure n\'ouvre pas de marge (L707, neufsAuDessus de qualite.mjs)', async () => {
+    const r = await depot();
+    renameSync(join(r, 'src/a.js'), join(r, 'src/b.js'));
+    writeFileSync(join(r, 'src/b.js'), 'x // TODO\nz\n');
+    expect((await cadence(r, '--migrer', '--contre', 'main')).code).toBe(0);
+    expect(base(r)).toEqual({ 'src/b.js|no-todo': 1, 'src/b.js|no-todo|total': 1 });
+    writeFileSync(join(r, '.cadence/analyse/lint.json'), JSON.stringify({ 'src/b.js|no-todo': 2, 'src/b.js|no-todo|total': 2 }));
+    git(r, 'add', '-A'); git(r, 'commit', '-qm', 'feat(L4): déplace');
+    const refus = await cadence(r, '--contre', 'main');
+    expect(refus.code).toBe(1);
+    expect(refus.sortie).toContain('clé(s) de fichier neuf au-dessus de la mesure');
+    expect(refus.sortie).toContain('src/b.js|no-todo : 2 → 1');
+    expect((await cadence(r)).code).toBe(0); // sans --contre, rien ne connaît le départ
   });
 });
 

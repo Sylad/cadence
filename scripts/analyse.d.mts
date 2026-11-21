@@ -10,3 +10,5 @@ export function jugerOutil(racine: string, outil: OutilAnalyse, mode: 'verifier'
 export function commandePorte(cible: string): string;
 export function main(argv: string[], io: { cwd: string; out: (l: string) => void; err: (l: string) => void }): Promise<number>;
 export function etapeAnalyse(valeur: unknown, cible: string): { commandes: string[]; refus?: string };
+/** La garde d'identité de l'analyse contre le départ du lot : un outil apparu, retiré ou modifié sous `analyse:`, une base absente au départ ou une `configs` changée, hors d'un lot `config: true`. */
+export function identiteChangee(racine: string, ref: import('./qualite.mjs').Ref, outils: OutilAnalyse[], parse: (texte: string) => unknown): { code: number; texte: string } | null;

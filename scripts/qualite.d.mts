@@ -20,3 +20,6 @@ export function lireRef(racine: string, ref: string): Ref;
 export function appliquer(racine: string, mode: 'verifier' | 'init' | 'ecrire' | 'migrer', mesure?: Mesure, ref?: Ref | null): { code: number; texte: string };
 export function retardSurBranche(racine: string, ref: string): { code: number; texte: string } | null;
 export function refDepartLot(racine: string, branche?: string): string;
+export function remontees(depart: Mesure, base: Mesure, mesure: Mesure, existe: (chemin: string) => boolean, lien?: Lien): Pire[];
+export function neufsAuDessus(base: Mesure, mesure: Mesure, existe: (chemin: string) => boolean): Pire[];
+export function ligne(p: Pire): string;

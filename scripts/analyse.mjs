@@ -2,13 +2,15 @@
 // Une commande par outil (ESLint typé, tsc --noEmit, ruff, Checkstyle, PMD, CPD, SpotBugs, analyseurs .NET en SARIF…) ; son rapport est lu par un
 // lecteur de format (`fichier|règle → nombre`), puis jugé par un cliquet générique : une ligne de base par outil, versionnée ; seules les nouvelles
 // violations font échouer ; une baisse s'écrit (--ecrire), une hausse jamais. Le cliquet réutilise celui de scripts/qualite.mjs (L462 : comparer,
-// comparerMigration, creerLien, lireRef), qui reste celui du code de cadence lui-même. Rien de propre à un dépôt : la recette est dans docs/analyse.md.
+// comparerMigration, creerLien, lireRef, remontees, neufsAuDessus), qui reste celui du code de cadence lui-même, et la règle des lots « config: true » de
+// scripts/lot-de-config.mjs (configChangee), commune aux deux. Rien de propre à un dépôt : la recette est dans docs/analyse.md.
 // JavaScript sans dépendance, comme scripts/regeneration.mjs : src et v2 l'importent hors de leur rootDir. Il lit la valeur déjà analysée (pas de yaml ici).
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, posix, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { comparer, comparerMigration, creerLien, lireEslint, lireRef, retardSurBranche, serialiser } from './qualite.mjs';
+import { configChangee, fichiersDifferents } from './lot-de-config.mjs';
+import { comparer, comparerMigration, creerLien, ligne, lireEslint, lireRef, neufsAuDessus, remontees, retardSurBranche, serialiser } from './qualite.mjs';
 
 /** Le chemin de ce script : la porte de cadence run le lance par lui (`node <script> --contre <cible>`). */
 export const SCRIPT = fileURLToPath(import.meta.url);
@@ -172,12 +174,15 @@ export const LECTEURS = {
 const JS = /\.(?:[cm]?[jt]sx?)$/;
 const JAVA = /\.java$/;
 /** Par format : les fichiers lus (git ls-files sous le dossier de l'outil, filtrés par extension) et les motifs comptés, chacun sous `directive:<nom>`. */
+// `@SuppressWarnings("all")` éteint toutes les règles de PMD et de Checkstyle (SuppressWarningsHolder) : il compte pour l'un comme pour l'autre
+const TOUT = String.raw`@SuppressWarnings\([^)]*"all"`;
 const DIRECTIVES = {
-  'eslint-json': [JS, { 'eslint-disable': /\/[/*][ \t]*eslint-disable/g }],
-  tsc: [JS, { 'ts-ignore': /\/[/*][ \t]*@ts-(?:ignore|nocheck|expect-error)/g }],
+  // la désactivation sous `//`, `/*` ou `/**` ; et la config en ligne, `/* eslint règle: off */` (ou un seuil relevé), qui éteint une règle sans le dire
+  'eslint-json': [JS, { 'eslint-disable': /\/(?:\/|\*+)[ \t]*eslint-disable/g, 'eslint-config': /\/\*+\s*eslint\s+[\w@/-]+\s*:/g }],
+  tsc: [JS, { 'ts-ignore': /\/(?:\/|\*+)[ \t]*@ts-(?:ignore|nocheck|expect-error)/g }],
   'ruff-json': [/\.pyi?$/, { noqa: /#[ \t]*(?:noqa|ruff:[ \t]*noqa)\b/gi }],
-  'checkstyle-xml': [JAVA, { 'checkstyle-off': /CHECKSTYLE[ \t]*:?[ \t]*OFF|@SuppressWarnings\([^)]*checkstyle:/gi }],
-  'pmd-xml': [JAVA, { nopmd: /\/\/[ \t]*NOPMD|@SuppressWarnings\([^)]*PMD/g }],
+  'checkstyle-xml': [JAVA, { 'checkstyle-off': new RegExp(String.raw`CHECKSTYLE[ \t]*:?[ \t]*OFF|@SuppressWarnings\([^)]*checkstyle:|${TOUT}`, 'gi') }],
+  'pmd-xml': [JAVA, { nopmd: new RegExp(String.raw`\/\/[ \t]*NOPMD|@SuppressWarnings\([^)]*PMD|${TOUT}`, 'g') }],
   'cpd-xml': [JAVA, { 'cpd-off': /CPD-OFF/g }],
   'spotbugs-xml': [JAVA, { 'suppress-fb': /@SuppressFBWarnings\b/g }],
   sarif: [/\.(?:cs|vb)$/, { 'pragma-warning': /#pragma[ \t]+warning[ \t]+disable|\[(?:assembly:[ \t]*)?SuppressMessage\b/g }],
@@ -220,35 +225,53 @@ export function mesurerOutil(racine, outil) {
 // ── le cliquet ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 const total = (m) => Object.entries(m).filter(([k]) => !k.endsWith('|total') && !k.endsWith('|lignes')).reduce((a, [, n]) => a + n, 0);
-const ligne = ({ cle, avant, apres, note }) => `  ${cle} : ${avant} → ${apres}${note ? ` — ${note}` : ''}`;
 // les clés d'un outil vues par le cliquet de scripts/qualite.mjs (`outil|fichier|règle`) : « analyse » n'est ni « eslint » ni « jscpd », aucune n'est un simple compteur
 const versQualite = (m) => Object.fromEntries(Object.entries(m).map(([k, n]) => [`analyse|${k}`, n]));
 const deQualite = (cle) => cle.replace(/^analyse\|/, '');
 const lireJson = (f) => JSON.parse(readFileSync(f, 'utf8'));
 const ecrire = (f, m) => { mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, serialiser(m)); };
 
-// Les commits qui ne citent que des lots déclarés `config: true` au plan du départ (L586, même lecture que scripts/qualite.mjs) peuvent changer une config.
-const lotsCites = (sujet) => /^[^(:]*\(([^)]+)\)/.exec(sujet)?.[1].split(',').map((i) => i.trim()) ?? [];
-function configsChangees(racine, outil, ref) {
-  const commits = ref.commits();
-  return outil.configs.filter((c) => {
-    const ici = existsSync(join(racine, c)) ? readFileSync(join(racine, c), 'utf8') : null;
-    if (ici === ref.config(c)) return false;
-    const touchants = commits.filter((x) => x.fichiers.includes(c));
-    return !(touchants.length && touchants.every((x) => lotsCites(x.sujet).length && lotsCites(x.sujet).every((id) => ref.lotsConfig.has(id))));
-  });
+/**
+ * Ce que l'analyse juge au départ du lot, pour configChangee de scripts/qualite.mjs (L586 : la même règle « config: true », la même lecture des commits) :
+ * une ligne de base ne naît (base absente au départ) ni ne change d'identité (l'entrée de l'outil sous `analyse:` : nom, commande, format, dossier,
+ * rapport, chemin de la base, configs — apparue, retirée ou modifiée) hors d'un lot déclaré `config: true`, et ses `configs` non plus. Sans cette garde,
+ * renommer l'outil (ou sa base) donnerait une base « neuve », donc libre, et la hausse passerait. `departs` : les outils de cadence.yaml au départ.
+ */
+function jeuAnalyse(racine, ref, outils, departs) {
+  const tous = [...departs, ...outils];
+  const configs = new Set(tous.flatMap((o) => o.configs));
+  const bases = new Set(tous.map((o) => o.baseline));
+  const identite = (o) => (o ? JSON.stringify(o) : null);
+  const changees = () => [
+    ...[...new Set(tous.map((o) => o.name))].map((n) => [`cadence.yaml#analyse.${n}`, identite(departs.find((o) => o.name === n)), identite(outils.find((o) => o.name === n))])
+      .filter(([, d, a]) => d !== a).map(([l, d, a]) => `${l} (${d === null ? 'nouveau' : a === null ? 'supprimé' : 'modifié'})`),
+    ...outils.filter((o) => ref.config(o.baseline) === null).map((o) => `${o.baseline} (nouveau)`),
+    ...fichiersDifferents(racine, ref, [...configs]),
+  ];
+  return {
+    actif: true, changees, estConfig: (f) => f === 'cadence.yaml' || configs.has(f) || bases.has(f),
+    raison: 'une ligne de base ne naît ni ne change d\'identité (nom, commande, format, dossier, rapport, chemin, configs), et un seuil ou une exclusion ne se change pas, hors d\'un lot « config: true » du plan, livré seul (corriger le code, pas l\'outil)',
+  };
 }
+
+/** Les outils de cadence.yaml au départ du lot ; vide sans fichier ou sans clé, et pour une clé mal formée (chaque outil d'aujourd'hui y est alors « nouveau »). */
+function outilsAuDepart(ref, parse) {
+  const t = ref.config('cadence.yaml');
+  try { return t === null ? [] : lireAnalyse(parse(t)?.analyse, 'cadence.yaml'); } catch { return []; }
+}
+
+/** La garde d'identité et de configs de l'analyse (jeuAnalyse) contre le départ du lot : { code: 1, texte } ou null. */
+export const identiteChangee = (racine, ref, outils, parse) => configChangee(racine, ref, jeuAnalyse(racine, ref, outils, outilsAuDepart(ref, parse)));
 
 /**
  * Juge un outil. mode : 'verifier' (la porte), 'init' (crée la base absente), 'ecrire' (fige une baisse, refuse si quoi que ce soit empire) ou 'migrer'
  * (fichiers déplacés ou découpés, exige `ref` : comparerMigration de scripts/qualite.mjs). `ref` (lireRef) : le départ du lot — sa base de l'outil ne peut pas
- * être dépassée par celle du lot, et les `configs` de l'outil (seuils, exclusions) doivent y être identiques. Rend { code, texte } : 0 vert, 1 refus, 2 erreur.
+ * être dépassée par celle du lot (remontees, neufsAuDessus : les gardes de scripts/qualite.mjs). L'identité de l'outil et ses `configs` se jugent avant, pour
+ * tous les outils (identiteChangee). Rend { code, texte } : 0 vert, 1 refus, 2 erreur.
  */
 export function jugerOutil(racine, outil, mode, mesure, ref = null) {
   const depart = ref ? ref.config(outil.baseline) : null;
   const j = { racine, outil, mesure, ref, fichier: join(racine, outil.baseline), baseDepart: depart === null ? null : JSON.parse(depart), nom: `${outil.name} (${outil.baseline})` };
-  const changees = ref && j.baseDepart ? configsChangees(racine, outil, ref) : [];
-  if (changees.length) return { code: 1, texte: `${j.nom} : ${changees.join(', ')} diffère(nt) de ${ref.nom} : un seuil ou une exclusion ne se change pas dans un lot jugé par eux (corriger le code ; changer une config est un lot « config: true » du plan, livré seul).` };
   if (mode === 'init') return initialiser(j);
   if (!existsSync(j.fichier)) return { code: 2, texte: `${j.nom} absente : lancer « cadence analyse --init --outil ${outil.name} » une fois, puis la versionner.` };
   j.base = lireJson(j.fichier);
@@ -272,7 +295,7 @@ const lignes = (pires) => pires.map((p) => ligne({ ...p, cle: deQualite(p.cle) }
 /** La base du lot ne remonte pas au-dessus de celle du départ (un fichier neuf n'y entre que crédité par sa source, comme --migrer) ; null si elle tient. */
 function remonte(j) {
   if (!j.baseDepart) return null;
-  const pires = comparerMigration(versQualite(j.baseDepart), versQualite(j.base), j.existe, lienDe(j, j.baseDepart));
+  const pires = remontees(versQualite(j.baseDepart), versQualite(j.base), versQualite(j.mesure), j.existe, lienDe(j, j.baseDepart));
   return pires.length ? { code: 1, texte: `${j.nom} remonte par rapport à ${j.ref.nom} (elle ne peut que baisser : corriger le code, pas la base) :\n${lignes(pires)}` } : null;
 }
 
@@ -286,10 +309,15 @@ function migrer(j) {
   return { code: 0, texte: `${j.nom} migrée : ${total(j.mesure)} violation(s), aucun total en hausse.` };
 }
 
-/** La mesure contre la base : ce qui empire refuse ; en mode 'ecrire', une baisse est écrite. */
-function comparerBase({ base, mesure, fichier, nom }, mode) {
+/**
+ * La mesure contre la base : ce qui empire refuse ; en mode 'ecrire', une baisse est écrite. À la porte (`--contre`), une clé d'un fichier neuf au-dessus
+ * de sa mesure est refusée (L707, neufsAuDessus) : intégrée, elle deviendrait au lot suivant la clé d'un fichier « qui existait » et le laisserait regrossir.
+ */
+function comparerBase({ base, mesure, fichier, nom, baseDepart, existe, ref }, mode) {
   const { pires, mieux } = comparer(base, mesure);
   if (pires.length) return { code: 1, texte: `${nom} : ${pires.length} mesure(s) empirent (seules les violations gelées passent ; corriger le code, jamais la base) :\n${pires.map(ligne).join('\n')}` };
+  const hautes = mode === 'verifier' && baseDepart ? neufsAuDessus(versQualite(base), versQualite(mesure), existe) : [];
+  if (hautes.length) return { code: 1, texte: `${nom} : ${hautes.length} clé(s) de fichier neuf au-dessus de la mesure (gain non figé) : un fichier neuf entre dans ${ref.nom} à sa mesure. Figer : « cadence analyse --ecrire » (ou --migrer --contre si des fichiers ont été déplacés).\n${lignes(hautes)}` };
   if (mode === 'ecrire') { ecrire(fichier, mesure); return { code: 0, texte: `${nom} baissée : ${total(base)} → ${total(mesure)} violation(s) gelée(s).` }; }
   const reste = mieux.length ? ` ; ${mieux.length} mesure(s) ont baissé : « cadence analyse --ecrire » fige le gain` : '';
   return { code: 0, texte: `${nom} : rien n'empire (${total(mesure)} violation(s), ${total(base)} gelée(s))${reste}.` };
@@ -322,35 +350,39 @@ function options(argv) {
 
 /** `cadence analyse` : joue chaque outil déclaré (ou `--outil`) depuis la racine `io.cwd` ; code 0 vert, 1 au moins un refus, 2 erreur. */
 export async function main(argv, io) {
-  let o, outils;
+  let o, tous, parse;
   try {
     o = options(argv);
     const y = join(io.cwd, 'cadence.yaml');
-    const { parse } = await import('yaml');
-    outils = lireAnalyse(existsSync(y) ? parse(readFileSync(y, 'utf8'))?.analyse : undefined, 'cadence.yaml');
-    if (!outils.length) { io.err('analyse : cadence.yaml ne déclare aucun outil (clé analyse:, docs/analyse.md)'); return 2; }
-    if (o.outil) {
-      outils = outils.filter((x) => x.name === o.outil);
-      if (!outils.length) { io.err(`analyse : outil « ${o.outil} » absent de la clé analyse: de cadence.yaml`); return 2; }
-    }
+    ({ parse } = await import('yaml'));
+    tous = lireAnalyse(existsSync(y) ? parse(readFileSync(y, 'utf8'))?.analyse : undefined, 'cadence.yaml');
+    if (!tous.length) { io.err('analyse : cadence.yaml ne déclare aucun outil (clé analyse:, docs/analyse.md)'); return 2; }
+    if (o.outil && !tous.some((x) => x.name === o.outil)) { io.err(`analyse : outil « ${o.outil} » absent de la clé analyse: de cadence.yaml`); return 2; }
   } catch (e) {
     io.err(`analyse : ${e.message}`);
     return 2;
   }
-  let code = 0;
   try {
-    const retard = o.contre ? retardSurBranche(io.cwd, o.contre) : null;
-    if (retard) { io.err(`analyse : ${retard.texte.replace('node scripts/qualite.mjs', 'cadence analyse')}`); return 1; }
-    const ref = o.contre ? lireRef(resolve(io.cwd), o.contre) : null;
-    for (const outil of outils) {
-      let r;
-      try { r = jugerOutil(io.cwd, outil, o.mode, mesurerOutil(io.cwd, outil), ref); } catch (e) { r = { code: 2, texte: e.message }; }
-      (r.code ? io.err : io.out)(`analyse : ${r.texte}`);
-      code = Math.max(code, r.code);
-    }
+    return jugerTout(io, o, tous, parse);
   } catch (e) {
     io.err(`analyse : ${e.message}`);
     return 2;
+  }
+}
+
+/** Contre le départ (`--contre`), d'abord l'identité de TOUS les outils déclarés (même avec --outil), puis chaque outil joué et jugé. */
+function jugerTout(io, o, tous, parse) {
+  const retard = o.contre ? retardSurBranche(io.cwd, o.contre) : null;
+  if (retard) { io.err(`analyse : ${retard.texte.replace('node scripts/qualite.mjs', 'cadence analyse')}`); return 1; }
+  const ref = o.contre ? lireRef(resolve(io.cwd), o.contre) : null;
+  const identite = ref && identiteChangee(io.cwd, ref, tous, parse);
+  if (identite) { io.err(`analyse : ${identite.texte}`); return 1; }
+  let code = 0;
+  for (const outil of tous.filter((x) => !o.outil || x.name === o.outil)) {
+    let r;
+    try { r = jugerOutil(io.cwd, outil, o.mode, mesurerOutil(io.cwd, outil), ref); } catch (e) { r = { code: 2, texte: e.message }; }
+    (r.code ? io.err : io.out)(`analyse : ${r.texte}`);
+    code = Math.max(code, r.code);
   }
   return code;
 }

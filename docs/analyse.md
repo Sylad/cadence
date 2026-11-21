@@ -53,10 +53,11 @@ command did not write (it is deleted before each run, so an old one never counts
 most of them exit 1 when they find something.
 
 **Suppression comments count as violations.** Per format, the files git tracks under `dir` are read and each directive is
-counted per file under `directive:<name>`: `eslint-disable` (eslint-json), `@ts-ignore`, `@ts-nocheck`, `@ts-expect-error`
-(tsc), `# noqa` (ruff), `CHECKSTYLE:OFF` and `@SuppressWarnings("checkstyle:…")`, `// NOPMD` and `@SuppressWarnings("PMD…")`,
-`CPD-OFF`, `@SuppressFBWarnings`, `#pragma warning disable` and `[SuppressMessage]` (.cs, .vb). Adding one makes the
-measure go up like a new finding.
+counted per file under `directive:<name>`: `eslint-disable` in a `//`, `/*` or `/**` comment, and the inline config
+`/* eslint <rule>: off */` (`eslint-config`, any rule set inline, a raised threshold too) (eslint-json); `@ts-ignore`,
+`@ts-nocheck`, `@ts-expect-error` (tsc); `# noqa` (ruff); `CHECKSTYLE:OFF` and `@SuppressWarnings("checkstyle:…")`,
+`// NOPMD` and `@SuppressWarnings("PMD…")`, and `@SuppressWarnings("all")` for both; `CPD-OFF`, `@SuppressFBWarnings`,
+`#pragma warning disable` and `[SuppressMessage]` (.cs, .vb). Adding one makes the measure go up like a new finding.
 
 ## The ratchet
 
@@ -67,10 +68,14 @@ measure go up like a new finding.
 3. A measure that went **down** passes, with a reminder; `cadence analyse --ecrire` writes the gain, and refuses (writing
    nothing) if anything got worse. The baseline is only ever lowered.
 4. `--contre <ref>` (what the run's gate passes: its target branch) also judges the baseline of the lot against the one at
-   the start of the lot (merge-base with `<ref>`): a key raised by hand is refused (« remonte par rapport à main »), and so is
-   any file of `configs` that differs from the start, unless every commit that touches it cites only lots the plan declares
-   `config: true` (the rule of [qualite.md](qualite.md), a threshold is changed by a lot of its own). The lot that adopts a
-   tool (no baseline at its start) is free; `--init --contre main` re-measures it after a rebase.
+   the start of the lot (merge-base with `<ref>`), with the guards of `scripts/qualite.mjs`: a key raised by hand is refused
+   (« remonte par rapport à main »), and so is a key of a new file above its measure (a moved file whose baseline was edited
+   up: it would leave room to grow back in the next lot). **A baseline is born, and a tool changes identity, only in a lot
+   the plan declares `config: true`**: an entry of `analyse:` added, removed or changed (name, command, format, dir, report,
+   baseline, configs), a baseline absent at the start of the lot, or a file of `configs` that differs from the start is
+   refused unless every commit that touches it cites only such lots, or the run is on the branch of such a lot (which then
+   touches nothing but configs, baselines and tests). Renaming a tool never gives a fresh, free baseline. The rule and its
+   reading of the plan are shared with [qualite.md](qualite.md) (`scripts/lot-de-config.mjs`).
 5. **Moving or splitting a file** makes new keys: `cadence analyse --migrer --contre main` rewrites the baseline only if no
    file that existed went up, no total went up, and each new file is credited by its source (the file it takes at least
    50 % of its lines from), as `--migrer` in [qualite.md](qualite.md#the-ratchet). A copy that leaves its source intact is refused.
@@ -89,7 +94,8 @@ measure go up like a new finding.
 
 ## Recipe per technology
 
-Do it in one lot per project: install the tools, declare them, `cadence analyse --init`, commit the baselines.
+Do it in one lot per project, declared `config: true` in the plan: install the tools, declare them, `cadence analyse --init`,
+commit the baselines.
 
 **TypeScript / JavaScript.** `npm i -D eslint typescript-eslint`; a typed config (`tseslint.configs.recommendedTypeChecked`
 with `parserOptions.projectService: true`) plus the size rules of [qualite.md](qualite.md#the-four-tools-and-what-each-one-is-for);

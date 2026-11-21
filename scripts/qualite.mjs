@@ -6,6 +6,7 @@ import { existsSync, globSync, lstatSync, mkdtempSync, readdirSync, readFileSync
 import { tmpdir } from 'node:os';
 import { basename, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { configChangee, differences, fichiersDifferents, lireSiPresent, lotsDeConfig } from './lot-de-config.mjs';
 
 export const BASELINE = 'qualite-baseline.json';
 
@@ -323,35 +324,6 @@ export function lireRef(racine, ref) {
   return { nom: `${ref} (${sha.slice(0, 7)})`, base: show.status === 0 ? JSON.parse(show.stdout) : null, existe, contenu, config, fichiers, touches, commits, lotsConfig: lots, lotConfig: (slug && [...lots].find((id) => id.split('/').join('__') === slug)) || undefined };
 }
 
-// Les plans que cadence lit par défaut (un plan tenu par un autre outil, `plan:` de cadence.yaml, n'est pas cherché : le lot n'y est pas de config).
-const PLANS = ['.cadence/raf.yaml', 'docs/plan/raf.yaml'];
-
-/**
- * Les ids des lots que le plan du point de départ déclare `config: true`. Lu au départ, pas dans l'arbre : un lot ne se déclare pas lui-même
- * exempté. Vide sans plan.
- */
-function lotsDeConfig(config) {
-  const texte = PLANS.map((f) => config(f)).find((t) => t !== null);
-  const lots = new Set();
-  if (!texte) return lots;
-  // le bloc d'un lot : de sa ligne « - id: » à la suivante ; ses clés sont indentées de 4 espaces
-  let courant = null;
-  for (const l of texte.split('\n')) {
-    const id = /^  - id:\s*["']?([^"'\s#]+)["']?\s*(#.*)?$/.exec(l);
-    if (id) courant = id[1];
-    else if (courant && /^    config:\s*true\s*(#.*)?$/.test(l)) lots.add(courant);
-  }
-  return lots;
-}
-
-// Ce qu'un lot de config peut toucher : les configs comparées, leurs tests, et ce que tout lot touche (base du cliquet, plan, CHANGELOG,
-// docs) ; dans changelog.d/, SON fragment seulement (L679, L770) : changelog.d/<id>.md, ou changelog.d/<id en « __ »>.md pour un id à « / »
-const estConfig = (f) => CONFIGS.includes(f) || f === 'package.json' || basename(f) === '.gitignore';
-const estTest = (f) => /^tests?\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f);
-const estComptabilite = (f) => f === BASELINE || f === 'CHANGELOG.md' || f.startsWith('.cadence/') || f.startsWith('docs/');
-const fragmentDe = (ids, f) => ids.some((id) => f === `changelog.d/${id}.md` || f === `changelog.d/${id.split('/').join('__')}.md`);
-const horsConfig = (ids) => (f) => !estConfig(f) && !estTest(f) && !estComptabilite(f) && !fragmentDe(ids, f);
-
 // Les seuils et les exclusions des trois outils : les relever ferait baisser la mesure sans corriger le code. Tout ce que les
 // outils lisent est comparé, pas seulement le fichier que ce dépôt utilise : ESLint 9 charge eslint.config.js AVANT .mjs, knip
 // lit huit noms et package.json#knip, jscpd lit package.json#jscpd, et knip comme jscpd respectent .gitignore.
@@ -372,12 +344,6 @@ const section = (texte, cle) => {
   if (texte === null) return null;
   try { const v = JSON.parse(texte)[cle]; return v === undefined ? null : JSON.stringify(v); } catch { return null; }
 };
-
-const lireSiPresent = (racine, f) => (existsSync(join(racine, f)) ? readFileSync(join(racine, f), 'utf8') : null);
-const etat = (depart, actuel) => (depart === null ? 'nouveau' : actuel === null ? 'supprimé' : 'modifié');
-
-// les libellés « fichier (nouveau|supprimé|modifié) » des couples (nom, départ, actuel) qui diffèrent
-const differences = (couples) => couples.filter(([, depart, actuel]) => depart !== actuel).map(([nom, depart, actuel]) => `${nom} (${etat(depart, actuel)})`);
 
 // les .gitignore imbriqués (src/.gitignore…), ceux du départ comme ceux d'aujourd'hui ; node_modules et .git ne sont pas parcourus
 const gitignoresImbriques = (racine, ref) => {
@@ -402,7 +368,7 @@ const gitignoresImbriques = (racine, ref) => {
   return [...new Set([...ici.filter((f) => !exclus.has(f)), ...depart])].filter((f) => f !== '.gitignore').sort();
 };
 
-const fichiersChanges = (racine, ref) => differences([...CONFIGS, ...gitignoresImbriques(racine, ref)].map((f) => [f, ref.config(f), lireSiPresent(racine, f)]));
+const fichiersChanges = (racine, ref) => fichiersDifferents(racine, ref, [...CONFIGS, ...gitignoresImbriques(racine, ref)]);
 
 function clesPackageChangees(racine, ref) {
   const depart = ref.config('package.json');
@@ -410,33 +376,13 @@ function clesPackageChangees(racine, ref) {
   return differences(CLES_PACKAGE.map((cle) => [`package.json#${cle}`, section(depart, cle), section(actuel, cle)]));
 }
 
-// Les commits dont le scope (`feat(L1,L2): …`) ne cite que des lots déclarés de config au plan du départ : à la porte d'intégration, qui ne porte pas le nom d'un lot, c'est eux qui portent la config
-const lotsCites = (c) => /^[^(:]*\(([^)]+)\)/.exec(c.sujet)?.[1].split(',').map((i) => i.trim()) ?? [];
-const estDeConfig = (c, ref) => lotsCites(c).length > 0 && lotsCites(c).every((id) => ref.lotsConfig?.has(id));
-
-// Vrai si le libellé « fichier (état) » d'une config changée n'est dû qu'à des commits de lots de config (au moins un) : un commit de code qui y touche, ou un arbre sale, la laisse refusée
-function deLotsDeConfig(libelle, commits, ref) {
-  const fichier = /^(.*?)(#\S*)? \([^()]*\)$/.exec(libelle)[1];
-  const touchants = commits.filter((c) => c.fichiers.includes(fichier));
-  return touchants.length > 0 && touchants.every((c) => estDeConfig(c, ref));
-}
-
-/** Refus (code 1) si une config que les outils lisent diffère de celle du point de départ du lot (apparue, disparue ou modifiée), null sinon. */
-function configChangee(racine, ref) {
-  // sans base au départ, rien n'est encore jugé par ces configs : le lot qui adopte les outils les introduit librement
-  if (!ref?.config || !ref.base) return null;
-  // un lot déclaré de config au plan (L586) peut changer les configs, à condition de ne rien toucher d'autre ; les autres mesures le jugent toujours
-  if (ref.lotConfig) {
-    const hors = (ref.touches?.() ?? []).filter(horsConfig([ref.lotConfig]));
-    return hors.length ? { code: 1, texte: `${hors.join(', ')} : un lot déclaré « config: true » au plan ne touche que les fichiers de config et leurs tests (le reste est du code : un autre lot).` } : null;
-  }
-  const commits = ref.commits?.() ?? [];
-  const changees = [...fichiersChanges(racine, ref), ...clesPackageChangees(racine, ref)].filter((libelle) => !deLotsDeConfig(libelle, commits, ref));
-  const hors = commits.filter((c) => estDeConfig(c, ref)).flatMap((c) => c.fichiers.filter(horsConfig(lotsCites(c))));
-  if (hors.length) return { code: 1, texte: `${[...new Set(hors)].join(', ')} : un lot déclaré « config: true » au plan ne touche que les fichiers de config et leurs tests (le reste est du code : un autre lot).` };
-  if (!changees.length) return null;
-  return { code: 1, texte: `${changees.join(', ')} diffère(nt) de ${ref.nom} : un seuil ou une exclusion ne se change pas dans un lot qui est jugé par eux (corriger le code ; changer une config est une décision du plan, livrée seule).` };
-}
+// Ce que la porte de ce dépôt (ESLint, knip, jscpd) juge : actif dès qu'une base existait au départ (sans elle, le lot qui adopte les outils les introduit librement)
+const jeuQualite = (racine, ref) => ({
+  actif: Boolean(ref?.base),
+  changees: () => [...fichiersChanges(racine, ref), ...clesPackageChangees(racine, ref)],
+  estConfig: (f) => CONFIGS.includes(f) || f === 'package.json' || basename(f) === '.gitignore' || f === BASELINE,
+  raison: 'un seuil ou une exclusion ne se change pas dans un lot qui est jugé par eux (corriger le code ; changer une config est une décision du plan, livrée seule)',
+});
 
 /** Les motifs actifs de .git/info/exclude (hors commentaires et lignes vides) ; vide hors dépôt git ou sans ce fichier. */
 function exclusLocaux(racine) {
@@ -446,7 +392,7 @@ function exclusLocaux(racine) {
   return readFileSync(chemin, 'utf8').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
 }
 
-const ligne = ({ cle, avant, apres, note }) => `  ${cle} : ${avant} → ${apres}${note ? ` — ${note}` : ''}`;
+export const ligne = ({ cle, avant, apres, note }) => `  ${cle} : ${avant} → ${apres}${note ? ` — ${note}` : ''}`;
 
 const existeAuDepart = (ref) => ref.existe ?? (() => true);
 
@@ -479,11 +425,20 @@ function baseRemonte(racine, base, mesure, ref) {
   if (!ref?.base) return null;
   const vus = new Map(); // un ls-tree par fichier, pas un par passage
   const existe = (chemin) => vus.get(chemin) ?? (vus.set(chemin, existeAuDepart(ref)(chemin)), vus.get(chemin));
-  const remonte = comparerMigration(ref.base, baseJugee(base, mesure, existe), existe, lienDe(racine, ref));
+  const remonte = remontees(ref.base, base, mesure, existe, lienDe(racine, ref));
+  return !remonte.length ? null : { code: 1, texte: `${BASELINE} remonte par rapport à ${ref.nom} (elle ne peut que baisser : corriger le code, pas la base) :\n${remonte.map(ligne).join('\n')}` };
+}
+
+/**
+ * Ce qui remonte dans la base d'un lot (`base`) par rapport à celle de son départ (`depart`) : `existe(chemin)` dit un fichier du départ, `lien` relie un
+ * fichier neuf à sa source. Une clé d'un fichier neuf qui ne mesure plus rien sort du jugement, les autres sont jugées à leur valeur (`baseJugee`).
+ */
+export function remontees(depart, base, mesure, existe, lien) {
+  const remonte = comparerMigration(depart, baseJugee(base, mesure, existe), existe, lien);
   // les clés sorties du jugement (fichier neuf qui ne mesure plus rien) pèsent encore dans le total de la base : une clé restante légitime a été acceptée
   // sous ce total, une clé fabriquée au-dessus est refusée (elle deviendrait au lot suivant la clé d'un fichier « qui existait »)
-  remonte.push(...comparer(totaux(ref.base), totaux(base)).pires.map((p) => ({ ...p, cle: `${p.cle} (total, tous fichiers)` })).filter((p) => !remonte.some((q) => q.cle === p.cle)));
-  return !remonte.length ? null : { code: 1, texte: `${BASELINE} remonte par rapport à ${ref.nom} (elle ne peut que baisser : corriger le code, pas la base) :\n${remonte.map(ligne).join('\n')}` };
+  remonte.push(...comparer(totaux(depart), totaux(base)).pires.map((p) => ({ ...p, cle: `${p.cle} (total, tous fichiers)` })).filter((p) => !remonte.some((q) => q.cle === p.cle)));
+  return remonte;
 }
 
 /**
@@ -491,7 +446,8 @@ function baseRemonte(racine, base, mesure, ref) {
  * fabriquée sous le total du départ, rien ne les distingue et rien n'est stocké (D1) ; une fois intégrée, elle deviendrait au lot suivant la clé d'un fichier
  * « qui existait » et le laisserait grossir jusqu'à elle. Un fichier neuf entre donc dans main à sa mesure : --ecrire ou --migrer la ramène, la base n'est pas coincée.
  */
-const neufsNonFiges = (base, mesure, ref) => (ref?.base ? Object.entries(base).filter(([k, n]) => !existeAuDepart(ref)(cheminDeCle(k)) && n > (mesure[k] ?? 0)).map(([cle, avant]) => ({ cle, avant, apres: mesure[cle] ?? 0 })) : []);
+export const neufsAuDessus = (base, mesure, existe) => Object.entries(base).filter(([k, n]) => !existe(cheminDeCle(k)) && n > (mesure[k] ?? 0)).map(([cle, avant]) => ({ cle, avant, apres: mesure[cle] ?? 0 }));
+const neufsNonFiges = (base, mesure, ref) => (ref?.base ? neufsAuDessus(base, mesure, existeAuDepart(ref)) : []);
 const nonFige = (hautes, ref) => ({ code: 1, texte: `Qualité : ${hautes.length} clé(s) de fichier neuf au-dessus de la mesure (gain non figé) : un fichier neuf entre dans ${ref.nom} à sa mesure, sinon il pourrait regrossir jusqu'à sa clé au lot suivant. Figer : « npm run qualite:cliquet -- --contre ${ref.nom.split(' ')[0]} » (ou --migrer si des fichiers ont été déplacés).\n${hautes.map(ligne).join('\n')}` });
 
 /** `--migrer` : réécrit la base pour une mesure où des fichiers ont été déplacés ou découpés. */
@@ -526,7 +482,7 @@ export function appliquer(racine, mode, mesure = mesurer(racine), ref = null) {
 
 function decider(racine, mode, mesure, ref) {
   const existe = existsSync(join(racine, BASELINE));
-  const config = configChangee(racine, ref);
+  const config = configChangee(racine, ref, jeuQualite(racine, ref));
   if (config) return config;
   if (mode === 'init') {
     if (ref?.base) return { code: 2, texte: `${BASELINE} existe déjà dans ${ref.nom} : --init ne la recrée pas (elle ne peut que baisser, utiliser --ecrire).` };

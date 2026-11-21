@@ -4059,7 +4059,7 @@ lots:
     estimate: 1
     created: 2026-11-21
     started: 2026-11-21
-    review: { date: 2026-11-21, verdict: "non conforme : 3 majeurs (cliquet contourné par renommage de l'outil, de command ou configs dans cadence.yaml ; garde L707 neufsNonFiges/baseJugee absente ; extinctions ESLint inline /* eslint …: off */ et @SuppressWarnings(\"all\") non comptées), 1 mineur (doublons lotsCites, ligne, configsChangees avec qualite.mjs) — tmp/revue-L801.md", commit: 32a202043568e8788582bdd8a6f8341d7c081e1b }
+    review: { date: 2026-11-21, verdict: "non conforme r2 : 2 majeurs — M1' adoption sous lot config: true refusée dès qu'elle touche package.json (recette docs/analyse.md:97-100 inapplicable ; plan tenu par un autre outil = aucune adoption possible) ; M3' /*\\n eslint-disable\\n*/ et /*\\n @ts-ignore */ sur plusieurs lignes non comptés (scripts/analyse.mjs:181-182) — M1, M2, M3, m1 de r1 corrigés (tmp/revue-L801-r2.md)", commit: 36cb45757a8818df8ad2aa0a63b987067ac48543 }
   - id: L802
     title: "D-30 : la barre (bandeau du lead) doit dire d'un coup d'œil si l'on peut fermer — séparer ce qui tourne (run vivant, sous-agent actif) de l'historique (run intégré, interrompu, rendu) ; compter les agents vivants seulement ; un hold échu sans session vivante le dit ; les créneaux affichés suivent le plafond appliqué ; une ligne « rien ne tourne, tu peux fermer » quand c'est le cas — capture réelle avant/après"
     status: todo

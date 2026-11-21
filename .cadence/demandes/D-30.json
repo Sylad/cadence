@@ -1,0 +1,19 @@
+{
+  "id": "D-30",
+  "texte": "du coup la barre est un peu ambigue",
+  "date": "2026-11-20",
+  "origine": "session du lead, 18 h 50 : Sylvain demande s'il peut arrêter Claude ou si quelque chose tourne encore, et joint une capture de la barre (bandeau). Celle-ci affiche « 3 agents », un run L800 en cours, un run TYPO-1 intégré et deux runs TYPO-1 interrompus listés à égalité, « créneaux libres : 4 sur 5 » alors que le lead plafonne à 3 (D-19), et « session du lead échue : ux-L32 » pour une session qui ne tourne plus (le hold n'a pas pu être libéré après 18 h 30).",
+  "etat": "ouverte",
+  "preuve": "",
+  "precisions": [
+    {
+      "date": "2026-11-20",
+      "texte": "Lecture du lead : la barre doit répondre d'un coup d'œil à « puis-je fermer ? ». Ce qui tourne vraiment (L800 seul) doit se distinguer de l'historique (intégré, interrompu) ; le compteur d'agents doit compter ce qui vit ; un hold échu sans session vivante doit le dire ; et le plafond des créneaux doit suivre le plafond réellement appliqué."
+    },
+    {
+      "date": "2026-11-20",
+      "texte": "je ne veux pas te couper, si y a un truc qui tourne, je peux le laisser finir. Par contre ca serait bien que la barre reflète clairement ce qui se passe"
+    }
+  ],
+  "lots": []
+}

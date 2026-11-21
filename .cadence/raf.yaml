@@ -4059,7 +4059,7 @@ lots:
     estimate: 1
     created: 2026-11-21
     started: 2026-11-21
-    review: { date: 2026-11-21, verdict: "non conforme r2 : 2 majeurs — M1' adoption sous lot config: true refusée dès qu'elle touche package.json (recette docs/analyse.md:97-100 inapplicable ; plan tenu par un autre outil = aucune adoption possible) ; M3' /*\\n eslint-disable\\n*/ et /*\\n @ts-ignore */ sur plusieurs lignes non comptés (scripts/analyse.mjs:181-182) — M1, M2, M3, m1 de r1 corrigés (tmp/revue-L801-r2.md)", commit: 36cb45757a8818df8ad2aa0a63b987067ac48543 }
+    review: { date: 2026-11-21, verdict: "non conforme r3 (tmp/revue-L801-r3.md) : M1 base absente au départ jamais comparée à sa mesure — une base gonflée s'adopte puis laisse passer la hausse (analyse.mjs:348,370) ; M2 jouerPorte ne garde la sortie que d'une porte rouge, « ligne de base neuve » absente du journal du run (run.ts:159-161, contredit docs/analyse.md:98) ; M3 sans plan natif, les configs d'un outil adopté ne peuvent plus changer (lot-de-config.mjs:8, docs/analyse.md:107,170). Scénarios r1/r2 corrigés ; /* exported */ surcompte sans effet.", commit: 344add035bb826cb91968e835cf11e068890921c }
   - id: L802
     title: "D-30 : la barre (bandeau du lead) doit dire d'un coup d'œil si l'on peut fermer — séparer ce qui tourne (run vivant, sous-agent actif) de l'historique (run intégré, interrompu, rendu) ; compter les agents vivants seulement ; un hold échu sans session vivante le dit ; les créneaux affichés suivent le plafond appliqué ; une ligne « rien ne tourne, tu peux fermer » quand c'est le cas — capture réelle avant/après"
     status: todo

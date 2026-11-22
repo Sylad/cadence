@@ -4085,6 +4085,11 @@ lots:
     quickwin: true
     planned: { from: 2026-11-23, to: 2026-11-23 }
     created: 2026-11-22
+  - id: L806
+    title: "Hook pre-push : un commit qui cite le lot d'un AUTRE dépôt (« lot du plan de <app> », articles écrits dans codex) est confondu avec le lot homonyme du dépôt courant et le push est refusé faute de verdict (vécu 22-11 : evatosorus L41 vs codex L41) — reconnaître la référence externe et lire le verdict dans le plan de l'app"
+    status: todo
+    estimate: 1
+    created: 2026-11-22
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -66,6 +66,12 @@ describe('fuites', () => {
     expect(chercherFuites([outil('Write', { file_path: '~/bench-cadence/secrets/1-t/attendu.md', content: 'x' })], r, H, C).certaines).toEqual([S]);
     expect(chercherFuites([outil('Read', { file_path: S })], r, H, C).certaines).toEqual([S]);
   });
+  // Revue L808 r2 : rg --files n'a pas de motif, son premier argument est le dossier lu (la recherche du 22-11) ; un echo envoyé à xargs est lu.
+  it('rg --files <dossier> et echo "<chemin>" | xargs cat : comptés ; le motif de rg et un echo écrit : ignorés', () => {
+    expect(chercherFuites([appel({ command: 'rg --files ~/projects/developpeur | grep playwright' })], r, H, C).certaines).toEqual([`${H}/projects/developpeur`]);
+    expect(chercherFuites([appel({ command: `echo "${H}/projects/x" | xargs cat` })], r, H, C).certaines).toEqual([`${H}/projects/x`]);
+    expect(chercherFuites([appel({ command: `rg -l '~/projects/x' src; echo "${H}/projects/x" >> notes.md` })], r, H, C).certaines).toEqual([]);
+  });
   it('fuitesDuBras lit aussi les transcripts de sous-agents', () => {
     const home = dossierTemp('fu-');
     const clone = `${home}/bench-cadence/runs/r1/1-t/c1`;

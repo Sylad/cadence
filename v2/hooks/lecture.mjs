@@ -146,26 +146,33 @@ const CHAMPS_CHEMIN = ['file_path', 'path', 'notebook_path'];
 const INTERPRETE = /(^|[\s;&|(])(python[\d.]*|node|bash|sh|zsh|perl|ruby|deno|bun|tsx|ts-node|psql|sqlite3|awk|sed)(?![\w.-])/;
 
 /** La commande Bash sans ses textes écrits (remplacés par des espaces) : corps d'un heredoc dont la ligne ne lance pas d'interprète (un script donné à
- * python, node, bash… est du code, gardé), message de `git commit|tag|merge|revert|notes|stash -m`, arguments entre guillemets de echo et printf, motif
- * de grep et rg. Un mot qui porte `$(` ou un accent grave est gardé (il exécute une commande). Dans le doute : gardé. */
+ * python, node, bash… est du code, gardé), message de `git commit|tag|merge|revert|notes|stash -m`, arguments entre guillemets de echo et printf (sauf si leur tube
+ * passe par xargs, qui en fait des chemins lus), motif de grep et rg (aucun avec --files ou --type-list). Un mot qui porte `$(` ou un accent grave est gardé (il exécute une commande). Dans le doute : gardé. */
 export function commandeLue(cmd) {
   const t = String(cmd).replace(/^([^\n]*<<-?\s*['"]?(\w+)['"]?[^\n]*)\n[\s\S]*?\n\s*\2(?=\n|$)/gm, (tout, tete) => (INTERPRETE.test(tete) ? tout : tete));
   const effaces = [], effacer = (m) => { if (m && !/\$\(|`/.test(m.s)) effaces.push(m); };
-  let mots = [];
-  const finir = () => {
+  let mots = [], echos = [], xargs = false; // echos : arguments d'echo et de printf du tube en cours, effacés à sa fin s'il ne passe pas par xargs
+  const finir = (tube) => {
+    if (!mots.length) return;
     while (/^\w+=/.test(mots[0]?.s ?? '')) mots.shift();
     const [c, ...args] = mots, nom = c?.s.replace(/^.*\//, '');
     mots = [];
     if (nom === 'git' && args.some((a) => /^(commit|tag|merge|revert|notes|stash)$/.test(a.s)))
       args.forEach((a, k) => { if (/^--message=/.test(a.s)) effacer(a); else if (/^(-[a-zA-Z]*m|--message)$/.test(a.s)) effacer(args[k + 1]); });
-    else if (nom === 'echo' || nom === 'printf') args.filter((a) => /^['"]/.test(a.s)).forEach(effacer);
+    else if (nom === 'echo' || nom === 'printf') echos.push(...args.filter((a) => /^['"]/.test(a.s)));
+    else if (nom === 'xargs') xargs = true; // revue r2 : « echo "/a/b" | xargs cat » lit /a/b
     else if (/^([ef]?grep|rg)$/.test(nom ?? '')) {
       args.forEach((a, k) => { if (/^--regexp=/.test(a.s)) effacer(a); else if (/^(-[a-zA-Z]*e|--regexp)$/.test(a.s)) effacer(args[k + 1]); });
-      if (!args.some((a) => /^(-[a-zA-Z]*[ef]|--regexp|--file)$|^--(regexp|file)=/.test(a.s))) effacer(args.find((a) => !a.s.startsWith('-'))); // sans -e ni -f : le premier nom est le motif
+      // sans -e ni -f : le premier nom est le motif ; avec --files ou --type-list (rg, revue r2), aucun motif : « rg --files <dossier> » lit le dossier
+      if (!args.some((a) => /^(-[a-zA-Z]*[ef]|--regexp|--file|--files|--type-list)$|^--(regexp|file)=/.test(a.s))) effacer(args.find((a) => !a.s.startsWith('-')));
     }
+    if (tube) return;
+    if (!xargs) echos.forEach(effacer);
+    echos = [];
+    xargs = false;
   };
   for (let i = 0; i < t.length;) {
-    if (/[\n;|&()]/.test(t[i])) { finir(); i++; continue; }
+    if (/[\n;|&()]/.test(t[i])) { finir(t[i] === '|' && t[i + 1] !== '|'); i++; continue; }
     if (/\s/.test(t[i])) { i++; continue; }
     const d = i;
     for (let q = ''; i < t.length; i++) {

@@ -301,6 +301,9 @@ describe('L808 : lecture hors du clone refusée au banc, avec la règle du déte
       ['Bash', { command: 'grep -rn motif ~/projects/developpeur' }], ['Bash', { command: 'grep -e motif ~/projects/developpeur/a.md' }],
       ['Bash', { command: 'echo "$(cat ~/projects/developpeur/a.md)"' }], ['Bash', { command: 'cat <<EOF | bash\nls ~/projects/developpeur\nEOF' }],
       ['Bash', { command: `python3 - <<'EOF'\nprint(open('${projets(m)}/developpeur/a.md').read())\nEOF` }],
+      // revue r2 : rg --files n'a pas de motif (la recherche du 22-11), et un echo envoyé à xargs donne des chemins à lire
+      ['Bash', { command: 'rg --files ~/projects/developpeur | grep playwright' }], ['Bash', { command: 'rg --files --hidden -g "*.mjs" ~/projects/developpeur' }],
+      ['Bash', { command: `echo "${projets(m)}/developpeur/a.md" | xargs cat` }], ['Bash', { command: `printf '%s\\n' "${projets(m)}/x" |& sort | xargs -n1 cat` }],
     ];
     for (const [name, input] of refuses) {
       expect([name, input, hook(outilE(m, name, input), borne(m)).code]).toEqual([name, input, 2]);
@@ -313,6 +316,9 @@ describe('L808 : lecture hors du clone refusée au banc, avec la règle du déte
     expect(commandeLue('echo ~/projects "x y" $HOME').replace(/ +/g, ' ')).toBe('echo ~/projects $HOME'); // sans guillemets : le shell le développe, gardé
     expect(commandeLue('grep -f motifs.txt a/b')).toBe('grep -f motifs.txt a/b');
     expect(commandeLue('cat a | grep -v x/y z/t').replace(/ +/g, ' ')).toBe('cat a | grep -v z/t');
+    expect(commandeLue('rg --files a/b | grep c/d').replace(/ +/g, ' ')).toBe('rg --files a/b | grep '); // revue r2 : --files, aucun motif
+    expect(commandeLue('rg --type-list a/b; rg -l x/y a/b').replace(/ +/g, ' ')).toBe('rg --type-list a/b; rg -l a/b');
+    expect(commandeLue('echo "/a/b" | xargs cat; echo "/c/d" || xargs cat; echo "/e/f" | tee g').replace(/ +/g, ' ')).toBe('echo "/a/b" | xargs cat; echo || xargs cat; echo | tee g');
     expect(commandeLue('node - <<EOF\nrequire("/a/b")\nEOF')).toContain('/a/b');
     expect(commandeLue('tee x.md <<EOF\n/a/b\nEOF')).not.toContain('/a/b');
   });

@@ -4082,13 +4082,14 @@ lots:
     created: 2026-11-22
   - id: L805
     title: "deliver --sha : la garde des lots compte comme du travail un commit de plan au sens du hook pre-push (registre .cadence/demandes, fichiers plan.onWrite) — deliveryLots doit filtrer avec isPlanSideOnly comme L784 (vécu ol 22-11 : 8c12b1d plan(L269) a bloqué la livraison de L262, contourné par raf ignore)"
-    status: doing
+    status: done
     estimate: 0.5
     quickwin: true
     planned: { from: 2026-11-23, to: 2026-11-23 }
     created: 2026-11-22
     started: 2026-11-23
     review: { date: 2026-11-23, verdict: "conforme (revue du lead) : deliveryLots filtre isPlanSideOnly aux deux endroits (travail du lot, commits après la revue), même règle que L784 ; test R1-R4 dont le cas inverse (commit avec code reste bloquant) ; tsc et suite verts au run", commit: 0c14687a5535a27c8c8bb7132313fedbc138b3db }
+    finished: 2026-11-23
   - id: L806
     title: "Hook pre-push : un commit qui cite le lot d'un AUTRE dépôt (« lot du plan de <app> », articles écrits dans codex) est confondu avec le lot homonyme du dépôt courant et le push est refusé faute de verdict (vécu 22-11 : evatosorus L41 vs codex L41) — reconnaître la référence externe et lire le verdict dans le plan de l'app"
     status: todo

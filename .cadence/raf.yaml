@@ -4065,11 +4065,12 @@ lots:
     finished: 2026-11-21
   - id: L802
     title: "D-30 : la barre (bandeau du lead) doit dire d'un coup d'œil si l'on peut fermer — séparer ce qui tourne (run vivant, sous-agent actif) de l'historique (run intégré, interrompu, rendu) ; compter les agents vivants seulement ; un hold échu sans session vivante le dit ; les créneaux affichés suivent le plafond appliqué ; une ligne « rien ne tourne, tu peux fermer » quand c'est le cas — capture réelle avant/après"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-21
     started: 2026-11-23
     review: { date: 2026-11-23, verdict: "conforme (lead) r1 7c5c5d42 : waiting compté avec running/pending, idle et finis exclus (AgentStatus du SDK), 2 tests rouges sur l'ancien filtre ; lead plafond dit depuis quand ; doc et fragment corrigés ; porte-mod 523/523, tsc 0", commit: 7c5c5d42615d94efa95f342d8a741db1ea8621c3 }
+    finished: 2026-11-23
   - id: L803
     title: "Écriture courte contrôlée (principes ASD-STE100 transposés au français, D-31) : un contrôle signale toute phrase de plus de 25 mots (20 pour une consigne) dans les entrées Nouveautés et les rapports de revue (ux-reviewer, code-reviewer, qa-reviewer), une idée par phrase, voix active ; réglable par projet ; le bilan du jour du dossier parent (scripts/bilan-livraisons.py) l'appelle aussi. Mesure : longueur moyenne des phrases avant/après sur 2-3 bilans et avis de Sylvain ; retiré sans gain"
     status: done
@@ -4107,10 +4108,12 @@ lots:
       - { date: 2026-11-22, text: "22-11 : même confusion dans cadence deliver — livrer cc1af3b dans codex a écrit delivered sur le L41 de codex (df376bc, annulé par a9be721) au lieu du L41 d'evatosorus" }
   - id: L807
     title: "cadence news new <lot> lancé par un cadence run écrit l'entrée dans l'arbre principal au lieu du worktree du run : le 22-11 (warhammer L98 r1) le squelette laissé dans l'arbre principal a fait refuser l'intégration (refus-integration, fichier que le run modifie aussi) — écrire dans le dossier courant du run, ou faire ignorer à l'intégration un squelette identique à celui que news new produit"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-22
     started: 2026-11-23
+    review: { date: 2026-11-23, verdict: "conforme (lead) ea446a89..efdfc658 : news new suit CADENCE_CLONE (posé par le run, v2/src/run/run.ts:188) quand le dossier courant est un autre arbre du même dépôt, sinon racine ; état du run écrit en atomique (tmp + rename) ; test L624 R1 attend une barrière au lieu d'un sleep 1.5, assertion inchangée ; test L807 5/5. Touche v2/ (run.ts, clore.ts, budget run 1212) → banc avant publication.", commit: efdfc658272900af37323ddd1bfce34c6d3e04d0 }
+    finished: 2026-11-23
   - id: L808
     title: "Banc séquence aether-b68-court r2 du 22-11 ROUGE sur la qualité (rapport ~/bench-cadence/rapports/2026-11-22-1821-fb065f2285f3-aether-b68-court-r2.md) : cadence-run 2 régressions contre 0 et sorties 5/8 contre 7/8 pour A (fiche au clic « D » quand la carte montre « L » ; centres non affichés avec Isobares, légende sans les centres). Lire les transcriptions des deux bras, établir pour chaque sortie manquée ce que cadence-run a fait autrement (brief, hook de lecture, pièces non lues…) et proposer le mécanisme qui la rattrape ; mesure : la séquence rejouée verte"
     status: doing
@@ -4131,6 +4134,30 @@ lots:
     started: 2026-11-23
     review: { date: 2026-11-23, verdict: "conforme revue du lead : 4 constats de L803 corrigés, chacun avec un test rouge sans le code ; mesure redonnée (24,9 mots/phrase, inchangée)", commit: 6f03b5ef141e2f7b2cd2a65cc47b5501c1bc54e6 }
     finished: 2026-11-23
+  - id: L811
+    title: "Issue #72 : la recette CI de cadence analyse (--contre origin/main, docs/analyse.md) compare un push sur main à lui-même ; une base relevée à la main laisse passer une violation nouvelle (mesuré en 2.0.18 par le compte pro). Attendu : sur un push, comparer au parent du push (before) ou refuser une base égale à HEAD ; test qui rejoue le cas de l'issue."
+    status: todo
+    estimate: 1
+    created: 2026-11-23
+    notes:
+      - { date: 2026-11-23, text: "Précision du lead (23-11) : .cadence/analyse/** ne doit PAS figurer dans paths-ignore ; prévoir le repli pour une nouvelle ref (before = 0000…) et pour un lancement manuel (workflow_dispatch)." }
+  - id: L812
+    title: "La porte de cadence rougit sous charge sans changement de code : le 23-11, le run L808 a été rendu 2 fois, Big-Blue étant à une charge de 65 à 79 avec 5 runs. Tests en cause : L563 R13 (dépasse 30 s), mise-en-service L330 (dépasse 120 s), L624 R1 (course). Rejoués seuls, ils sont verts (97/97). Attendu : la porte d'un cadence run règle CADENCE_TEST_WORKERS d'après la charge, ou ces tests tiennent sous charge ; mesure : aucun rendu porte-rouge de cadence dû à un délai sur une semaine. Même famille qu'avatar L68."
+    status: todo
+    estimate: 1
+    created: 2026-11-23
+    notes:
+      - { date: 2026-11-23, text: "Précision du lead (23-11) : couvrir les portes de TOUS les dépôts — cadence verify --gate et cadence run adaptent les workers de test à la charge de la machine ; 3 occurrences le 23-11 (avatar, cadence, codex). En attendant : CADENCE_TEST_WORKERS=4." }
+  - id: L813
+    title: "Banc : critère écrit avant le passage (idée reprise d'ECC, banc du 23-11, bilans/2026-11-23/banc-ECC.md du dossier parent). Chaque banc qui juge un mécanisme a une fiche pré-enregistrée (hypothèse, seuil, nombre de répétitions) avant d'être joué, et un verdict « non concluant : il faudrait N paires » calculé depuis bruitParBanc quand l'effet est sous le détectable. Aujourd'hui ni pré-enregistrement ni effet détectable (vérifié par grep). Mesure : décisions de mécanisme renversées ensuite (cible 0)."
+    status: todo
+    estimate: 1
+    created: 2026-11-23
+  - id: L814
+    title: "Banc : repérer les bancs saturés, où les deux bras ont la même issue, et ne plus les compter dans la garde (idée reprise d'ECC, banc du 23-11). Aucun critère aujourd'hui. Mesure : part de bancs saturés dans les 108 rapports de ~/bench-cadence/rapports, puis effet sur les verdicts de la garde."
+    status: todo
+    estimate: 1
+    created: 2026-11-23
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

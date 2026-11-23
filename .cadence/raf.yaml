@@ -4120,11 +4120,13 @@ lots:
     created: 2026-11-23
   - id: L810
     title: "cadence ecriture, suites de la revue L803 : passif nié avec élision non signalé (« n'est pas livré », ecriture.mjs:169) ; découpage qui coupe après « Cf. », « M. », « Etc. » et dans une citation « … » (ecriture.mjs:118, fausse la moyenne, mesure du lot) ; bloc de code indenté de 4 espaces lu comme prose (ecriture.mjs:94) ; clé ecriture: vide qui coupe les avertissements de raf news check (news-writing.ts:14). Rapport tmp/revue-cadence-L803.md"
-    status: doing
+    status: done
     estimate: 1
     after: [ L803 ]
     created: 2026-11-23
     started: 2026-11-23
+    review: { date: 2026-11-23, verdict: "conforme revue du lead : 4 constats de L803 corrigés, chacun avec un test rouge sans le code ; mesure redonnée (24,9 mots/phrase, inchangée)", commit: 6f03b5ef141e2f7b2cd2a65cc47b5501c1bc54e6 }
+    finished: 2026-11-23
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -1,8 +1,9 @@
 import { spawnSync } from 'node:child_process';
-import { closeSync, mkdirSync, openSync, symlinkSync, writeFileSync, writeSync } from 'node:fs';
+import { closeSync, mkdirSync, openSync, readFileSync, symlinkSync, writeFileSync, writeSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { chercherFuites, reglesDuBras } from '../src/bench/fuites.js';
 import { lectureReferences } from '../src/sequence/mesures.js';
 import { ecritureBash } from '../hooks/lecture.mjs';
 import { dossierTemp } from './temp.js';
@@ -220,5 +221,59 @@ describe('hook lecture obligatoire, Bash et code du hook (R31 ronde 3)', () => {
     expect(lectureReferences(l, [m.doc], m.clone)).toMatchObject({ ouvertes: [], apres_ecriture: [m.doc] });
     const neutre = [JSON.stringify({ type: 'assistant', cwd: m.clone, message: { content: [{ type: 'tool_use', id: 'b2', name: 'Bash', input: { command: 'npx vitest run' } }] } }), ...lu({ file_path: m.doc })];
     expect(lectureReferences(neutre, [m.doc], m.clone).ouvertes).toEqual([m.doc]);
+  });
+});
+
+// L808 (banc séquence aether-b68-court r2 du 22-11, ROUGE « aucune fuite ») : le bras cadence-run, dont la sonde Node posée dans qa/ ne trouvait
+// pas playwright (installé dans frontend/node_modules), a lancé `ls -d ~/projects/developpeur/maritime-atlas/qa/node_modules/playwright
+// ~/projects/developpeur/*/node_modules/playwright` : une LECTURE hors du clone, comptée fuite certaine (deux chemins). Au banc
+// (CADENCE_LECTURE_BORNEE = id du banc, posé par lancerBras), le hook refuse l'appel que le détecteur compterait comme fuite certaine, avec la même règle.
+describe('L808 : lecture hors du clone refusée au banc, avec la règle du détecteur de fuites', () => {
+  const borne = (m: Monde, pieces: string[] = []) => ({ ...env(m, pieces), CADENCE_LECTURE_BORNEE: 'b' });
+  const outilE = (m: Monde, tool_name: string, tool_input: object, cwd = m.clone) => ({ hook_event_name: 'PreToolUse', tool_name, tool_input, transcript_path: m.t, cwd });
+  const projets = (m: Monde) => join(m.r, 'home', 'projects');
+  it('la commande du banc du 22-11 : refusée au banc, le message nomme le chemin et dit où chercher ; permise hors banc (cadence run)', () => {
+    const m = monde(); m.ecrire([]);
+    const cmd = `ls -d ~/projects/developpeur/maritime-atlas/qa/node_modules/playwright ~/projects/developpeur/*/node_modules/playwright ${m.clone}/frontend/node_modules/@playwright 2>/dev/null | head; npm root -g`;
+    const r = hook(outilE(m, 'Bash', { command: cmd }), borne(m));
+    refuse(r, `${projets(m)}/developpeur/maritime-atlas/qa/node_modules/playwright`);
+    expect(r.stderr).toMatch(/hors de ton dépôt/); expect(r.stderr).toContain(m.clone); expect(r.stderr).toMatch(/node_modules/);
+    permis(hook(outilE(m, 'Bash', { command: cmd }), env(m, [])));
+  });
+  it('Read, Glob et Grep hors du clone (vrais dépôts, secrets, transcripts) et cd relatif : refusés au banc', () => {
+    const m = monde(); m.ecrire([]);
+    refuse(hook(outilE(m, 'Read', { file_path: join(projets(m), 'developpeur', 'maritime-atlas', 'qa', 'x.mjs') }), borne(m)), /hors de ton dépôt/);
+    refuse(hook(outilE(m, 'Glob', { pattern: '**/*.ts', path: join(m.r, 'secrets') }), borne(m)), /hors de ton dépôt/);
+    refuse(hook(outilE(m, 'Grep', { pattern: 'L', path: join(m.r, 'home', '.claude', 'projects', '-x') }), borne(m)), /hors de ton dépôt/);
+    refuse(hook(outilE(m, 'Bash', { command: 'cd ../../home/projects && ls' }), borne(m)), /hors de ton dépôt/);
+  });
+  it('le clone, ses captures, les pièces, ses propres transcripts, le dossier temporaire et la commande sans chemin : permis au banc', () => {
+    const m = monde(); m.ecrire([]);
+    const home = join(m.r, 'home'), transcripts = join(home, '.claude', 'projects', m.clone.replace(/[^A-Za-z0-9]/g, '-'));
+    permis(hook(outilE(m, 'Read', { file_path: join(m.clone, 'src', 'a.ts') }), borne(m)));
+    permis(hook(outilE(m, 'Read', { file_path: m.doc }), borne(m, [m.doc])));
+    permis(hook(outilE(m, 'Read', { file_path: join(transcripts, 's', 'tool-results', 'a.txt') }), borne(m)));
+    permis(hook(outilE(m, 'Bash', { command: `cd ${m.clone}/frontend && npx vitest run; ls ../../c1.captures; cat /tmp/x/serve.log` }), borne(m)));
+    permis(hook(outilE(m, 'Bash', { command: 'npm root -g' }), borne(m)));
+    permis(hook(outilE(m, 'Bash', { command: `ls ${join(m.r, 'bancs', 'b')}` }), borne(m))); // son banc, comme reglesDuBras
+    refuse(hook(outilE(m, 'Bash', { command: `ls ${join(m.r, 'bancs', 'autre')}` }), borne(m)), /hors de ton dépôt/);
+    refuse(hook(outilE(m, 'Read', { file_path: join(m.clone, 'a.ts') }), { ...borne(m), CADENCE_LECTURE_BORNEE: '../x' }), /CADENCE_LECTURE_BORNEE/);
+  });
+  it('même règle que le détecteur : refusé au banc si et seulement si chercherFuites compte une fuite certaine', () => {
+    const m = monde(); m.ecrire([]);
+    const home = join(m.r, 'home'), regles = { ...reglesDuBras(home, m.r, 'b', m.clone), autorises: [...reglesDuBras(home, m.r, 'b', m.clone).autorises, m.doc] };
+    const cas: [string, object][] = [
+      ['Bash', { command: 'ls ~/projects/developpeur/*/node_modules/playwright' }], ['Bash', { command: `ls ${m.clone}/qa` }],
+      ['Bash', { command: 'cd .. && ls' }], ['Bash', { command: `cat ${join(m.r, 'eval', 'x.md')}` }], ['Read', { file_path: m.doc }],
+      ['Read', { file_path: join(m.r, 'rapports', 'r.md') }], ['Bash', { command: `ls ${join(m.r, 'bancs', 'b', 'x')} ${join(m.r, 'bancs')}` }], ['Grep', { pattern: 'x', path: join(m.clone, 'src') }], ['Bash', { command: 'echo ~/projects' }],
+    ];
+    for (const [name, input] of cas) {
+      const certaine = chercherFuites([appel(name, input)], regles, home, m.clone).certaines.length > 0;
+      expect([name, input, hook(outilE(m, name, input), borne(m, [m.doc])).code]).toEqual([name, input, certaine ? 2 : 0]);
+    }
+  });
+  it('réglages du bras : le hook voit aussi Read, Glob et Grep', () => {
+    const s = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'briefs', 'settings-sequence-v2.json'), 'utf8'));
+    expect(s.hooks.PreToolUse[0].matcher.split('|')).toEqual(expect.arrayContaining(['Read', 'Glob', 'Grep', 'Bash', 'Edit', 'Write']));
   });
 });

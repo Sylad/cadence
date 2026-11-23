@@ -29,8 +29,8 @@ export function chargerBras(racine: string): Record<string, DefBras> {
   return Object.fromEntries(Object.entries(y).map(([nom, d]) => [nom, { nom, modele: d.modele, brief: d.brief, ...(d.settings ? { settings: d.settings } : {}), ...(d.aiguillage ? { aiguillage: true } : {}), ...(d.suite ? { suite: d.suite } : {}) }]));
 }
 
-export const environnementNeutre = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv => // L715 : la garde d'un bras (CADENCE_CLONE, _PIECES, _BANC_RACINE) est posée pour CETTE session, jamais héritée de celle qui lance le banc
-  ({ ...Object.fromEntries(Object.entries(env).filter(([k]) => !/^CADENCE_(CLONE|PIECES|BANC_RACINE)$/.test(k))), KUBECONFIG: '/nonexistent', GH_TOKEN: '', GITHUB_TOKEN: '', GH_CONFIG_DIR: '/nonexistent', SSH_AUTH_SOCK: '', AETHERWX_URL: 'http://127.0.0.1:9' });
+export const environnementNeutre = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv => // L715 : la garde d'un bras (CADENCE_CLONE, _PIECES, _BANC_RACINE, _LECTURE_BORNEE L808) est posée pour CETTE session, jamais héritée de celle qui lance le banc
+  ({ ...Object.fromEntries(Object.entries(env).filter(([k]) => !/^CADENCE_(CLONE|PIECES|BANC_RACINE|LECTURE_BORNEE)$/.test(k))), KUBECONFIG: '/nonexistent', GH_TOKEN: '', GITHUB_TOKEN: '', GH_CONFIG_DIR: '/nonexistent', SSH_AUTH_SOCK: '', AETHERWX_URL: 'http://127.0.0.1:9' });
 
 /** Lance la commande dans son propre groupe de processus et tue le groupe au retour : rien ne survit au bras suivant. L711 : l'enveloppe écrit le signal reçu sur la sortie d'erreur de l'appelant (le journal d'un run --fond, préfixe CAUSE de ../trace.ts) et s'arrête comme avant (HUP : arrêt par défaut, la commande continue), avec le code de shell du signal reçu (TERM 143, INT 130). Les traps sont posés avant le lancement (un signal reçu tôt tuait l'enveloppe, suite complète du 16-11) et lisent $! : p n'est peut-être pas encore écrit. */
 export const creerExecuteur = (commande = 'claude', delaiMs = 4 * 3600_000): Executeur => (args, o) => {
@@ -91,7 +91,7 @@ export function lancerBras(b: Banc, d: DefBras, clone: string, exec: Executeur, 
   const brief = texte.replaceAll('{{CLONE}}', clone).replaceAll('{{QUESTION}}', question);
   const empreinte_bras = createHash('sha1').update([texte, d.modele, d.settings ? readFileSync(d.settings, 'utf8') : '', ...garde.pieces.map((p) => relative(clone, p))].join('\0')).digest('hex').slice(0, 12);
   const commun = argsClaude(d, clone);
-  const o = { cwd: clone, env: { ...environnementNeutre(process.env), ...(d.settings ? { CADENCE_CLONE: clone, CADENCE_PIECES: JSON.stringify(garde.pieces), CADENCE_BANC_RACINE: garde.racine } : {}) } };
+  const o = { cwd: clone, env: { ...environnementNeutre(process.env), ...(d.settings ? { CADENCE_CLONE: clone, CADENCE_PIECES: JSON.stringify(garde.pieces), CADENCE_BANC_RACINE: garde.racine, CADENCE_LECTURE_BORNEE: b.id } : {}) } }; // L808 : au banc, le hook refuse aussi les lectures hors du clone
   const reponse = b.reponses ? readFileSync(join(b.dir, 'reponses.md'), 'utf8') : SANS_REPONSE;
   const claude = claudeVide(reglagesClaude(o.env, d.settings)), ex = (a: string[]) => { const s = exec(a, o); ajouterSession(claude, s.stdout); return s; };
   const debut = horloge();

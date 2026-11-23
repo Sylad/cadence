@@ -103,7 +103,7 @@ describe('lancerBras', () => {
     expect(appels).toHaveLength(2);
     for (const a of appels) {
       expect(a.args[a.args.indexOf('--settings') + 1]).toBe(cheminReglages(clone));
-      expect(a.env).toMatchObject({ CADENCE_CLONE: clone, CADENCE_PIECES: '["/ref/a.pdf"]', CADENCE_BANC_RACINE: '/banc' });
+      expect(a.env).toMatchObject({ CADENCE_CLONE: clone, CADENCE_PIECES: '["/ref/a.pdf"]', CADENCE_BANC_RACINE: '/banc', CADENCE_LECTURE_BORNEE: b.id });
     }
     expect(cheminReglages(clone)).toBe(join(`${clone}.reglages`, 'settings.json'));
     expect(statSync(`${clone}.reglages`).mode & 0o777).toBe(0o500);
@@ -111,7 +111,7 @@ describe('lancerBras', () => {
     expect(() => writeFileSync(cheminReglages(clone), '{}')).toThrow();
     const j = JSON.parse(readFileSync(cheminReglages(clone), 'utf8'));
     expect(j.hooks.PreToolUse[0].hooks[0].command).toBe(`node "${join(import.meta.dirname, '..', 'hooks', 'lecture-obligatoire.mjs')}" || exit 2`);
-    expect(j.hooks.PreToolUse[0].matcher).toBe('Edit|Write|MultiEdit|NotebookEdit|Bash');
+    expect(j.hooks.PreToolUse[0].matcher).toBe('Edit|Write|MultiEdit|NotebookEdit|Bash|Read|Glob|Grep'); // L808 : lectures hors du clone
     const e0 = empreinteReglages(clone);
     lancerBras(b, { nom: 'C', modele: 'opus', brief, settings }, clone, exec); // réécrit à l'identique : même empreinte
     expect(empreinteReglages(clone)).toBe(e0);
@@ -126,10 +126,10 @@ describe('lancerBras', () => {
     } finally { process.env.HOME = home; }
     const sans: { args: string[]; env: NodeJS.ProcessEnv }[] = [];
     // L715 : banc lancé depuis une session cadence run, qui a sa propre garde dans l'environnement ; le bras sans réglages n'en hérite pas
-    vi.stubEnv('CADENCE_CLONE', '/parent'); vi.stubEnv('CADENCE_PIECES', '[]'); vi.stubEnv('CADENCE_BANC_RACINE', '/runs');
+    vi.stubEnv('CADENCE_CLONE', '/parent'); vi.stubEnv('CADENCE_PIECES', '[]'); vi.stubEnv('CADENCE_BANC_RACINE', '/runs'); vi.stubEnv('CADENCE_LECTURE_BORNEE', 'x');
     try { lancerBras(b, { nom: 'A', modele: 'opus', brief }, clone, (args, o) => { sans.push({ args, env: o.env }); return { stdout: json('s', 1, 0), code: 0 }; }); } finally { vi.unstubAllEnvs(); }
     expect(sans[0].args).not.toContain('--settings');
-    for (const k of ['CADENCE_CLONE', 'CADENCE_PIECES', 'CADENCE_BANC_RACINE']) expect(sans[0].env[k]).toBeUndefined();
+    for (const k of ['CADENCE_CLONE', 'CADENCE_PIECES', 'CADENCE_BANC_RACINE', 'CADENCE_LECTURE_BORNEE']) expect(sans[0].env[k]).toBeUndefined();
   });
 
   it('{{TAILLE}} : la taille du gardien (retouche ou fonction), fonction pour un banc court « grosse »', () => {
@@ -153,7 +153,7 @@ describe('lancerBras', () => {
     expect(e).toMatchObject({ HOME: '/h', KUBECONFIG: '/nonexistent', GH_TOKEN: '', GITHUB_TOKEN: '', GH_CONFIG_DIR: '/nonexistent', SSH_AUTH_SOCK: '', AETHERWX_URL: 'http://127.0.0.1:9' });
 
     // L715 : la garde d'une session cadence run parente n'est pas transmise
-    const g = environnementNeutre({ HOME: '/h', CADENCE_CLONE: '/parent', CADENCE_PIECES: '[]', CADENCE_BANC_RACINE: '/runs', CADENCE_HOME: '/ch' });
+    const g = environnementNeutre({ HOME: '/h', CADENCE_CLONE: '/parent', CADENCE_PIECES: '[]', CADENCE_BANC_RACINE: '/runs', CADENCE_LECTURE_BORNEE: 'b', CADENCE_HOME: '/ch' });
     expect(Object.keys(g).filter((k) => k.startsWith('CADENCE_'))).toEqual(['CADENCE_HOME']);
   });
 });

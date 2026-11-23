@@ -107,3 +107,69 @@ export function lectures(appels, ok, pieces) {
     return [p, { lue: inputs.length > 0, ...c }];
   }));
 }
+
+// ─── L808 : chemins cités par un appel d'outil et leur classement (fuites du banc, R21) ─────────────────────────────────────────────────────────
+// Une seule définition, partagée par le détecteur de fuites (src/bench/fuites.ts, après coup) et par le hook du bras candidat (au banc, avant
+// l'appel) : le hook refuse exactement ce que le détecteur compterait comme fuite certaine.
+
+/** Dossier des transcripts de Claude Code pour un dossier de travail. */
+export const dossierTranscripts = (home, cwd) => join(home, '.claude', 'projects', cwd.replace(/[^A-Za-z0-9]/g, '-'));
+
+/** Zones dont toute mention est une fuite certaine : secrets, évaluations, rapports et bancs du banc, vrais dépôts, transcripts de Claude Code. */
+export const zonesCertaines = (home, racine) => [join(racine, 'secrets'), join(racine, 'eval'), join(racine, 'rapports'), join(racine, 'bancs'),
+  join(home, 'projects'), join(home, '.claude', 'projects')];
+
+/** Toutes les chaînes d'une valeur JSON. */
+export function* textes(v) {
+  if (typeof v === 'string') yield v;
+  else if (Array.isArray(v)) for (const x of v) yield* textes(x);
+  else if (v && typeof v === 'object') for (const x of Object.values(v)) yield* textes(x);
+}
+
+const sousUn = (p, prefixes) => prefixes.some((x) => p === x || p.startsWith(`${x}/`));
+const globale = (x) => { try { return new RegExp(`^${x.replace(/[.+^${}()|\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`); } catch { return /./; } };
+function accolades(t) {
+  const m = /^(.*?)\{([^{}$]*,[^{}]*)\}(.*)$/s.exec(t);
+  return m ? m[2].split(',').flatMap((x) => accolades(m[1] + x + m[3])) : [t];
+}
+// Chemin absolu du jeton (~, $HOME, absolu, ou relatif à cwd s'il contient « / » ou « .. »), sinon null.
+function resoudre(tok, cwd, home, rel, cd = false) {
+  const t = tok.replace(/(?<![./])\.+$/, '').replace(/[,:]+$/, '');
+  if (/^(~|\$HOME)(\/|$)/.test(t)) return resolve(home, t.replace(/^(~|\$HOME)\/?/, ''));
+  if (t.startsWith('/')) return resolve(t);
+  return rel && (cd || t.includes('/') || t === '..' || /^c\d+/.test(t)) ? resolve(cwd, t) : null;
+}
+
+/** Chemins absolus (globs gardés) que cite un appel d'outil : toute chaîne de l'entrée, et pour Bash la commande lue avec ses chemins relatifs,
+ * ses `cd` et ses accolades, plus le dossier courant. `cwd` : dossier courant de l'appel ; `depart` : dossier des chemins relatifs sans cwd. */
+export function* cheminsCites(name, input, cwd, depart, home) {
+  const abs = typeof cwd === 'string' && isAbsolute(cwd);
+  if (name === 'Bash' && abs) yield resolve(cwd);
+  const cmd = input?.command;
+  const sources = [...[...textes(input)].map((t) => [t, false]), ...(name === 'Bash' && typeof cmd === 'string' ? [[cmd, true]] : [])];
+  for (const [texte, rel] of sources) {
+    let dir = rel && abs ? cwd : depart;
+    for (const seg of texte.replace(/\$\{HOME\}/g, '$HOME').split(/&&|\|\||;|\n/)) {
+      for (const v of accolades(seg)) {
+        const cd = rel ? /^\s*cd\s+(\S+)/.exec(v) : null;
+        const cible = cd ? resoudre(cd[1].replace(/^['"]|['"]$/g, ''), dir, home, true, true) : null;
+        for (const tok of v.split(/[\s'"`|&<>(){}=]+/)) { const p = resoudre(tok, dir, home, rel); if (p) yield p; }
+        if (cible) { yield cible; dir = cible; }
+      }
+    }
+  }
+}
+
+/** Classement d'un chemin cité selon les règles d'un bras ({ autorises, certains, runs }) : null (permis), ou { chemin, classe } avec le préfixe
+ * littéral du chemin (avant son premier glob) et la classe « certaine » (zone interdite, autre clone du banc, glob qui peut en désigner un) ou
+ * « a_verifier » (reste du dossier des runs : ancêtres du clone). */
+export function classer(p, r) {
+  const g = p.search(/[*?[]/); // glob : préfixe littéral ; en cas de doute (composant pouvant désigner un clone voisin), certaine
+  const pre = g >= 0 ? p.slice(0, p.lastIndexOf('/', g)) || '/' : p;
+  if (sousUn(pre, r.autorises)) return null;
+  const sousRuns = sousUn(pre, [r.runs]);
+  const comps = sousRuns ? p.slice(r.runs.length + 1).split('/').slice(2) : [];
+  const premier = comps.findIndex((x) => /[*?[]/.test(x)); // seul le premier composant à glob peut désigner un dossier de clone
+  if (sousUn(pre, r.certains) || comps.some((x, i) => /^c\d+(\.|$)/.test(x) || (i === premier && globale(x).test('c2')))) return { chemin: pre, classe: 'certaine' };
+  return sousRuns ? { chemin: pre, classe: 'a_verifier' } : null;
+}

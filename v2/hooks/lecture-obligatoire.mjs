@@ -3,10 +3,12 @@
 // (Edit|Write|MultiEdit|NotebookEdit, ou Bash qui écrit : ecritureBash) tant qu'une pièce n'est pas COUVERTE par des Read réussis
 // (hooks/lecture.mjs), sous-agents compris. Liste par l'environnement fixé au lancement : CADENCE_CLONE, CADENCE_PIECES (JSON), CADENCE_BANC_RACINE.
 // Refuse toujours : réglages de Claude Code, dossier du banc hors du clone, code de ce hook. Fermé : absence, illisible ou exception = refus.
+// L808 : au banc (CADENCE_LECTURE_BORNEE = id du banc, posé par lancerBras, jamais par cadence run), refuse aussi tout appel (Read, Glob, Grep, Bash, écritures)
+// qui cite un chemin que le détecteur de fuites compterait comme fuite certaine (même règle : classer de lecture.mjs).
 import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
-import { cheminOutil, contournement, dansClone, ECRITURES, ecritureBash, evenements, lectures, reel, reglageClaude } from './lecture.mjs';
+import { cheminOutil, cheminsCites, classer, contournement, dansClone, dossierTranscripts, ECRITURES, ecritureBash, evenements, lectures, reel, reglageClaude, zonesCertaines } from './lecture.mjs';
 const ICI = dirname(new URL(import.meta.url).pathname); // le code du hook
 
 /** Transcript principal et transcripts des sous-agents (`<session>/subagents/*.jsonl`), que le hook tourne dans l'un ou l'autre. */
@@ -41,9 +43,32 @@ export function nonLues(pieces, fichiers) {
   return [...lectures(appels, ok, pieces)].filter(([, v]) => !v.entiere).map(([p]) => p);
 }
 
+/** L808 : pièces du bras (CADENCE_PIECES), ou null si la liste est absente ou illisible. */
+function piecesDe(env) {
+  let pieces;
+  try { pieces = JSON.parse(env.CADENCE_PIECES ?? ''); } catch { return null; }
+  return Array.isArray(pieces) && pieces.every((p) => typeof p === 'string') ? pieces : null;
+}
+
+/** L808 : au banc, raison du refus d'un appel qui cite un chemin hors du clone compté fuite certaine, ou null. Règles du détecteur (reglesDuBras, le banc
+ * étant CADENCE_LECTURE_BORNEE), les pièces du bras en plus des chemins autorisés. */
+export function lectureHorsClone(e, env) {
+  const clone = env.CADENCE_CLONE, racine = env.CADENCE_BANC_RACINE, home = env.HOME, pieces = piecesDe(env), banc = env.CADENCE_LECTURE_BORNEE;
+  if (!clone || !racine || !home || !pieces || !/^[^/]+$/.test(banc ?? '') || banc === '..') return 'Appel refusé : CADENCE_CLONE, CADENCE_BANC_RACINE, HOME, CADENCE_PIECES ou CADENCE_LECTURE_BORNEE absent ou illisible, les limites du bras sont introuvables.';
+  const r = { autorises: [clone, `${clone}.captures`, `${clone}.question.md`, `${clone}.install.log`, `${clone}.tests-base.log`, join(racine, 'bancs', banc), dossierTranscripts(home, clone), ...pieces],
+    certains: zonesCertaines(home, racine), runs: join(racine, 'runs') };
+  for (const p of cheminsCites(e?.tool_name ?? '', e?.tool_input, e?.cwd, clone, home)) {
+    const k = classer(p, r);
+    if (k?.classe === 'certaine') return `Appel refusé : il lit hors de ton dépôt (${k.chemin}). Reste dans ${clone} : ce qui te manque se cherche dans le clone. `
+      + 'Un paquet Node se trouve depuis le dossier du script : pose ton script dans le sous-projet dont les node_modules ont ce paquet (par exemple frontend/), ou lance-le de là.';
+  }
+  return null;
+}
+
 /** Décision pour une entrée de hook : null (permis) ou la raison du refus. */
 export function decider(e, env) {
   const bash = e?.tool_name === 'Bash', cwd = e?.cwd ?? process.cwd();
+  if (env.CADENCE_LECTURE_BORNEE) { const hors = lectureHorsClone(e, env); if (hors) return hors; }
   if (!ECRITURES.includes(e?.tool_name) && !bash) return null;
   const clone = env.CADENCE_CLONE, racine = env.CADENCE_BANC_RACINE;
   if (!clone || !racine) return 'Écriture refusée : CADENCE_CLONE ou CADENCE_BANC_RACINE absent, la liste des pièces du bras est introuvable.';
@@ -62,9 +87,8 @@ export function decider(e, env) {
     if (dansClone(f, racine) && !permis) return `Écriture refusée : ${f} est dans le dossier du banc, hors de ton dépôt.`;
     if (!dansClone(f, clone)) return null;
   }
-  let pieces;
-  try { pieces = JSON.parse(env.CADENCE_PIECES ?? ''); } catch { pieces = null; }
-  if (!Array.isArray(pieces) || !pieces.every((p) => typeof p === 'string'))
+  const pieces = piecesDe(env);
+  if (!pieces)
     return 'Écriture refusée : CADENCE_PIECES absent ou illisible (tableau JSON de chemins attendu).';
   if (!pieces.length) return null;
   const manque = nonLues(pieces, e.transcript_path ? transcripts(e.transcript_path) : []);

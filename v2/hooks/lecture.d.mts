@@ -12,3 +12,9 @@ export declare function evenements(ligne: string): { appels: Appel[]; resultats:
 export declare const pagesDe: (f: string) => number | null;
 export declare function couverture(f: string, inputs: Entree[]): { entiere: boolean; pages_inconnues: boolean };
 export declare function lectures(appels: Appel[], ok: Set<string | undefined>, pieces: string[]): Map<string, Lecture>;
+export interface ReglesFuites { autorises: string[]; certains: string[]; runs: string }
+export declare const dossierTranscripts: (home: string, cwd: string) => string;
+export declare const zonesCertaines: (home: string, racine: string) => string[];
+export declare function textes(v: unknown): Generator<string>;
+export declare function cheminsCites(name: string, input: unknown, cwd: string | undefined, depart: string, home: string): Generator<string>;
+export declare function classer(p: string, r: ReglesFuites): { chemin: string; classe: 'certaine' | 'a_verifier' } | null;

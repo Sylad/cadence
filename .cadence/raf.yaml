@@ -4076,10 +4076,11 @@ lots:
     created: 2026-11-21
   - id: L804
     title: "Banc refusé pour v2/dist périmé (v2/src plus récent que dist/cli.js) : le banc du samedi 21-11 12:04 a échoué en silence pour cette raison (complet.log), et le lead l'a rencontré la veille avant une publication. Le banc construit v2 lui-même avant de mesurer (ou le service systemd le fait en ExecStartPre), et un échec du minuteur se voit au tour du lead avec sa cause"
-    status: todo
+    status: doing
     estimate: 1
     planned: { from: 2026-11-22, to: 2026-11-22 }
     created: 2026-11-22
+    started: 2026-11-23
   - id: L805
     title: "deliver --sha : la garde des lots compte comme du travail un commit de plan au sens du hook pre-push (registre .cadence/demandes, fichiers plan.onWrite) — deliveryLots doit filtrer avec isPlanSideOnly comme L784 (vécu ol 22-11 : 8c12b1d plan(L269) a bloqué la livraison de L262, contourné par raf ignore)"
     status: done

@@ -10,7 +10,8 @@ import { movePriority } from '../priority.js';
 import { findProjects, isProject, leadTour, readDepth, tourCiLines, tourFreeLine, tourLine, tourNoTestLines, tourSettingsLines, tourStaleBranchLines, tourUnpublishedLines, tourWorktreeLines } from '../lead.js';
 import { tourMemoryLines } from '../memory-index.js';
 import { localOverdueLines } from '../local-task.js';
-import { configuredCap, expiredHoldLines, slotsLine } from '../orchestrate/command.js';
+import { expiredHoldLines, shownCap, slotsLine } from '../orchestrate/command.js';
+import { readLeadCap, writeLeadCap } from '../orchestrate/plafond-lead.js';
 import { addHold, cadenceHome, liveRuns, releaseHold, runNamedBy } from '../orchestrate/registry.js';
 import { perfHeader } from '../perf.js';
 import { tourInspectLines } from '../inspect-read.js';
@@ -79,11 +80,12 @@ function leadHold(rest: string[], ttl: string | undefined, io: Io, today: Day): 
     if (ttl !== undefined) throw new RafError(`--ttl ne va qu'avec lead hold (${usage})`);
     io.out(releaseHold(cadenceHome(), label!) ? `session « ${label} » rendue` : `aucune session « ${label} » inscrite`);
     // ce que la libération laisse (L416) : les créneaux, les lots prêts qui peuvent les prendre, et un ⚠ tant qu'un créneau reste vide
-    const { line, free } = slotsLine(configuredCap(io.env), io.now());
+    const { cap, setting } = shownCap(io.env);
+    const { line, free } = slotsLine(cap, io.now(), setting);
     io.out(line);
     const ready = tourFreeLine(leadTour(resolve(io.cwd), today));
     if (ready) io.out(ready);
-    if (free > 0) io.out(`⚠ ${free} ${free === 1 ? 'créneau libre' : 'créneaux libres'} sur ${configuredCap(io.env)} : lancer un lot prêt ou une session, un créneau vide ne sert à rien`);
+    if (free > 0) io.out(`⚠ ${free} ${free === 1 ? 'créneau libre' : 'créneaux libres'} sur ${cap} : lancer un lot prêt ou une session, un créneau vide ne sert à rien`);
     return 0;
   }
   // le nom de fichier encode l'étiquette (6 octets par lettre accentuée) : au-delà, le système de fichiers refuse (ENAMETOOLONG)
@@ -93,6 +95,30 @@ function leadHold(rest: string[], ttl: string | undefined, io: Io, today: Day): 
   refuseLiveRun(label!);
   addHold(cadenceHome(), label!, minutes, io.now());
   io.out(`session « ${label} » inscrite pour ${minutes} min : elle compte dans les créneaux libres (cadence lead release « ${label} » à sa fin)`);
+  return 0;
+}
+
+/**
+ * `cadence lead plafond [<n>|aucun]` (L802, D-30) : le plafond que le lead s'applique sous le réglage CADENCE_MAX_SESSIONS (rythme du quota…).
+ * Les créneaux de la bande, de `orchestrate --status` et de `lead tour` se comptent alors sur lui, et un lancement de vague le respecte ;
+ * il ne relève jamais le réglage. Sans argument : le plafond appliqué.
+ */
+function leadPlafond(rest: string[], io: Io): number {
+  const usage = 'usage : cadence lead plafond [<n> | aucun]';
+  if (rest.length > 2) throw new RafError(usage);
+  const home = cadenceHome();
+  const arg = rest[1];
+  if (arg === 'aucun') writeLeadCap(home, null, io.now());
+  else if (arg !== undefined) {
+    const n = Number(arg);
+    if (!(Number.isInteger(n) && n >= 1)) throw new RafError(`plafond invalide : ${arg} (un entier ≥ 1, ou « aucun » pour le retirer ; ${usage})`);
+    writeLeadCap(home, n, io.now());
+  }
+  const lead = readLeadCap(home);
+  const { cap, setting } = shownCap(io.env);
+  if (!lead) io.out(`plafond du lead : aucun · créneaux sur ${setting} (réglage CADENCE_MAX_SESSIONS)`);
+  else if (lead.cap >= setting) io.out(`plafond du lead : ${lead.cap}, sans effet (réglage ${setting}, le lead ne le relève pas) · créneaux sur ${cap}`);
+  else io.out(`plafond du lead : ${lead.cap} (réglage ${setting}) · créneaux, lancements de vague, bande et lead tour sur ${cap} ; le retirer : cadence lead plafond aucun`);
   return 0;
 }
 
@@ -112,9 +138,10 @@ export function cmdConfig(c: EarlyCtx): number {
 export function cmdLead(c: EarlyCtx): number {
   const { rest, values, io, today } = c;
   if (rest[0] === 'hold' || rest[0] === 'release') return leadHold(rest, values.ttl, io, today);
+  if (rest[0] === 'plafond') return leadPlafond(rest, io);
   if (rest[0] === 'priority') return leadPriority(rest, values.before, values.after, values.depth, io);
   if (values.ttl !== undefined) throw new RafError('--ttl ne va qu\'avec lead hold');
-  if (rest[0] !== 'tour' || rest.length > 2) throw new RafError('usage : cadence lead tour [dossier] [--idle 3] [--depth n] [--json] | lead priority <projet> --before|--after <projet> [dossier] | lead hold <étiquette> [--ttl minutes] | lead release <étiquette>');
+  if (rest[0] !== 'tour' || rest.length > 2) throw new RafError('usage : cadence lead tour [dossier] [--idle 3] [--depth n] [--json] | lead priority <projet> --before|--after <projet> [dossier] | lead hold <étiquette> [--ttl minutes] | lead release <étiquette> | lead plafond [<n> | aucun]');
   const idle = values.idle === undefined ? undefined : Number(values.idle);
   if (idle !== undefined && !(Number.isInteger(idle) && idle >= 0)) throw new RafError(`--idle invalide : ${values.idle}`);
   const depth = values.depth === undefined ? undefined : Number(values.depth);
@@ -142,7 +169,8 @@ export function cmdLead(c: EarlyCtx): number {
     for (const l of [...tourNoTestLines(rows), ...tourCiLines(rows), ...tourIssueLines(parent, depth, io.env)]) io.out(l);
     // les créneaux libres viennent du registre, le lead les lit au lieu de les calculer (L141)
     // toujours imprimés, même sans vague ni session du lead (L416) : un créneau vide se lit, il ne se déduit pas d'une ligne absente
-    io.out(slotsLine(configuredCap(io.env), io.now()).line);
+    const { cap, setting } = shownCap(io.env);
+    io.out(slotsLine(cap, io.now(), setting).line);
     // en face des créneaux libres, les lots prêts dont aucune ressource n'est prise (L252)
     const free = tourFreeLine(rows);
     if (free) io.out(free);

@@ -7,7 +7,7 @@ import { bancDetail, bancLine, enCoursLine, readBanc, readEnCours } from './banc
 import { buildDecisions, decisionsOf, parseDeliveries } from './decisions'
 import { buildDeliveries, deliveriesHeight, deliveriesOf, parseLastDeliveries } from './deliveries'
 import { buildSpend, parseTypical, spendHeight, spendOf } from './spend'
-import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, RESET_BACK, colorOfRun, isRunLive, runCells, RUNS_SHOWN, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
+import { ago, attributeTurn, bar, closeLine, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, historyLine, holdAlive, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, RESET_BACK, colorOfRun, isRunLive, runCells, RUNS_SHOWN, shortModel, slotsLine, splitCommands, staleHoldText, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
 import { lotRow } from './lot-row'
 import { CEDENT, lignesDuBloc, partage } from './partage'
@@ -41,6 +41,8 @@ const shownRuns = atom({ plugin: 'cadence-hud', key: 'shownRuns' } as const, [])
 /** Le panneau des lots est ouvert (L687) : la bande ne répète pas l'historique du banc qu'il montre. */
 const lotsOpen = atom({ plugin: 'cadence-hud', key: 'lotsOpen' } as const, false)
 const slotCap = atom({ plugin: 'cadence-hud', key: 'slotCap' } as const, DEFAULT_CAP)
+/** Le réglage CADENCE_MAX_SESSIONS seul (L802) : la ligne des créneaux dit l'écart quand le lead s'est borné plus bas. */
+const slotSetting = atom({ plugin: 'cadence-hud', key: 'slotSetting' } as const, DEFAULT_CAP)
 const lotsBoard = atom({ plugin: 'cadence-hud', key: 'lotsBoard' } as const, null)
 const lotsFailed = atom({ plugin: 'cadence-hud', key: 'lotsFailed' } as const, false)
 const lotsFolds = atom({ plugin: 'cadence-hud', key: 'lotsFolds' } as const, {})
@@ -214,10 +216,11 @@ export const register: Register = on => {
           : null
         // un sous-agent fini (ou disparu) emporte ses commandes même si son avis de fin n'a pas été vu
         if (listed) for (const gone of endedOwners(ownersNow, list)) await endCommand($, gone)
-        const live = list.filter(a => a.status === 'running' || a.status === 'pending' || a.status === 'waiting')
+        // L802 (D-30) : seuls comptent les sous-agents qui travaillent ; un agent au repos (« waiting » : fini, il attend un message) ne retient pas la fermeture
+        const live = list.filter(a => a.status === 'running' || a.status === 'pending')
         const summary: AgentsSummary = {
           running: live.length,
-          names: live.map(a => a.name ?? a.type).slice(0, 4),
+          names: live.map(a => a.name ?? a.type),
         }
 
         let found: Wave[] = []
@@ -225,11 +228,12 @@ export const register: Register = on => {
         let foundRuns: LiveRun[] = []
         let foundShown: ShownRun[] = []
         let foundCap = DEFAULT_CAP
+        let foundSetting = DEFAULT_CAP
         let foundEnded: Wave[] = []
         let problem: string | null = null
         if (collected.exitCode === 0) {
           try {
-            ;({ waves: found, holds: foundHolds, runs: foundRuns, shownRuns: foundShown, cap: foundCap, ended: foundEnded } = parseCollected(collected.stdout))
+            ;({ waves: found, holds: foundHolds, runs: foundRuns, shownRuns: foundShown, cap: foundCap, capSetting: foundSetting, ended: foundEnded } = parseCollected(collected.stdout))
           } catch (err) {
             problem = `collecteur illisible : ${String(err).slice(0, 60)}`
           }
@@ -264,6 +268,7 @@ export const register: Register = on => {
         const open = await isLotsOpen($)
         await update($, lotsOpen, () => open)
         await update($, slotCap, () => foundCap)
+        await update($, slotSetting, () => foundSetting)
         await update($, error, () => problem)
         await update($, now, () => at)
         // L719 : le tour (plusieurs secondes par appel) ne nourrit que le panneau des lots et le repli des lots clos des vagues de la bande (L609) :
@@ -461,7 +466,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey || (await read($, isHidden))) return next(e)
 
-    const [u, a, cmds, cmdInfo, m, allWaves, problem, at, allHolds, runs, cap, board, bench, running, allShownRuns, paneOpen] = await Promise.all([
+    const [u, a, cmds, cmdInfo, m, allWaves, problem, at, allHolds, runs, cap, board, bench, running, allShownRuns, paneOpen, setting] = await Promise.all([
       read($, usage),
       read($, agents),
       read($, commands),
@@ -478,6 +483,7 @@ export const register: Register = on => {
       read($, enCours),
       read($, shownRuns),
       read($, lotsOpen),
+      read($, slotSetting),
     ])
     // L687 (D-1) : panneau des lots ouvert, la bande ne répète pas ce qu'il montre — les lots en cours de chaque projet (l'arbre) et l'historique du banc (son bloc « Banc »).
     // L716 : elle garde la ligne du banc en cours (vivante, comme les runs : le panneau ne la porte plus).
@@ -583,7 +589,7 @@ export const register: Register = on => {
             </Text>
           ),
         })
-        const names = fit(a.names.join(', '), 40)
+        const names = fit(a.names.slice(0, 4).join(', '), 40)
         if (names) segments.push({ key: 'agent-names', text: ` ${names}`, drop: 6, requires: 'agents', node: <Text key="agent-names" dimColor> {names}</Text> })
       }
       const { live: liveCmds, stale: staleCmds } = splitCommands(cmds, cmdInfo, at)
@@ -738,9 +744,11 @@ export const register: Register = on => {
       )
     })
 
-    // L687 (D-1) : une ligne par run de cadence run, alignée comme les lots d'une vague : dépôt:lot, état, détail (modèle et durée, ou depuis quand il est fini ; coût), titre de la demande.
-    // Les vivants d'abord (ordre du collecteur), RUNS_SHOWN au plus puis « … +N runs ».
-    const runList = allShownRuns.slice(0, RUNS_SHOWN).map(run => ({ run, ...runCells(run, at) }))
+    // L687 (D-1) : une ligne par run de cadence run, alignée comme les lots d'une vague : dépôt:lot, état, détail (modèle et durée ; coût), titre de la demande.
+    // L802 (D-30) : seuls les runs VIVANTS ont leur ligne (RUNS_SHOWN au plus puis « … +N runs ») ; les finis (intégrés, interrompus, en attente d'un geste)
+    // passent sur une ligne grise d'historique, sous la réponse à « puis-je fermer ? », au lieu d'être listés à égalité.
+    const liveShown = allShownRuns.filter(isRunLive)
+    const runList = liveShown.slice(0, RUNS_SHOWN).map(run => ({ run, ...runCells(run, at) }))
     const runLabelWidth = Math.max(0, ...runList.map(r => r.label.length))
     const runStatusWidth = Math.max(0, ...runList.map(r => r.status.length))
     const runDetailWidth = Math.max(0, ...runList.map(r => r.detail.length))
@@ -749,8 +757,8 @@ export const register: Register = on => {
         {runList.map(r => (
           <Box key={`run-${r.run.id}`} flexDirection="row">
             <Box minWidth={6 + runLabelWidth} flexShrink={0}>
-              <Text wrap="truncate-end" bold={isRunLive(r.run)} color={isRunLive(r.run) ? 'claude' : 'subtle'}>
-                {isRunLive(r.run) ? '▶ ' : '  '}run {r.label}
+              <Text wrap="truncate-end" bold color="claude">
+                ▶ run {r.label}
               </Text>
             </Box>
             <Box minWidth={2 + runStatusWidth} paddingLeft={2} flexShrink={0}>
@@ -772,17 +780,20 @@ export const register: Register = on => {
             </Box>
           </Box>
         ))}
-        {allShownRuns.length > RUNS_SHOWN && (
+        {liveShown.length > RUNS_SHOWN && (
           <Text color="subtle" wrap="truncate-end">
-            {'  '}… +{allShownRuns.length - RUNS_SHOWN} runs
+            {'  '}… +{liveShown.length - RUNS_SHOWN} runs
           </Text>
         )}
       </Box>
     )
 
-    // comme `cadence orchestrate --status` : la ligne des créneaux, puis une ligne par session que le lead a inscrite
-    const slots = slotsLine(w, holds, cap, runs)
-    const leadRows = (slots || lateHolds.length > 0) && (
+    // comme `cadence orchestrate --status` : la ligne des créneaux (sur le plafond appliqué, L802), puis une ligne par session que le lead a inscrite.
+    // Une session échue que rien de vivant ne porte (L802) n'est plus une alerte rouge parmi le travail en cours : elle descend, grise, dans l'historique.
+    const slots = slotsLine(w, holds, cap, runs, setting)
+    const aliveLate = lateHolds.filter(hold => holdAlive(hold, a.names, allShownRuns))
+    const staleLate = lateHolds.filter(hold => !holdAlive(hold, a.names, allShownRuns))
+    const leadRows = (slots || aliveLate.length > 0) && (
       <Box key="lead" flexDirection="column">
         {slots && (
           <Text color="subtle" wrap="truncate-end">
@@ -795,13 +806,22 @@ export const register: Register = on => {
             {holdText(hold, at)}
           </Text>
         ))}
-        {lateHolds.map(hold => (
+        {aliveLate.map(hold => (
           <Text key={`late-${hold.label}`} color={colorOfLot('failed')} wrap="truncate-end">
-            {expiredHoldText(hold, at)}
+            {expiredHoldText(hold, at)} · tourne encore
           </Text>
         ))}
       </Box>
     )
+
+    // L802 (D-30) : « puis-je fermer ? » d'un coup d'œil. Ne compte que ce qui vit : la session elle-même quand elle travaille, les vagues vivantes, les runs
+    // tenus par un processus, les sous-agents qui travaillent, les commandes d'arrière-plan en cours, les sessions du lead non échues, le banc en cours.
+    const { live: liveCmdIds, stale: staleCmdIds } = splitCommands(cmds, cmdInfo, at)
+    const verdict = closeLine(
+      { session: e.props.isWorking, waves: w.filter(wave => wave.live).length, runs: liveShown.length, agents: a.running, commands: liveCmdIds.length, holds: holds.length, bench: !!runningLine },
+      staleCmdIds.length,
+    )
+    const history = historyLine(allShownRuns, at)
 
     return (
       <Box flexDirection="column">
@@ -815,6 +835,22 @@ export const register: Register = on => {
             {runningLine.text}
           </Text>
         )}
+        <Text key="fermer" color={verdict.live ? 'claude' : 'success'} bold wrap="truncate-end">
+          {verdict.text}
+        </Text>
+        {/* L802 : l'historique, en retrait et en gris, sous la réponse : rien de ce qui suit ne tourne */}
+        {history && (
+          <Text key="historique" color="subtle" wrap="truncate-end">
+            {'  '}
+            {history}
+          </Text>
+        )}
+        {staleLate.map(hold => (
+          <Text key={`stale-${hold.label}`} color="subtle" wrap="truncate-end">
+            {'  '}
+            {staleHoldText(hold, at)}
+          </Text>
+        ))}
         {benchLine && (
           <Text key="banc" color={benchLine.color} wrap="truncate-end">
             {benchLine.text}

@@ -449,13 +449,15 @@ export const gatedLots = (waves: readonly Wave[]): string[] => waves.filter(w =>
  * « runs cadence run : 1 · sessions du lead : 1 · créneaux libres : 1 sur 3 · 2 en porte : L514 L473 » (sans segment à zéro, sans le dernier sans lot en porte) ;
  * null sans vague vivante, session du lead ni run (L710) : rien à dire. Les runs ne sont plus nommés ici (L687) : chacun a sa ligne au-dessus (runRows), la ligne ne les répète pas.
  */
-export const slotsLine = (waves: readonly Wave[], holds: readonly LeadHold[], cap: number, runs: readonly LiveRun[] = []): string | null => {
+export const slotsLine = (waves: readonly Wave[], holds: readonly LeadHold[], cap: number, runs: readonly LiveRun[] = [], setting = cap): string | null => {
   if (!waves.some(w => w.live) && holds.length === 0 && runs.length === 0) return null
   const run = runs.length > 0 ? `runs cadence run : ${runs.length} · ` : ''
   const lead = holds.length > 0 ? `sessions du lead : ${holds.length} · ` : ''
   const gated = gatedLots(waves)
   const porte = gated.length > 0 ? ` · ${gated.length} en porte : ${gated.join(' ')}` : ''
-  return `${run}${lead}créneaux libres : ${freeSlots(waves, cap, holds.length + runs.length)} sur ${cap}${porte}`
+  // L802 (D-30) : les créneaux se comptent sur le plafond appliqué ; quand le lead s'est borné sous le réglage, la ligne le dit
+  const plafond = setting > cap ? ` (plafond du lead, réglage ${setting})` : ''
+  return `${run}${lead}créneaux libres : ${freeSlots(waves, cap, holds.length + runs.length)} sur ${cap}${plafond}${porte}`
 }
 
 /** « correctif-L12  depuis 4 min · reste 56 min » : l'étiquette, l'âge (omis si la date est illisible) et le TTL restant. */
@@ -471,6 +473,25 @@ export const expiredHoldText = (hold: LeadHold, now: number): string => {
   const age = Number.isFinite(since) ? `depuis ${duration(now - since)} · ` : ''
   return `⚠ session du lead échue : ${hold.label}  ${age}échue depuis ${duration(now - Date.parse(hold.expires))}`
 }
+
+/** `word` est cité dans `label` comme un mot entier (le `cites` de src/orchestrate/registry.ts) : « run-L32 » cite L32, « L320 » non. */
+const cites = (label: string, word: string): boolean =>
+  word !== '' && new RegExp(`(^|[^A-Za-z0-9])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^A-Za-z0-9])`).test(label)
+
+/**
+ * L802 (D-30) : une session du lead échue tourne-t-elle encore ? Un hold ne porte aucun processus ; la bande ne peut le dire vivant que s'il nomme
+ * ce qu'elle voit vivre : un sous-agent de cette session qui travaille (même nom, ou nom qui cite l'étiquette) ou un run vivant (son id ou son lot cité).
+ */
+export const holdAlive = (hold: LeadHold, agentNames: readonly string[], runs: readonly Pick<ShownRun, 'id' | 'lot' | 'role'>[]): boolean =>
+  agentNames.some(n => n === hold.label || cites(n, hold.label)) ||
+  runs.some(r => isRunLive(r) && (cites(hold.label, r.id) || (r.lot !== null && cites(hold.label, r.lot))))
+
+/**
+ * Une session du lead échue que rien de vivant ne porte (L802, D-30) : ce n'est plus du travail, c'est une réservation oubliée. Grise, sous l'historique :
+ * « réservation échue, rien ne tourne : ux-L32  échue depuis 2 h 00 · cadence lead release ux-L32 ».
+ */
+export const staleHoldText = (hold: LeadHold, now: number): string =>
+  `réservation échue, rien ne tourne : ${hold.label}  échue depuis ${duration(now - Date.parse(hold.expires))} · cadence lead release ${hold.label}`
 
 // ── L687 (D-1) : les runs de cadence run et leur état ──────────────────────────────────────────────────────────────
 
@@ -542,5 +563,47 @@ export const runCells = (run: ShownRun, now: number): { label: string; status: s
   return { label, status, detail: detail.filter(Boolean).join(' · '), title }
 }
 
-/** Au-delà de ce nombre, les runs de la bande se comptent sur une ligne (« … +N runs »), les vivants d'abord (l'ordre du collecteur). */
+/** Au-delà de ce nombre, les runs VIVANTS de la bande se comptent sur une ligne (« … +N runs ») ; les finis vont dans la ligne d'historique (L802). */
 export const RUNS_SHOWN = 4
+
+/**
+ * L802 (D-30) : les runs qui ne tournent plus (intégrés, interrompus, en attente d'un geste) sur UNE ligne grise, groupés par état, chaque lot nommé une fois
+ * avec son nombre : « ne tourne plus : interrompu eywa:TYPO-1 ×2 · intégré eywa:TYPO-1 ». null sans run fini. Ils ne sont plus listés à égalité des runs vivants.
+ */
+export const historyLine = (runs: readonly ShownRun[], now: number): string | null => {
+  const ended = runs.filter(r => !isRunLive(r))
+  if (ended.length === 0) return null
+  const byState = new Map<string, Map<string, number>>()
+  for (const r of ended) {
+    const { label, status } = runCells(r, now)
+    const labels = byState.get(status) ?? new Map<string, number>()
+    labels.set(label, (labels.get(label) ?? 0) + 1)
+    byState.set(status, labels)
+  }
+  const groups = [...byState].map(([status, labels]) => `${status} ${[...labels].map(([l, n]) => (n > 1 ? `${l} ×${n}` : l)).join(', ')}`)
+  return `ne tourne plus : ${groups.join(' · ')}`
+}
+
+/** Ce qui tourne à l'instant (L802, D-30) : ce que la ligne « puis-je fermer ? » compte. */
+export type Running = { session: boolean; waves: number; runs: number; agents: number; commands: number; holds: number; bench: boolean }
+
+/**
+ * La réponse à « puis-je fermer ? » (L802, D-30) : « ✓ rien ne tourne : tu peux fermer », ou « ▶ tourne encore : 1 run · 2 agents · … » qui nomme ce qui vit.
+ * Seul le vivant compte : un run fini, une vague finie, une commande sans fin vue depuis plus d'une heure, une réservation échue sans session ne retiennent pas.
+ * `staleCommands` : les commandes sans fin vue, dites en clair à côté de « rien ne tourne » (on ne les sait ni vivantes ni mortes).
+ */
+export const closeLine = (r: Running, staleCommands = 0): { text: string; live: boolean } => {
+  const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`
+  const parts = [
+    r.session ? 'cette session' : '',
+    r.waves > 0 ? plural(r.waves, 'vague', 'vagues') : '',
+    r.runs > 0 ? plural(r.runs, 'run', 'runs') : '',
+    r.agents > 0 ? plural(r.agents, 'agent', 'agents') : '',
+    r.commands > 0 ? `${r.commands} cmd` : '',
+    r.holds > 0 ? plural(r.holds, 'session du lead', 'sessions du lead') : '',
+    r.bench ? 'banc' : '',
+  ].filter(Boolean)
+  if (parts.length > 0) return { text: `▶ tourne encore : ${parts.join(' · ')}`, live: true }
+  const stale = staleCommands > 0 ? ` (${staleCommands} cmd sans fin vue depuis plus d'une heure : /hud cmd)` : ''
+  return { text: `✓ rien ne tourne : tu peux fermer${stale}`, live: false }
+}

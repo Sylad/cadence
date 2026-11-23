@@ -122,7 +122,7 @@ Detail: [lead.md](lead.md).
   <img alt="A queue of lots feeds the slots of a wave: two sessions, a held slot, a free slot filled from the plan" src="concepts-vague-light.svg">
 </picture>
 
-The machine and your quota are shared: at most **N sessions run at once**: N is the cap (`CADENCE_MAX_SESSIONS` or `--max-sessions`, 2 by default; never raised by the lead). Each running session occupies a **slot**; a freed slot goes to the next
+The machine and your quota are shared: at most **N sessions run at once**: N is the cap (`CADENCE_MAX_SESSIONS` or `--max-sessions`, 2 by default; only lowered by the lead). Each running session occupies a **slot**; a freed slot goes to the next
 lot of the wave; a freed slot is also filled at once by the next ready lot of the plan (always with `--continue`, with named lots since L587; `--no-fill` stops it). A session the lead starts by hand (fix, QA pass) is invisible to waves, so
 the lead declares it: `cadence lead hold <label>` and lifts it with `cadence lead release <label>`: a **hold** takes a slot that
 waves wait for. Detail: [lead.md](lead.md#lead-hold-and-release).

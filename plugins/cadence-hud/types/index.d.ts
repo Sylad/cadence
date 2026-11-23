@@ -17,6 +17,7 @@ export type BackgroundCommandInfo = CommandInfo
 /** Un passage du banc de cadence 2, une ligne de `historique.jsonl` (ligneHistorique de v2/src/bench/verdict.ts) ; `sequence` : ligne `type: 'sequence'` (v2/src/sequence/verdict.ts). */
 export type BancPassage = { date: string; candidat: string; bancs: string[]; hebdo: boolean; vert: boolean; rouges: string[]; sequence?: boolean; niveau?: string }
 
+/** Les sous-agents de la session qui travaillent (L802 : `running` ou `pending`, jamais un agent au repos qui attend un message) ; `names` les nomme tous. */
 export type AgentsSummary = { running: number; names: string[] }
 
 /** Ce qu'un modèle a consommé sur la session : tokens (entrée + sortie + cache) et dollars qui lui sont attribués. */
@@ -180,8 +181,10 @@ declare module 'claude-code' {
       shownRuns: ShownRun[]
       /** Le panneau des lots est ouvert (L687) : la bande ne répète pas l'historique du banc qu'il montre. */
       lotsOpen: boolean
-      /** Plafond de sessions simultanées (CADENCE_MAX_SESSIONS, 2 par défaut). */
+      /** Plafond de sessions simultanées appliqué (CADENCE_MAX_SESSIONS, 2 par défaut, borné par le plafond du lead, L802). */
       slotCap: number
+      /** Le réglage CADENCE_MAX_SESSIONS seul (L802) : au-dessus de `slotCap`, la ligne des créneaux dit « plafond du lead, réglage N ». */
+      slotSetting: number
       /** Ce que le panneau des lots (`/hud lots`) a lu de `cadence lead tour --json` ; null avant la première lecture réussie. */
       lotsBoard: LotsBoard | null
       /** La dernière lecture du panneau des lots a échoué (cadence absent, délai dépassé, sortie illisible). */

@@ -15,12 +15,13 @@ import type { LeadHold, LiveRun, ShownRun, Wave } from '../types'
  * effaçait les questions et les lots rendus non tranchés des vagues d'avant. Chaque état de lot porte `repo` (le chemin absolu du dépôt du lot) et
  * chaque vague `cwd` (son dossier de lancement) : les commandes à copier du panneau commencent par `cd` là.
  * Il rend aussi, avec les vagues, les sessions du lead inscrites par `cadence lead hold` (`<home>/holds/*.json`, sans
- * filtrer l'échéance : la bande le fait à chaque dessin) et le plafond de sessions (CADENCE_MAX_SESSIONS, 2 par défaut).
+ * filtrer l'échéance : la bande le fait à chaque dessin) et le plafond de sessions appliqué (`cap` : CADENCE_MAX_SESSIONS, 2 par défaut, borné par le
+ * plafond du lead de `plafond-lead.json`, L802) avec le réglage seul (`capSetting`), pour que la ligne des créneaux dise l'écart.
  * Chaque lot porte `trail`, la liste de ses pas (genre, statut, début, fin ; L413) d'où la frise du panneau des lots tire ses étapes.
  * Chaque lot porte aussi ce que le panneau lit de sa dépense (L414) : `budget`, `escalationReserve`, `estimate`, `escalated`, `spec`, les tokens comptés par ses étapes (`consumed`), le début de sa première étape (`since`) ; la durée écoulée court jusqu'à maintenant (le panneau n'en lit pas la fin).
  * Il rend enfin les runs de `cadence run` vivants (`<home>/runs/*.json`, L710) : ils prennent un créneau comme une session du lead.
  * Il rend aussi les runs à montrer avec leur état (`shownRuns`, L687) : vivants, intégrés depuis moins de 30 min, ou en attente d'un geste depuis moins de 12 h.
- * Sortie : `{waves, holds, runs, shownRuns, cap, ended}`.
+ * Sortie : `{waves, holds, runs, shownRuns, cap, capSetting, ended}`.
  */
 export const COLLECTOR = `
 import json, os, glob, datetime, time
@@ -242,14 +243,18 @@ for x in shown:
     del x['_held'], x['_m']
 
 raw_cap = (os.environ.get('CADENCE_MAX_SESSIONS') or '').strip()
-cap = int(raw_cap) if raw_cap.isdigit() and int(raw_cap) >= 1 else 2
-print(json.dumps({'waves': out, 'holds': holds, 'runs': runs, 'shownRuns': shown, 'cap': cap, 'ended': ended}))
+setting = int(raw_cap) if raw_cap.isdigit() and int(raw_cap) >= 1 else 2
+# L802 (D-30) : le plafond que le lead s'applique (cadence lead plafond, plafond-lead.json du foyer, comme readLeadCap de src/orchestrate/plafond-lead.ts) borne le réglage, jamais ne le relève
+lead_cap = load(os.path.join(home, 'plafond-lead.json'))
+lead_n = lead_cap.get('cap') if isinstance(lead_cap, dict) else None
+cap = min(setting, lead_n) if isinstance(lead_n, int) and not isinstance(lead_n, bool) and lead_n >= 1 else setting
+print(json.dumps({'waves': out, 'holds': holds, 'runs': runs, 'shownRuns': shown, 'cap': cap, 'capSetting': setting, 'ended': ended}))
 `
 
 /** Plafond de sessions quand le collecteur n'en donne pas de valide (le défaut de cadence). */
 export const DEFAULT_CAP = 2
 
-export type Collected = { waves: Wave[]; holds: LeadHold[]; /** les runs de cadence run vivants (L710) */ runs: LiveRun[]; /** les runs à montrer avec leur état (L687) */ shownRuns: ShownRun[]; cap: number; /** les vagues finies du dossier, la plus récente d'abord, qu'une vague vive ou non (L412) ; vide sans */ ended: Wave[] }
+export type Collected = { waves: Wave[]; holds: LeadHold[]; /** les runs de cadence run vivants (L710) */ runs: LiveRun[]; /** les runs à montrer avec leur état (L687) */ shownRuns: ShownRun[]; /** le plafond appliqué (L802) */ cap: number; /** le réglage CADENCE_MAX_SESSIONS, ≥ cap ; cap quand le collecteur ne le dit pas */ capSetting: number; /** les vagues finies du dossier, la plus récente d'abord, qu'une vague vive ou non (L412) ; vide sans */ ended: Wave[] }
 
 const isWave = (w: unknown): w is Wave => typeof w === 'object' && w !== null && typeof (w as Wave).id === 'string'
 
@@ -275,7 +280,8 @@ export const parseCollected = (stdout: string): Collected => {
     (r): r is ShownRun => typeof r === 'object' && r !== null && typeof (r as ShownRun).id === 'string' && typeof (r as ShownRun).etat === 'string' && typeof (r as ShownRun).vu === 'string',
   ).map(r => ({ ...r, repo: typeof r.repo === 'string' ? r.repo : '', lot: typeof r.lot === 'string' ? r.lot : null, role: typeof r.role === 'string' ? r.role : null, titre: typeof r.titre === 'string' ? r.titre : '' }))
   const cap = typeof obj.cap === 'number' && Number.isInteger(obj.cap) && obj.cap >= 1 ? obj.cap : DEFAULT_CAP
-  return { waves, holds, runs, shownRuns, cap, ended }
+  const capSetting = typeof obj.capSetting === 'number' && Number.isInteger(obj.capSetting) && obj.capSetting >= cap ? obj.capSetting : cap
+  return { waves, holds, runs, shownRuns, cap, capSetting, ended }
 }
 
 /**

@@ -18,8 +18,10 @@ the plan says closed out of the wave lines; it runs only while the panel is open
 
 - `ctx` — context of the session; `5h`, `7j` — quota windows and time to their reset; `$1.23` — cost of the session;
   `fable 410k sonnet 85k` — consumption per model;
-- `⚙ 2 agents` — subagents of this session; `2 cmd` — background commands of this session;
-- one header and one aligned line per active lot for each live `cadence orchestrate` wave; one line per `cadence run` and its state; free slots and the sessions of the lead;
+- `⚙ 2 agents` — subagents of this session that work; `2 cmd` — background commands of this session;
+- one header and one aligned line per active lot for each live `cadence orchestrate` wave; one line per live `cadence run`; free slots on the cap applied
+  (`cadence lead plafond`) and the sessions of the lead;
+- `✓ rien ne tourne : tu peux fermer` or `▶ tourne encore : …` (what lives), then, grey and indented, what no longer runs (finished runs, forgotten holds);
 - the bench run in progress; the last bench verdict, left out while the lots panel (which shows the bench history) is open.
   The progress bar of each project is never in the band: it is in the lots panel, beside each project of the project order.
 

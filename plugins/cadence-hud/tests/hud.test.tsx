@@ -536,7 +536,9 @@ test('la première ligne n\'emploie que de l\'ASCII et les symboles que cells() 
   expect(await ui.find({ type: 'Text', text: /↻ \d/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /\.\.\./ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /EUR/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /[^\x00-\x7f▰▱⚙│↻]/ })).toBeUndefined()
+  // la ligne « puis-je fermer ? » (L802) est une ligne à elle, sous la première : elle n'entre pas dans la mesure de la première ligne
+  const outside = (await ui.findAll({ type: 'Text' })).map(t => t.text ?? '').filter(t => !/^(▶ tourne encore|✓ rien ne tourne)/.test(t))
+  expect(outside.filter(t => /[^\x00-\x7f▰▱⚙│↻]/.test(t))).toEqual([])
   await ui.unmount()
 })
 
@@ -953,6 +955,22 @@ test('un sous-agent terminé emporte ses commandes au rafraîchissement, un sous
   expect(hud.commands()).toEqual(['b1', 'b3'])
   expect(hud.owners()).toEqual({ b3: 'a2' })
   expect(Object.keys(hud.info())).toEqual(['b1', 'b3'])
+})
+
+test('L802 — le compteur d’agents ne compte que ceux qui travaillent (running, pending) : un agent au repos (waiting) ou fini ne retient pas la fermeture', async ($, on) => {
+  const agentList = {
+    current: (): unknown => ({
+      value: [
+        { id: 'a1', status: 'running', name: 'livreur', type: 'cadence:livreur' },
+        { id: 'a2', status: 'pending', type: 'cadence:qa-reviewer' },
+        { id: 'a3', status: 'waiting', name: 'revue-L800', type: 'cadence:code-reviewer' },
+        { id: 'a4', status: 'completed', name: 'fini', type: 'general-purpose' },
+      ],
+    }),
+  }
+  const { hud, refresh } = await mounted($, on, agentList)
+  await refresh()
+  expect(hud.state('agents')).toEqual({ running: 2, names: ['livreur', 'cadence:qa-reviewer'] })
 })
 
 test('si $.agent.list() échoue, le rafraîchissement ne retire aucune commande (une liste vide ne dit pas que tous les sous-agents ont fini)', async ($, on) => {
@@ -1516,7 +1534,7 @@ test('R5 — le collecteur rend aussi les sessions du lead et le plafond, un anc
   expect(parseCollected(JSON.stringify([WAVE]))).toMatchObject({ holds: [], cap: 2 })
   expect(parseCollected(JSON.stringify({ waves: [], holds: [], cap: 0 })).cap).toBe(2)
   expect(parseCollected(JSON.stringify({ waves: [{ ...WAVE, repos: 1, lanes: 3 }] })).waves[0]).toMatchObject({ repos: 1, lanes: 3 })
-  expect(parseCollected('{}')).toEqual({ waves: [], holds: [], runs: [], shownRuns: [], cap: 2, ended: [] })
+  expect(parseCollected('{}')).toEqual({ waves: [], holds: [], runs: [], shownRuns: [], cap: 2, capSetting: 2, ended: [] })
 })
 
 test('R6 — la bande affiche les sessions du lead et les créneaux sans aucune vague', async ($, on) => {
@@ -1555,14 +1573,24 @@ test('L278 R1 — les sessions échues se séparent des vivantes, et se lisent a
   expect(expiredHoldText({ ...expired, since: 'illisible' }, T0)).toBe('⚠ session du lead échue : correctif-B28  échue depuis 2 h 00')
 })
 
-test('L278 R2 — la bande dessine le ⚠ d’une session échue, même sans vague ni session vivante', async ($, on) => {
+test('L278 R2 — la bande dessine une session échue, même sans vague ni session vivante ; L802 : sans rien de vivant qui la porte, une réservation oubliée en gris', async ($, on) => {
   seed(on, { ...EMPTY, usage: { percent: 42, window: 200_000, limits: [] }, waves: [], leadHolds: [HOLD], slotCap: 3, now: Date.parse(HOLD.expires) + 3_600_000 })
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: PLUGIN, surface, ...BAND })
-    expect(await ui.find({ type: 'Text', text: /⚠ session du lead échue : correctif-L12/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /échue depuis 1 h 00/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /⚠ session du lead échue/ })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: /réservation échue, rien ne tourne : correctif-L12  échue depuis 1 h 00 · cadence lead release correctif-L12/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^✓ rien ne tourne : tu peux fermer$/ })).toBeDefined()
     await ui.unmount()
   }
+})
+
+test('L802 R2 — une session échue que porte un sous-agent qui travaille reste le ⚠ rouge du travail en cours', async ($, on) => {
+  seed(on, { ...EMPTY, agents: { running: 1, names: ['correctif-L12'] }, usage: { percent: 42, window: 200_000, limits: [] }, waves: [], leadHolds: [HOLD], slotCap: 3, now: Date.parse(HOLD.expires) + 3_600_000 })
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
+  expect(await ui.find({ type: 'Text', text: /⚠ session du lead échue : correctif-L12 .* · tourne encore$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /réservation échue/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /^▶ tourne encore : 1 agent$/ })).toBeDefined()
+  await ui.unmount()
 })
 
 test('L278 R3 — une session encore vivante n’a pas de ⚠', async ($, on) => {

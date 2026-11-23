@@ -25,7 +25,7 @@ import { claimFirstDraw, firstDraw } from './draw.js';
 
 import { followCommand } from './follow.js';
 import { answerOnly, control, freeLines, maxSessions, onceAuth, statusCommand, waveExists } from './status.js';
-export { configuredCap, expiredHoldLines, liveLines, slotsLine } from './status.js';
+export { configuredCap, expiredHoldLines, liveLines, shownCap, slotsLine } from './status.js';
 
 import { addOnlyLive, continueRounds, execute } from './execute.js';
 

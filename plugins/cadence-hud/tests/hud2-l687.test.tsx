@@ -73,9 +73,11 @@ test('L687 — la bande montre chaque run et son état, le vivant en tête, sur 
     expect(t).toMatch(/^en cours$/m)
     expect(t).toMatch(/opus 12 min · \$1\.20/)
     expect(t).toMatch(/HUD 2\.0 \(D-1\)/)
-    expect(t).toMatch(/run cadence:L705/)
-    expect(t).toMatch(/^intégré$/m)
+    // L802 (D-30) : le run fini n'a plus sa ligne à égalité du vivant, il est dans l'historique replié, sous la réponse à « puis-je fermer ? »
+    expect(t).not.toMatch(/run cadence:L705/)
+    expect(t).toMatch(/^ {2}ne tourne plus : intégré cadence:L705$/m)
     expect(t).toMatch(/runs cadence run : 1 · créneaux libres : 2 sur 3/)
+    expect(t).toMatch(/^▶ tourne encore : 1 run$/m)
     expect(t.indexOf('L687')).toBeLessThan(t.indexOf('L705'))
     await ui.unmount()
   }

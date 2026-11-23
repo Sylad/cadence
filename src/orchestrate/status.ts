@@ -16,11 +16,22 @@ import { preflight } from './preflight.js';
 import { dryRun } from './dry-run.js';
 import type { OrchestrateDeps, OrchestrateIo } from './command.js';
 import { DEFAULT_MAX_SESSIONS, parseMaxSessions, type Args } from './command-args.js';
+import { appliedCap, readLeadCap } from './plafond-lead.js';
 
+/** Le plafond d'un lancement : `--max-sessions` s'il est donné, sinon le réglage (CADENCE_MAX_SESSIONS, 2 par défaut) borné par le plafond du lead (`lead plafond`, L802). */
 export function maxSessions(args: Args, io: OrchestrateIo): number {
   if (args.maxSessions !== undefined) return args.maxSessions;
   const env = io.env.CADENCE_MAX_SESSIONS;
-  return env ? parseMaxSessions(env, 'CADENCE_MAX_SESSIONS') : DEFAULT_MAX_SESSIONS;
+  return appliedCap(env ? parseMaxSessions(env, 'CADENCE_MAX_SESSIONS') : DEFAULT_MAX_SESSIONS, readLeadCap(cadenceHome()));
+}
+
+/**
+ * Le plafond des créneaux à AFFICHER (`--status`, `lead tour`, `lead release`, L802) : celui qui s'applique, le réglage borné par le plafond du lead,
+ * et le réglage quand il diffère (la ligne dit alors « sur 3 (plafond du lead, réglage 5) »). Un `--max-sessions` donné s'affiche tel quel.
+ */
+export function shownCap(env: Record<string, string | undefined>, flag?: number): { cap: number; setting: number } {
+  const setting = configuredCap(env, flag);
+  return { cap: flag !== undefined ? setting : appliedCap(setting, readLeadCap(cadenceHome())), setting };
 }
 
 /** Plafond à AFFICHER (`--status`, `lead tour`) : le réglage de l'humain, jamais 2 en dur. Un réglage invalide ne casse pas l'affichage (le lancement, lui, le refuse) : retour au défaut. */
@@ -42,22 +53,22 @@ export function duration(ms: number): string {
  * La ligne des créneaux (L141, L255) et leur nombre libre : toujours, même sans vague ni session du lead (L416 : « libres : 3 sur 3 » se lit, il ne se déduit pas d'une absence de ligne).
  * L710 (issue #55) : les runs vivants de `cadence run` comptent dans les sessions en cours et dans les créneaux pris, et la ligne les nomme.
  */
-export function slotsLine(cap = DEFAULT_MAX_SESSIONS, now = new Date()): { line: string; free: number } {
+export function slotsLine(cap = DEFAULT_MAX_SESSIONS, now = new Date(), setting = cap): { line: string; free: number } {
   const home = cadenceHome();
   const holds = liveHolds(home, now);
   const runs = liveRuns(home);
   const free = freeSlots(liveWaves(home), cap, outsideSessions(home, now)); // la somme des vagues, pas une copie : une source ajoutée là s'affiche ici
   const run = runs.length ? ` · runs cadence run : ${runs.length} (${runs.map((r) => `${basename(r.repo)} ${r.id}`).join(', ')})` : '';
   const lead = holds.length ? ` · sessions du lead : ${holds.length} (${holds.map((h) => h.label).join(', ')})` : '';
-  return { line: `vagues en cours : ${liveWaves(home).length} · sessions en cours : ${liveSlots(home).length + runs.length}${run}${lead} · créneaux libres : ${free} sur ${cap}`, free };
+  return { line: `vagues en cours : ${liveWaves(home).length} · sessions en cours : ${liveSlots(home).length + runs.length}${run}${lead} · créneaux libres : ${free} sur ${cap}${setting > cap ? ` (plafond du lead, réglage ${setting})` : ''}`, free };
 }
 
 /** Vagues vivantes (toutes, quel que soit leur dossier de départ), sessions du lead (L255), runs de `cadence run` (L710), créneaux libres et dépôts qu'elles tiennent. Rien sans vague, session du lead ni run. */
-export function liveLines(cap = DEFAULT_MAX_SESSIONS, now = new Date()): string[] {
+export function liveLines(cap = DEFAULT_MAX_SESSIONS, now = new Date(), setting = cap): string[] {
   const home = cadenceHome();
   const waves = liveWaves(home);
   if (waves.length === 0 && liveHolds(home, now).length === 0 && liveRuns(home).length === 0) return [];
-  const lines = [slotsLine(cap, now).line];
+  const lines = [slotsLine(cap, now, setting).line];
   for (const w of waves) lines.push(`  ${w.wave} (pid ${w.pid}, depuis ${w.started}) lancée depuis ${w.cwd} · plafond ${w.cap ?? '?'} · dépôts : ${w.repos.join(', ')}`);
   return lines;
 }
@@ -84,10 +95,10 @@ const CLEAR_SCREEN = '\x1b[H\x1b[2J';
 const DEFAULT_WATCH_INTERVAL = 10;
 
 /** Ce que `--status` montre à un instant : les vagues vivantes, puis le tableau (absent si seules les vagues vivantes comptent). */
-function statusView(args: Args, launch: string, cap: number, now: Date): { live: string[]; table?: string[]; running: boolean } {
+function statusView(args: Args, launch: string, { cap, setting }: { cap: number; setting: number }, now: Date): { live: string[]; table?: string[]; running: boolean } {
   const id = statusWave(args);
   const store = id !== undefined ? RunStore.find(launch, id) : RunStore.last(launch);
-  const live = [...liveLines(cap, now), ...expiredHoldLines(now), ...localOverdueLines((isLeadProject(launch) ? [launch] : findProjects(launch)).map((d) => gitRoot(d) ?? d), now)];
+  const live = [...liveLines(cap, now, setting), ...expiredHoldLines(now), ...localOverdueLines((isLeadProject(launch) ? [launch] : findProjects(launch)).map((d) => gitRoot(d) ?? d), now)];
   const waveLive = liveWaves(cadenceHome()).length > 0;
   if (!store && live.length && id === undefined) return { live, running: waveLive };
   if (!store) throw new RafError(id !== undefined ? `vague inconnue : ${id}` : 'aucune vague dans ce dossier');
@@ -132,7 +143,7 @@ export function onceAuth(deps: OrchestrateDeps): OrchestrateDeps {
 /** `--status` (L395) : le tableau des vagues vivantes et de la vague suivie, une fois ou rafraîchi avec `--watch` jusqu'à ce que plus rien ne tourne. */
 export async function statusCommand(args: Args, io: OrchestrateIo, deps: OrchestrateDeps, launch: string): Promise<number> {
   maxSessions(args, io); // une valeur invalide est refusée ici aussi
-  const view = () => statusView(args, launch, configuredCap(io.env, args.maxSessions), io.now());
+  const view = () => statusView(args, launch, shownCap(io.env, args.maxSessions), io.now());
   if (!args.watch) {
     const { live, table } = view();
     printStatus(io, live, table); // sans identifiant (pas de tableau) : les vagues vivantes suffisent

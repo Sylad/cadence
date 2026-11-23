@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { chercherFuites, reglesDuBras } from '../src/bench/fuites.js';
 import { lectureReferences } from '../src/sequence/mesures.js';
-import { ecritureBash } from '../hooks/lecture.mjs';
+import { commandeLue, ecritureBash } from '../hooks/lecture.mjs';
 import { dossierTemp } from './temp.js';
 
 // Le vrai script du hook, lancé comme Claude Code le lance : JSON sur stdin, liste des pièces dans l'environnement (R31),
@@ -271,6 +271,63 @@ describe('L808 : lecture hors du clone refusée au banc, avec la règle du déte
       const certaine = chercherFuites([appel(name, input)], regles, home, m.clone).certaines.length > 0;
       expect([name, input, hook(outilE(m, name, input), borne(m, [m.doc])).code]).toEqual([name, input, certaine ? 2 : 0]);
     }
+  });
+  // Revue L808 r1 (M1) : 128 fichiers de maritime-atlas (source du clone aether) citent ~/projects ; les écrire, les chercher ou le dire dans un
+  // message de commit n'est pas une lecture hors du clone.
+  it('revue r1 : un texte écrit ou un motif qui cite ~/projects passe (Write, Edit, Grep, commit, heredoc, echo, grep) ; la lecture reste refusée', () => {
+    const m = monde(); m.ecrire([]);
+    const home = join(m.r, 'home'), regles = reglesDuBras(home, m.r, 'b', m.clone), f = join(m.clone, 'docs', 'a.md');
+    const passent: [string, object][] = [
+      ['Write', { file_path: f, content: 'Sources : ~/projects/developpeur/maritime-atlas/qa\n' }],
+      ['Edit', { file_path: f, old_string: 'cd ~/projects/developpeur', new_string: `cd ${projets(m)}/developpeur/maritime-atlas` }],
+      ['MultiEdit', { file_path: f, edits: [{ old_string: '~/projects/x', new_string: '~/projects/y' }] }],
+      ['Grep', { pattern: '~/projects/developpeur', path: m.clone }], ['Grep', { pattern: `${projets(m)}/developpeur`, glob: '*.md' }],
+      ['Glob', { pattern: 'docs/**/*.md' }],
+      ['Bash', { command: 'git add -A && git commit -m "docs: le chemin ~/projects/developpeur ; suite" && git log -1', description: 'commit qui cite ~/projects/x' }],
+      ['Bash', { command: `git commit -qm "$(cat <<'EOF'\nfix: ne lit plus ~/projects/developpeur\n\n${projets(m)}/x cité\nEOF\n)"` }],
+      ['Bash', { command: `cat > docs/b.md <<EOF\nVoir ~/projects/developpeur/maritime-atlas\nEOF` }],
+      ['Bash', { command: 'echo "voir ~/projects/developpeur" >> docs/a.md; printf \'%s\\n\' \'~/projects/x\' > docs/c.md' }],
+      ['Bash', { command: 'grep -rn "~/projects/developpeur" docs | head; rg -l -e \'~/projects\' src' }],
+    ];
+    for (const [name, input] of passent) {
+      expect([name, input, hook(outilE(m, name, input), borne(m)).code]).toEqual([name, input, 0]);
+      expect([name, input, chercherFuites([appel(name, input)], regles, home, m.clone).certaines]).toEqual([name, input, []]); // le détecteur suit la même règle
+    }
+    const refuses: [string, object][] = [
+      ['Read', { file_path: join(projets(m), 'developpeur', 'a.md') }], ['Read', { file_path: '~/projects/developpeur/a.md' }],
+      ['Edit', { file_path: join(projets(m), 'developpeur', 'a.md'), old_string: 'a', new_string: 'b' }],
+      ['Grep', { pattern: 'x', path: '../../home/projects' }], ['Glob', { pattern: `${projets(m)}/**/*.ts` }], ['Glob', { pattern: '**/*.ts', path: '~/projects' }],
+      ['Bash', { command: 'git commit -m "x" && cat ~/projects/developpeur/a.md' }], ['Bash', { command: 'git commit -m "$(cat ~/projects/developpeur/a.md)"' }],
+      ['Bash', { command: 'grep -rn motif ~/projects/developpeur' }], ['Bash', { command: 'grep -e motif ~/projects/developpeur/a.md' }],
+      ['Bash', { command: 'echo "$(cat ~/projects/developpeur/a.md)"' }], ['Bash', { command: 'cat <<EOF | bash\nls ~/projects/developpeur\nEOF' }],
+      ['Bash', { command: `python3 - <<'EOF'\nprint(open('${projets(m)}/developpeur/a.md').read())\nEOF` }],
+    ];
+    for (const [name, input] of refuses) {
+      expect([name, input, hook(outilE(m, name, input), borne(m)).code]).toEqual([name, input, 2]);
+      expect([name, input, chercherFuites([appel(name, input)], regles, home, m.clone).certaines.length > 0]).toEqual([name, input, true]);
+    }
+  });
+  it('revue r1 : commandeLue ne retire que les textes écrits', () => {
+    expect(commandeLue('git commit -am "a ; b" && ls x').replace(/ +/g, ' ')).toBe('git commit -am && ls x');
+    expect(commandeLue('git checkout -m "a b"')).toBe('git checkout -m "a b"'); // pas un message
+    expect(commandeLue('echo ~/projects "x y" $HOME').replace(/ +/g, ' ')).toBe('echo ~/projects $HOME'); // sans guillemets : le shell le développe, gardé
+    expect(commandeLue('grep -f motifs.txt a/b')).toBe('grep -f motifs.txt a/b');
+    expect(commandeLue('cat a | grep -v x/y z/t').replace(/ +/g, ' ')).toBe('cat a | grep -v z/t');
+    expect(commandeLue('node - <<EOF\nrequire("/a/b")\nEOF')).toContain('/a/b');
+    expect(commandeLue('tee x.md <<EOF\n/a/b\nEOF')).not.toContain('/a/b');
+  });
+  // Revue L808 r1 (2) : en séquence, les règles de l'étape (reglesEtape) arrivent par CADENCE_LECTURE_ZONES ; le test « même règle » sur une vraie
+  // séquence est dans passage.test.ts (« L808 : en séquence… »).
+  it('revue r1 : CADENCE_LECTURE_ZONES ajoute des zones permises et refusées ; illisible = refus', () => {
+    const m = monde(); m.ecrire([]);
+    const seq = join(m.r, 'sequences', 's1'), z = (o: object) => ({ ...borne(m), CADENCE_LECTURE_ZONES: JSON.stringify(o) });
+    const zones = { autorises: [join(seq, 'etapes', '1')], certains: [join(m.r, 'sequences'), join(m.r, 'run', 'etape-1.c2.json')] };
+    permis(hook(outilE(m, 'Read', { file_path: join(seq, 'etapes', '2', 'demande.md') }), borne(m))); // sans zones : règle du banc court
+    refuse(hook(outilE(m, 'Read', { file_path: join(seq, 'etapes', '2', 'demande.md') }), z(zones)), /hors de ton dépôt/);
+    permis(hook(outilE(m, 'Read', { file_path: join(seq, 'etapes', '1', 'demande.md') }), z(zones)));
+    refuse(hook(outilE(m, 'Bash', { command: 'cat ../etape-1.c2.json' }), z(zones)), /hors de ton dépôt/);
+    refuse(hook(outilE(m, 'Read', { file_path: join(m.clone, 'a.ts') }), { ...borne(m), CADENCE_LECTURE_ZONES: '{"autorises":"x"}' }), /CADENCE_LECTURE_ZONES/);
+    refuse(hook(outilE(m, 'Read', { file_path: join(m.clone, 'a.ts') }), { ...borne(m), CADENCE_LECTURE_ZONES: 'non' }), /CADENCE_LECTURE_ZONES/);
   });
   it('réglages du bras : le hook voit aussi Read, Glob et Grep', () => {
     const s = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'briefs', 'settings-sequence-v2.json'), 'utf8'));

@@ -4,7 +4,9 @@
 // (hooks/lecture.mjs), sous-agents compris. Liste par l'environnement fixé au lancement : CADENCE_CLONE, CADENCE_PIECES (JSON), CADENCE_BANC_RACINE.
 // Refuse toujours : réglages de Claude Code, dossier du banc hors du clone, code de ce hook. Fermé : absence, illisible ou exception = refus.
 // L808 : au banc (CADENCE_LECTURE_BORNEE = id du banc, posé par lancerBras, jamais par cadence run), refuse aussi tout appel (Read, Glob, Grep, Bash, écritures)
-// qui cite un chemin que le détecteur de fuites compterait comme fuite certaine (même règle : classer de lecture.mjs).
+// qui LIT un chemin que le détecteur de fuites compterait comme fuite certaine (même règle : cheminsCites et classer de lecture.mjs — champs de chemin et
+// commande Bash, jamais un contenu écrit, un motif ou un message de commit). En séquence, CADENCE_LECTURE_ZONES (JSON { autorises, certains }) porte les
+// règles de l'étape (reglesEtape : demandes et pièces déjà jouées permises ; reste de la séquence et mesures de l'autre bras refusés).
 import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
@@ -50,13 +52,22 @@ function piecesDe(env) {
   return Array.isArray(pieces) && pieces.every((p) => typeof p === 'string') ? pieces : null;
 }
 
-/** L808 : au banc, raison du refus d'un appel qui cite un chemin hors du clone compté fuite certaine, ou null. Règles du détecteur (reglesDuBras, le banc
- * étant CADENCE_LECTURE_BORNEE), les pièces du bras en plus des chemins autorisés. */
+/** L808 : zones de l'étape d'une séquence (CADENCE_LECTURE_ZONES) : absente = aucune ; illisible = null (refus). */
+function zonesDe(env) {
+  if (env.CADENCE_LECTURE_ZONES === undefined || env.CADENCE_LECTURE_ZONES === '') return { autorises: [], certains: [] };
+  let z;
+  try { z = JSON.parse(env.CADENCE_LECTURE_ZONES); } catch { return null; }
+  const liste = (v) => Array.isArray(v) && v.every((p) => typeof p === 'string');
+  return z && liste(z.autorises) && liste(z.certains) ? z : null;
+}
+
+/** L808 : au banc, raison du refus d'un appel qui lit un chemin hors du clone compté fuite certaine, ou null. Règles du détecteur (reglesDuBras, le banc
+ * étant CADENCE_LECTURE_BORNEE ; en séquence, plus les zones de l'étape), les pièces du bras en plus des chemins autorisés. */
 export function lectureHorsClone(e, env) {
-  const clone = env.CADENCE_CLONE, racine = env.CADENCE_BANC_RACINE, home = env.HOME, pieces = piecesDe(env), banc = env.CADENCE_LECTURE_BORNEE;
-  if (!clone || !racine || !home || !pieces || !/^[^/]+$/.test(banc ?? '') || banc === '..') return 'Appel refusé : CADENCE_CLONE, CADENCE_BANC_RACINE, HOME, CADENCE_PIECES ou CADENCE_LECTURE_BORNEE absent ou illisible, les limites du bras sont introuvables.';
-  const r = { autorises: [clone, `${clone}.captures`, `${clone}.question.md`, `${clone}.install.log`, `${clone}.tests-base.log`, join(racine, 'bancs', banc), dossierTranscripts(home, clone), ...pieces],
-    certains: zonesCertaines(home, racine), runs: join(racine, 'runs') };
+  const clone = env.CADENCE_CLONE, racine = env.CADENCE_BANC_RACINE, home = env.HOME, pieces = piecesDe(env), banc = env.CADENCE_LECTURE_BORNEE, zones = zonesDe(env);
+  if (!clone || !racine || !home || !pieces || !zones || !/^[^/]+$/.test(banc ?? '') || banc === '..') return 'Appel refusé : CADENCE_CLONE, CADENCE_BANC_RACINE, HOME, CADENCE_PIECES, CADENCE_LECTURE_BORNEE ou CADENCE_LECTURE_ZONES absent ou illisible, les limites du bras sont introuvables.';
+  const r = { autorises: [clone, `${clone}.captures`, `${clone}.question.md`, `${clone}.install.log`, `${clone}.tests-base.log`, join(racine, 'bancs', banc), dossierTranscripts(home, clone), ...pieces, ...zones.autorises],
+    certains: [...zonesCertaines(home, racine), ...zones.certains], runs: join(racine, 'runs') };
   for (const p of cheminsCites(e?.tool_name ?? '', e?.tool_input, e?.cwd, clone, home)) {
     const k = classer(p, r);
     if (k?.classe === 'certaine') return `Appel refusé : il lit hors de ton dépôt (${k.chemin}). Reste dans ${clone} : ce qui te manque se cherche dans le clone. `

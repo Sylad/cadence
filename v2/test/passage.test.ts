@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -151,6 +151,35 @@ describe('passage d\'une séquence', () => {
     expect(res!.etapes.C.map((e) => e.fuites.filter((f) => f.startsWith('contournement')).length)).toEqual([0, 1, 0]);
     expect(res!.etapes.A.every((e) => e.fuites.length === 0)).toBe(true);
     expect(statSync(dir('c2.reglages')).mode & 0o777).toBe(0o700); // rendu effaçable en fin de séquence
+  });
+
+  // Revue L808 r1 (2) : le hook du bras reçoit les règles de l'étape (reglesEtape) ; sur une vraie séquence, il refuse si et seulement si le détecteur
+  // de la séquence compte une fuite certaine.
+  it('L808 : en séquence, même règle — le hook, avec l\'environnement que la séquence donne au bras, refuse ce que le détecteur de l\'étape compte', () => {
+    const { r, d } = racine();
+    const settings = join(r, 'settings.json'); writeFileSync(settings, '{"hooks":{}}');
+    writeFileSync(join(r, 'bras.yaml'), `A:\n  modele: opus\n  brief: ${join(r, 'brief-A.md')}\nC:\n  modele: opus\n  brief: ${join(r, 'brief-C.md')}\n  settings: ${settings}\n`);
+    const dir = (x: string) => join(r, 'runs', '2026-11-08-1100-e1', 's1', x), c2 = dir('c2');
+    const cas: [string, object][] = [
+      ['Read', { file_path: join(d, 'etapes', '3', 'demande.md') }], // le reste de la séquence
+      ['Read', { file_path: join(d, 'sequence.yaml') }],
+      ['Read', { file_path: join(d, 'etapes', '2', 'demande.md') }], ['Read', { file_path: join(d, 'etapes', '1', 'pieces', 'fig.png') }], // déjà joués : permis
+      ['Bash', { command: `cat ${dir('etape-1.c1.json')}` }], ['Read', { file_path: dir('suite-1.c1.json') }], // mesures de l'autre bras
+      ['Read', { file_path: dir('etape-1.c2.json') }], // ses propres mesures
+      ['Write', { file_path: join(c2, 'src', 'n.js'), content: `// voir ${join(d, 'etapes', '3')} et ~/projects/x` }], ['Grep', { pattern: join(r, 'sequences'), path: c2 }],
+      ['Read', { file_path: join(r, 'secrets', 'sequences', 's1', 'c2.ts') }],
+    ];
+    let envC2: NodeJS.ProcessEnv = {};
+    const { exec: base } = faux(r, d, { C2: (_c, ecrire) => ecrire(cas.map(([n, i]) => outil(n, i))) });
+    const exec: Executeur = (args, o) => { if (/BRAS-C\ndemande 2/.test(args[args.indexOf('-p') + 1])) envC2 = o.env; return base(args, o); };
+    const fuites = passageSequence(opts(r, exec)).etapes.C[1].fuites;
+    expect(JSON.parse(envC2.CADENCE_LECTURE_ZONES ?? '{}').certains).toContain(join(r, 'sequences'));
+    const hook = (name: string, input: object) => spawnSync('node', [join(import.meta.dirname, '..', 'hooks', 'lecture-obligatoire.mjs')],
+      { input: JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: name, tool_input: input, cwd: c2 }), encoding: 'utf8', env: { ...envC2, HOME: r } as NodeJS.ProcessEnv }).status;
+    const chemin = (i: object) => { const v = i as { file_path?: string; command?: string }; return v.file_path ?? v.command?.split(' ')[1] ?? ''; };
+    const attendu = cas.map(([n, i]) => [n, chemin(i), fuites.includes(chemin(i)) ? 2 : 0]);
+    expect(cas.map(([n, i]) => [n, chemin(i), hook(n, i)])).toEqual(attendu);
+    expect(attendu.map((x) => x[2])).toEqual([2, 2, 0, 0, 2, 2, 0, 0, 0, 2]);
   });
 
   it('L690 : l\'étape k d\'un bras « suite » reprend la dernière session de l\'étape k-1 ; sa mesure ne garde que les lignes de l\'étape ; un bras sans suite reste en session neuve', () => {

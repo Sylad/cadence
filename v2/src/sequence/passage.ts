@@ -185,7 +185,7 @@ function reglesEtape(x: Ctx, b: string, k: number): Regles {
 function lancer(x: Ctx, e: Etape, b: string, avant: { head: string; sale: string[] }, pieces: string[]): Mesure {
   const c = x.clones[b];
   try {
-    const m = lancerBras(bancEtape(x.s, e, avant.head), x.bras[b], c, x.o.exec, x.o.horloge, { pieces, racine: x.o.racine }, x.sessions?.[b]);
+    const m = lancerBras(bancEtape(x.s, e, avant.head), x.bras[b], c, x.o.exec, x.o.horloge, { pieces, racine: x.o.racine, zones: reglesEtape(x, b, e.k) }, x.sessions?.[b]); // L808 : le hook du bras applique les règles de l'étape
     if (m.releve) (x.sessions ??= {})[b] = m.releve; // un bras « suite » reprend la session de l'étape d'avant et ne compte que l'écart à ce relevé (L703)
     m.echec ??= travailNonLivre(avant, etatGit(c));
     return m;

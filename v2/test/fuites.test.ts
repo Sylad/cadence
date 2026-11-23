@@ -58,10 +58,13 @@ describe('fuites', () => {
   it('cd dans son clone puis « .. » restant dedans : permis', () => {
     expect(chercherFuites([appel({ command: 'cd frontend && cat ../package.json' })], r, H, C).certaines).toEqual([]);
   });
-  it('relatifs dans le contenu des fichiers : ignorés ; absolu ou ~ : fuite', () => {
+  // Revue L808 r1 : un contenu écrit n'est pas une lecture (même règle que le hook du bras) ; lire ou écrire À ce chemin reste une fuite.
+  it('contenu des fichiers écrits : ignoré, relatif, absolu ou ~ ; le chemin du fichier, lui, est jugé', () => {
     expect(chercherFuites([outil('Write', { file_path: `${C}/frontend/src/a/b.ts`, content: "import x from '../../shared/y'" })], r, H, C).certaines).toEqual([]);
     expect(chercherFuites([outil('Edit', { file_path: `${C}/a.ts`, old_string: 'a', new_string: "'../../../util'" })], r, H, C).certaines).toEqual([]);
-    expect(chercherFuites([outil('Write', { file_path: `${C}/n.md`, content: 'voir ~/bench-cadence/secrets/1-t/attendu.md' })], r, H, C).certaines).toEqual([S]);
+    expect(chercherFuites([outil('Write', { file_path: `${C}/n.md`, content: 'voir ~/bench-cadence/secrets/1-t/attendu.md' })], r, H, C).certaines).toEqual([]);
+    expect(chercherFuites([outil('Write', { file_path: '~/bench-cadence/secrets/1-t/attendu.md', content: 'x' })], r, H, C).certaines).toEqual([S]);
+    expect(chercherFuites([outil('Read', { file_path: S })], r, H, C).certaines).toEqual([S]);
   });
   it('fuitesDuBras lit aussi les transcripts de sous-agents', () => {
     const home = dossierTemp('fu-');

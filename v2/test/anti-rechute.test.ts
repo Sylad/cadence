@@ -137,7 +137,7 @@ const FLAGS_CLI: Record<string, string[]> = {
 const prefixe = (k: string) => (k.startsWith('src/bench/') || k === 'src/sequence/cli.ts' || k === 'src/cli.ts' ? 'bench' : 'cadence2'); // l'aide de cli.ts et le banc séquence décrivent les options de « bench »
 // Budgets de R29 : relever un total ou un module (même sous le total) est une violation ; le baisser est permis.
 const BUDGET_R29: Record<string, { total: number; modules: Record<string, number> }> = {
-  noyau: { total: 3000, modules: { plan: 350, accueil: 200, run: 1212, porte: 250, deliver: 450, hooks: 321 } }, // R32 : hooks, mécanisme du bras candidat ; issue #57 : run 455, run.ts détassé, messages gardés à toute fin ; L722 : run 466 (+11), le départ nomme les fichiers non commités de l'arbre principal (pas de ligne tassée)
+  noyau: { total: 3000, modules: { plan: 350, accueil: 200, run: 1212, porte: 250, deliver: 450, hooks: 376 } }, // R32 : hooks, mécanisme du bras candidat ; issue #57 : run 455, run.ts détassé, messages gardés à toute fin ; L722 : run 466 (+11), le départ nomme les fichiers non commités de l'arbre principal (pas de ligne tassée)
   // L723 : run 520, rebase seul quand la cible avance pendant la porte (conflit rendu à la session, porte rejouée, arbre principal sale nommé), sans ligne tassée
   // L723 (revue, M1) : run 539, un conflit de rebase résolu est ajouté à l'état (conflits, détail de fin) et au journal sans remplacer le rapport du travail, sans ligne tassée
   // L722 (revue r1) : run 532 (-7), la lecture des fichiers non commités vient de scripts/arbre-non-commite.mjs, partagée avec src (copie retirée de run.ts)
@@ -191,6 +191,8 @@ const BUDGET_R29: Record<string, { total: number; modules: Record<string, number
   // détassés (m3 : une seule ligne de run.ts au-delà de 250 colonnes, deux avant le lot).
   // L808 : hooks 321 (+90) : cheminsCites et classer passent de bench/fuites.ts (-53) à hooks/lecture.mjs, partagés par le détecteur de fuites et le hook
   // lecture-obligatoire.mjs, qui refuse au banc toute lecture hors du clone (lectureHorsClone), sans ligne tassée.
+  // L808 (revue r1) : hooks 376 (+55) : seul ce qui est LU est jugé (commandeLue retire d'une commande Bash les textes écrits : heredoc, message de commit,
+  // echo, motif de grep ; cheminsCites ne lit que les champs de chemin) et le hook applique les zones de l'étape d'une séquence (zonesDe), sans ligne tassée.
   // L794 : run 1202 (+18) : un lot visible du plan reçoit la consigne de son entrée Nouveautés, la fin du run et --liste disent « Nouveautés manquante »
   // (logique dans scripts/nouveautes-du-run.mjs), sans ligne tassée.
   // L801 : run 1205 (+3) : l'étape analyse (clé analyse:, scripts/analyse.mjs) entre le build et les tests de la porte, contre la cible, sans ligne tassée.
@@ -304,8 +306,8 @@ const mutations: [string, string, string, (t: string) => string][] = [
   ['C4', 'total noyau relevé', 'budget.json', remplace('"total": 3000', '"total": 3500')],
   ['C4', 'budget sequence relevé', 'budget.json', remplace('"sequence": 717', '"sequence": 900')],
   ['C4', 'budget plan relevé sous le total', 'budget.json', remplace('"plan": 350', '"plan": 1000')],
-  ['C4', 'budget hooks relevé (R32)', 'budget.json', remplace('"hooks": 321', '"hooks": 400')],
-  ['C4', 'hooks déplacé dans la mesure', 'budget.json', (t) => t.replace('"deliver": 450, "hooks": 321', '"deliver": 450').replace('"sequence": 717', '"sequence": 717, "hooks": 321')],
+  ['C4', 'budget hooks relevé (R32)', 'budget.json', remplace('"hooks": 376', '"hooks": 400')],
+  ['C4', 'hooks déplacé dans la mesure', 'budget.json', (t) => t.replace('"deliver": 450, "hooks": 376', '"deliver": 450').replace('"sequence": 717', '"sequence": 717, "hooks": 376')],
   ['C4', 'module sans budget R29', 'budget.json', remplace('"bench": 1868', '"bench": 1868, "outil": 100')],
   ['C4', 'groupe de budget ajouté', 'budget.json', remplace(/\n}\s*$/, ',\n  "autre": { "total": 900, "modules": {} }\n}')],
   ['C4', "option(reste,'zzz') sans entrée", 'src/bench/cli.ts', remplace("option(reste, 'taille')", "option(reste, 'zzz')")],

@@ -110,7 +110,7 @@ export function lectures(appels, ok, pieces) {
 
 // ─── L808 : chemins cités par un appel d'outil et leur classement (fuites du banc, R21) ─────────────────────────────────────────────────────────
 // Une seule définition, partagée par le détecteur de fuites (src/bench/fuites.ts, après coup) et par le hook du bras candidat (au banc, avant
-// l'appel) : le hook refuse exactement ce que le détecteur compterait comme fuite certaine.
+// l'appel) : le hook refuse exactement ce que le détecteur compterait comme fuite certaine, avec les règles (zones) que la séquence lui passe.
 
 /** Dossier des transcripts de Claude Code pour un dossier de travail. */
 export const dossierTranscripts = (home, cwd) => join(home, '.claude', 'projects', cwd.replace(/[^A-Za-z0-9]/g, '-'));
@@ -140,22 +140,66 @@ function resoudre(tok, cwd, home, rel, cd = false) {
   return rel && (cd || t.includes('/') || t === '..' || /^c\d+/.test(t)) ? resolve(cwd, t) : null;
 }
 
-/** Chemins absolus (globs gardés) que cite un appel d'outil : toute chaîne de l'entrée, et pour Bash la commande lue avec ses chemins relatifs,
- * ses `cd` et ses accolades, plus le dossier courant. `cwd` : dossier courant de l'appel ; `depart` : dossier des chemins relatifs sans cwd. */
+// Revue L808 r1 (M1) : seul ce qui est LU compte. Un texte écrit (content d'un Write, old_string d'un Edit, motif d'un Grep, message de commit, corps
+// d'un heredoc donné à cat) qui cite un chemin n'ouvre pas ce chemin : 128 fichiers de maritime-atlas citent ~/projects, les éditer n'est pas une fuite.
+const CHAMPS_CHEMIN = ['file_path', 'path', 'notebook_path'];
+const INTERPRETE = /(^|[\s;&|(])(python[\d.]*|node|bash|sh|zsh|perl|ruby|deno|bun|tsx|ts-node|psql|sqlite3|awk|sed)(?![\w.-])/;
+
+/** La commande Bash sans ses textes écrits (remplacés par des espaces) : corps d'un heredoc dont la ligne ne lance pas d'interprète (un script donné à
+ * python, node, bash… est du code, gardé), message de `git commit|tag|merge|revert|notes|stash -m`, arguments entre guillemets de echo et printf, motif
+ * de grep et rg. Un mot qui porte `$(` ou un accent grave est gardé (il exécute une commande). Dans le doute : gardé. */
+export function commandeLue(cmd) {
+  const t = String(cmd).replace(/^([^\n]*<<-?\s*['"]?(\w+)['"]?[^\n]*)\n[\s\S]*?\n\s*\2(?=\n|$)/gm, (tout, tete) => (INTERPRETE.test(tete) ? tout : tete));
+  const effaces = [], effacer = (m) => { if (m && !/\$\(|`/.test(m.s)) effaces.push(m); };
+  let mots = [];
+  const finir = () => {
+    while (/^\w+=/.test(mots[0]?.s ?? '')) mots.shift();
+    const [c, ...args] = mots, nom = c?.s.replace(/^.*\//, '');
+    mots = [];
+    if (nom === 'git' && args.some((a) => /^(commit|tag|merge|revert|notes|stash)$/.test(a.s)))
+      args.forEach((a, k) => { if (/^--message=/.test(a.s)) effacer(a); else if (/^(-[a-zA-Z]*m|--message)$/.test(a.s)) effacer(args[k + 1]); });
+    else if (nom === 'echo' || nom === 'printf') args.filter((a) => /^['"]/.test(a.s)).forEach(effacer);
+    else if (/^([ef]?grep|rg)$/.test(nom ?? '')) {
+      args.forEach((a, k) => { if (/^--regexp=/.test(a.s)) effacer(a); else if (/^(-[a-zA-Z]*e|--regexp)$/.test(a.s)) effacer(args[k + 1]); });
+      if (!args.some((a) => /^(-[a-zA-Z]*[ef]|--regexp|--file)$|^--(regexp|file)=/.test(a.s))) effacer(args.find((a) => !a.s.startsWith('-'))); // sans -e ni -f : le premier nom est le motif
+    }
+  };
+  for (let i = 0; i < t.length;) {
+    if (/[\n;|&()]/.test(t[i])) { finir(); i++; continue; }
+    if (/\s/.test(t[i])) { i++; continue; }
+    const d = i;
+    for (let q = ''; i < t.length; i++) {
+      const x = t[i];
+      if (q) { if (x === '\\' && q === '"') i++; else if (x === q) q = ''; }
+      else if (x === '\'' || x === '"') q = x;
+      else if (x === '\\') i++;
+      else if (/[\s;|&()]/.test(x)) break;
+    }
+    mots.push({ d, f: i, s: t.slice(d, i) });
+  }
+  finir();
+  return effaces.reduce((r, m) => r.slice(0, m.d) + ' '.repeat(m.f - m.d) + r.slice(m.f), t);
+}
+
+/** Chemins absolus (globs gardés) que LIT un appel d'outil : ses champs de chemin (file_path, path, notebook_path ; le motif d'un Glob, depuis son
+ * `path`), relatifs au dossier courant, et pour Bash le dossier courant et la commande sans ses textes écrits (commandeLue), avec ses chemins relatifs,
+ * ses `cd` et ses accolades. Jamais un contenu écrit ni un motif de recherche. `cwd` : dossier courant de l'appel ; `depart` : à défaut de cwd. */
 export function* cheminsCites(name, input, cwd, depart, home) {
-  const abs = typeof cwd === 'string' && isAbsolute(cwd);
-  if (name === 'Bash' && abs) yield resolve(cwd);
-  const cmd = input?.command;
-  const sources = [...[...textes(input)].map((t) => [t, false]), ...(name === 'Bash' && typeof cmd === 'string' ? [[cmd, true]] : [])];
-  for (const [texte, rel] of sources) {
-    let dir = rel && abs ? cwd : depart;
-    for (const seg of texte.replace(/\$\{HOME\}/g, '$HOME').split(/&&|\|\||;|\n/)) {
-      for (const v of accolades(seg)) {
-        const cd = rel ? /^\s*cd\s+(\S+)/.exec(v) : null;
-        const cible = cd ? resoudre(cd[1].replace(/^['"]|['"]$/g, ''), dir, home, true, true) : null;
-        for (const tok of v.split(/[\s'"`|&<>(){}=]+/)) { const p = resoudre(tok, dir, home, rel); if (p) yield p; }
-        if (cible) { yield cible; dir = cible; }
-      }
+  const abs = typeof cwd === 'string' && isAbsolute(cwd), base = abs ? cwd : depart;
+  const absolu = (v, d) => (/^(~|\$HOME)(\/|$)/.test(v) ? resolve(home, v.replace(/^(~|\$HOME)\/?/, '')) : resolve(d, v));
+  const champ = (k) => (typeof input?.[k] === 'string' && input[k] ? input[k] : null);
+  for (const k of CHAMPS_CHEMIN) if (champ(k)) yield absolu(champ(k), base);
+  if (name === 'Glob' && champ('pattern')) yield absolu(champ('pattern'), champ('path') ? absolu(champ('path'), base) : base);
+  if (name !== 'Bash') return;
+  if (abs) yield resolve(cwd);
+  if (typeof input?.command !== 'string') return;
+  let dir = base;
+  for (const seg of commandeLue(input.command).replace(/\$\{HOME\}/g, '$HOME').split(/&&|\|\||;|\n/)) {
+    for (const v of accolades(seg)) {
+      const cd = /^\s*cd\s+(\S+)/.exec(v);
+      const cible = cd ? resoudre(cd[1].replace(/^['"]|['"]$/g, ''), dir, home, true, true) : null;
+      for (const tok of v.split(/[\s'"`|&<>(){}=]+/)) { const p = resoudre(tok, dir, home, true); if (p) yield p; }
+      if (cible) { yield cible; dir = cible; }
     }
   }
 }

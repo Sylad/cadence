@@ -110,6 +110,8 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // pretAPasser), et une relance qui ne démarre pas ou qu'un signal arrête note sa cause, sans ligne tassée.
   // L808 : hooks 321 (+90) : cheminsCites et classer passent de bench/fuites.ts (-53) à hooks/lecture.mjs, partagés par le détecteur de fuites et le hook
   // lecture-obligatoire.mjs, qui refuse au banc toute lecture hors du clone (lectureHorsClone), sans ligne tassée.
+  // L808 (revue r1) : hooks 376 (+55) : seul ce qui est LU est jugé (commandeLue retire d'une commande Bash les textes écrits : heredoc, message de commit,
+  // echo, motif de grep ; cheminsCites ne lit que les champs de chemin) et le hook applique les zones de l'étape d'une séquence (zonesDe), sans ligne tassée.
   it('les totaux sont ceux de R29 : noyau 3000, mesure 2585 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742, L752, L756, L762, L775, L777, L798, L804)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
     expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2585]);

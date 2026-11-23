@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { executerRun, repondreRun, type Etat } from '../src/run/run.js';
 import { commite, depot, fauxClaude, git, io } from './run-outils.js';
 
@@ -22,6 +22,16 @@ describe('cadence run', () => {
     expect(env.CADENCE_CLONE).toBe(e.worktree);
     expect(JSON.parse(env.CADENCE_PIECES ?? '[]')).toEqual([join(e.worktree, 'cadence.yaml')]);
     expect(l.join('\n')).toMatch(/D-1 ouverte : pour plus tard : un export/);
+  });
+
+  // Revue L808 r1 (3) : un cadence run lancé depuis un bras de banc (ou une session qui en porte la garde) n'hérite pas de la borne de lecture du banc.
+  it('L808 : la session n\'hérite ni de CADENCE_LECTURE_BORNEE ni de CADENCE_LECTURE_ZONES', () => {
+    const repo = depot(), appels: { args: string[]; env: NodeJS.ProcessEnv }[] = [];
+    vi.stubEnv('CADENCE_LECTURE_BORNEE', 'banc-parent'); vi.stubEnv('CADENCE_LECTURE_ZONES', '{"autorises":[],"certains":["/x"]}');
+    let e: ReturnType<typeof executerRun>;
+    try { e = executerRun({ repo, demande: 'Crée fait.txt', exec: fauxClaude([commite('fait.txt')], appels), out: () => {} }); } finally { vi.unstubAllEnvs(); }
+    expect(appels.length).toBeGreaterThan(0);
+    for (const a of appels) { expect(a.env.CADENCE_LECTURE_BORNEE).toBeUndefined(); expect(a.env.CADENCE_LECTURE_ZONES).toBeUndefined(); expect(a.env.CADENCE_CLONE).toBe(e!.worktree); }
   });
 
   it('porte rouge : la même session est reprise une fois avec la sortie de la porte, puis intégration', () => {

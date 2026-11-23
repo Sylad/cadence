@@ -184,8 +184,8 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false, sujet?: string
   if (!neuve) retirerRegenerations(e.worktree, e.id, e.base); // L781 (revue r1, M2) : la session ne travaille jamais par-dessus la régénération (rien pendant un rebase en cours)
   const exec = o.exec ?? creerExecuteur('claude', 4 * 3600_000);
   // L699 : le modèle est celui du lancement, gardé dans l'état (une reprise par --reponse ne le change pas) ; un état d'avant L699 n'en a pas : opus.
-  // orchestrate.prodAccess (comme les vagues de la v1) : sans lui, ni kubectl, ni helm, ni KUBECONFIG ; avec lui, la session joue le banc du projet
-  const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !LIEN_HOTE.test(k) && k !== 'CADENCE_RUN_JOURNAL' && k !== 'CADENCE_RUN_ID')), CADENCE_CLONE: e.worktree, CADENCE_PIECES: JSON.stringify(e.pieces), CADENCE_BANC_RACINE: dossierRuns(e.repo), ...(e.acces_cluster ? {} : { KUBECONFIG: '/dev/null' }) };
+  // orchestrate.prodAccess (comme les vagues de la v1) : sans lui, ni kubectl, ni helm, ni KUBECONFIG ; avec lui, la session joue le banc du projet ; L808 (revue r1) : jamais la garde de lecture d'un bras de banc (CADENCE_LECTURE_BORNEE, _ZONES), un run lit ses pièces hors du worktree
+  const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !LIEN_HOTE.test(k) && !/^CADENCE_(RUN_JOURNAL|RUN_ID|LECTURE_BORNEE|LECTURE_ZONES)$/.test(k))), CADENCE_CLONE: e.worktree, CADENCE_PIECES: JSON.stringify(e.pieces), CADENCE_BANC_RACINE: dossierRuns(e.repo), ...(e.acces_cluster ? {} : { KUBECONFIG: '/dev/null' }) };
   const coupes = e.acces_cluster ? OUTILS_INTERDITS.filter((x) => !/kubectl|helm/.test(x)) : OUTILS_INTERDITS;
   const interdits = e.spec_check ? interditsPourSpec(coupes) : coupes; // L792 : cadence spec check, nommée par le brief, reste permise
   e.passes = [...(e.passes ?? []), { quoi: quoiPasse(e, neuve, sujet), modele: e.modele ?? 'opus', raison: e.modele_raison ?? (e.modele ? 'choisi au lancement' : 'par défaut') }]; // L726

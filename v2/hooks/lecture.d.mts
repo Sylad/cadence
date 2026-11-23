@@ -16,5 +16,6 @@ export interface ReglesFuites { autorises: string[]; certains: string[]; runs: s
 export declare const dossierTranscripts: (home: string, cwd: string) => string;
 export declare const zonesCertaines: (home: string, racine: string) => string[];
 export declare function textes(v: unknown): Generator<string>;
+export declare function commandeLue(cmd: string): string;
 export declare function cheminsCites(name: string, input: unknown, cwd: string | undefined, depart: string, home: string): Generator<string>;
 export declare function classer(p: string, r: ReglesFuites): { chemin: string; classe: 'certaine' | 'a_verifier' } | null;

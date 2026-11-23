@@ -19,9 +19,9 @@ const lu = (input: object, erreur = false) => { const id = `t${++n}`; return [ap
 /** PDF minimal de `pages` pages (objets /Type /Page comptés quand pdfinfo est absent ou refuse le fichier). */
 const pdf = (pages: number) => `%PDF-1.4\n1 0 obj << /Type /Pages /Count ${pages} >> endobj\n${Array.from({ length: pages }, (_, i) => `${i + 2} 0 obj << /Type /Page >> endobj`).join('\n')}\n%%EOF\n`;
 
-function monde() {
+function monde(...place: string[]) {
   const r = dossierTemp('hook-lecture-');
-  const clone = join(r, 'run', 'c1'); mkdirSync(join(clone, 'src'), { recursive: true });
+  const clone = join(r, ...(place.length ? place : ['run', 'c1'])); mkdirSync(join(clone, 'src'), { recursive: true });
   const ref = join(r, 'ref'); mkdirSync(ref);
   const doc = join(ref, 'norme.md'), fig = join(ref, 'fig.png'), long = join(ref, 'long.md'), p40 = join(ref, 'p40.pdf');
   writeFileSync(doc, 'n\n'); writeFileSync(fig, 'p'); writeFileSync(long, 'l\n'.repeat(2500)); writeFileSync(p40, pdf(40));
@@ -325,12 +325,12 @@ describe('L808 : lecture hors du clone refusée au banc, avec la règle du déte
   // L817 (revue L808 r3) : un echo n'est effacé que si sa sortie va à un fichier ou à un filtre qui ne lit pas (tee, sort…), jamais dans $(…) ou un
   // sous-shell ; ~ et $HOME seuls, les globs, cd puis nom relatif et les commandes récursives sont jugés ; l'argument d'une option n'est pas le motif.
   it('L817 : echo lu par sh, while read, parallel, $(…), sous-shell ; find ~, ls ~/proj*, cd puis nom relatif : refusés et comptés', () => {
-    const m = monde(); m.ecrire([]);
+    const m = monde('runs', 'P1', 'b', 'c1'); m.ecrire([]); mkdirSync(join(m.clone, '..', 'c2', 'src'), { recursive: true }); // clone et frère c2 comme au banc
     const home = join(m.r, 'home'), regles = reglesDuBras(home, m.r, 'b', m.clone), P = projets(m);
     const passent: [string, object][] = [
       ['Bash', { command: `grep -m 1 ${P}/x notes.md` }], ['Bash', { command: `grep -A 3 -B2 "${P}/x" docs/a.md` }], ['Bash', { command: `rg -g "*.md" -t md ${P}/x src` }],
       ['Bash', { command: `echo "${P}/x" | tee -a notes.md` }], ['Bash', { command: `printf '%s\\n' "${P}/x" | sort | uniq | head -1 >> notes.md` }],
-      ['Bash', { command: 'ls ~/.cache ~/.npm; find . -name playwright; grep -rn x .. ; cd ~/.cache && ls' }], ['Grep', { pattern: 'x', path: join(m.clone, 'src') }],
+      ['Bash', { command: 'ls ~/.cache ~/.npm; find . -name playwright; grep -rn x . ; cd ~/.cache && ls' }], ['Grep', { pattern: 'x', path: join(m.clone, 'src') }],
       ['Bash', { command: 'tr / _ < a.txt; ls ~' }], ['Glob', { pattern: '**/*.ts' }],
     ];
     for (const [name, input] of passent) {
@@ -346,6 +346,9 @@ describe('L808 : lecture hors du clone refusée au banc, avec la règle du déte
       ['Bash', { command: 'cd ~ && find . -name playwright' }], ['Bash', { command: 'rg -l playwright ~' }], ['Bash', { command: 'grep -rl x $HOME' }],
       ['Bash', { command: 'ls -R ~ | grep playwright' }], ['Bash', { command: 'du -sh /' }], ['Bash', { command: 'ls projects', }, ],
       ['Grep', { pattern: 'playwright', path: '~' }], ['Glob', { pattern: '**/playwright', path: '~' }], ['Glob', { pattern: '~/p*/developpeur' }],
+      // revue L817 r1 : « .. » nu (clone voisin c2 du même banc)
+      ['Bash', { command: 'find .. -name playwright' }], ['Bash', { command: 'grep -r playwright ..' }], ['Bash', { command: 'grep -rn x ..' }],
+      ['Bash', { command: 'rg x ..' }], ['Bash', { command: 'du -sh ..' }], ['Bash', { command: 'cd .. && cat c2/src/main.ts' }],
     ];
     for (const [name, input] of refuses) {
       const cwd = name === 'Bash' && (input as { command: string }).command === 'ls projects' ? home : m.clone; // dossier courant déjà dans ~ (cd d'un appel précédent)

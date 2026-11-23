@@ -132,13 +132,13 @@ function accolades(t) {
   const m = /^(.*?)\{([^{}$]*,[^{}]*)\}(.*)$/s.exec(t);
   return m ? m[2].split(',').flatMap((x) => accolades(m[1] + x + m[3])) : [t];
 }
-// Chemin absolu du jeton (~, $HOME, absolu, « . », ou relatif à cwd s'il contient « / » ou « .. »), sinon null.
+// Chemin absolu du jeton (~, $HOME, absolu, « . » ou « .. », ou relatif à cwd s'il contient « / » ou « .. »), sinon null.
 function resoudre(tok, cwd, home, rel, cd = false) {
-  if (rel && /^\.\/?$/.test(tok)) return resolve(cwd);
+  if (rel && /^\.\.?\/?$/.test(tok)) return resolve(cwd, tok); // revue L817 r1 : « .. » aussi, que le retrait du point final effacerait
   const t = tok.replace(/(?<![./])\.+$/, '').replace(/[,:]+$/, '');
   if (/^(~|\$HOME)(\/|$)/.test(t)) return resolve(home, t.replace(/^(~|\$HOME)\/?/, ''));
   if (t.startsWith('/')) return resolve(t);
-  return rel && (cd || t.includes('/') || t === '..' || /^c\d+/.test(t)) ? resolve(cwd, t) : null;
+  return rel && (cd || t.includes('/') || /^c\d+/.test(t)) ? resolve(cwd, t) : null;
 }
 /** L817 : commande qui lit récursivement ses dossiers (find ~ lit ~/projects) ; son dossier courant si elle n'en nomme aucun. */
 const recursive = (nom, etape) => /^(find|fd|fdfind|tree|du|rg|ag|ack|tar|rsync)$/.test(nom)

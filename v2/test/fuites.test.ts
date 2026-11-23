@@ -85,6 +85,10 @@ describe('fuites', () => {
     expect(cert('grep -m 1 ~/projects/x notes.md')).toEqual([]);
     expect(cert('grep -r x ../..')).toEqual([`${H}/bench-cadence/runs/r1`]); // lit tous les clones du run (c2 compris) ; grep -r x . reste dans le clone
     expect(cert('grep -r x . && rg y')).toEqual([]);
+    // revue L817 r1 : « .. » nu se résout comme « . » ; il lit le banc, donc le clone voisin c2
+    expect(cert('grep -r x ..')).toEqual([`${H}/bench-cadence/runs/r1/1-t`]);
+    expect(cert('find .. -name playwright')).toEqual([`${H}/bench-cadence/runs/r1/1-t`]);
+    expect(cert('cd .. && cat c2/src/main.ts')).toEqual([`${H}/bench-cadence/runs/r1/1-t/c2/src/main.ts`]);
     expect(chercherFuites([outil('Grep', { pattern: 'playwright', path: H })], r, H, C).certaines).toEqual([H]);
     expect(chercherFuites([appel({ command: 'ls ~' })], r, H, C)).toEqual({ certaines: [], a_verifier: [H] });
     expect(chercherFuites([appel({ command: 'ls ~/.cache; tr / _ < a' })], r, H, C)).toEqual({ certaines: [], a_verifier: [] });

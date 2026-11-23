@@ -3,8 +3,8 @@
   "texte": "du coup la barre est un peu ambigue",
   "date": "2026-11-20",
   "origine": "session du lead, 18 h 50 : Sylvain demande s'il peut arrêter Claude ou si quelque chose tourne encore, et joint une capture de la barre (bandeau). Celle-ci affiche « 3 agents », un run L800 en cours, un run TYPO-1 intégré et deux runs TYPO-1 interrompus listés à égalité, « créneaux libres : 4 sur 5 » alors que le lead plafonne à 3 (D-19), et « session du lead échue : ux-L32 » pour une session qui ne tourne plus (le hold n'a pas pu être libéré après 18 h 30).",
-  "etat": "ouverte",
-  "preuve": "",
+  "etat": "livrée",
+  "preuve": "L802 : 9aad5a6b + 7c5c5d42 (la bande compte les sous-agents en waiting ; lead plafond dit depuis quand), revue conforme, 4 cas d éval verts au sha ac8f5eb, raf done le 2026-11-23 ; non publié (prochaine version)",
   "precisions": [
     {
       "date": "2026-11-20",

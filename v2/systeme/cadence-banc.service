@@ -8,9 +8,12 @@ User=sylvain_ladoire
 Environment=HOME=/home/sylvain_ladoire
 # PATH explicite : ~/.bashrc rend la main aux shells non interactifs, nvm n'y est donc pas chargé.
 Environment=PATH=/home/sylvain_ladoire/.nvm/versions/node/v22.22.3/bin:/home/sylvain_ladoire/.local/bin:/usr/local/bin:/usr/bin:/bin
-ExecStartPre=/bin/bash -c 'command -v node >/dev/null || { echo "cadence-banc : node introuvable sur le PATH de l unité ; mettre à jour la ligne Environment=PATH de /etc/systemd/system/cadence-banc.service après une montée de version nvm" >&2; exit 1; }'
-ExecStartPre=/bin/bash -c 'c=$$(readlink -f "$$(command -v cadence2)"); case "$$c" in /home/sylvain_ladoire/projects/developpeur/cadence/v2/*) ;; *) echo "cadence-banc : cadence2 pointe sur « $$c » et non sur le checkout principal ; corriger : cd ~/projects/developpeur/cadence/v2 && npm run build && npm link" >&2; exit 1;; esac'
+# L804 : un contrôle qui échoue écrit sa cause dans ~/bench-cadence/complet-refus.txt (1re ligne la date, puis la cause), que « cadence2 bench statut »
+# montre en ⚠ au hook de démarrage et au tour du lead ; le 21-11, le refus du banc n'était lisible que dans complet.log. Un v2/dist périmé, lui,
+# est construit par « cadence2 bench complet » avant de mesurer (npm run build, puis relance sur le dist neuf).
 ExecStartPre=/usr/bin/mkdir -p /home/sylvain_ladoire/bench-cadence
+ExecStartPre=/bin/bash -c 'command -v node >/dev/null || { m="node introuvable sur le PATH de l unité ; mettre à jour la ligne Environment=PATH de /etc/systemd/system/cadence-banc.service après une montée de version nvm"; { date -Is; echo "minuteur : $$m"; } > "$$HOME/bench-cadence/complet-refus.txt"; echo "cadence-banc : $$m" >&2; exit 1; }'
+ExecStartPre=/bin/bash -c 'c=$$(readlink -f "$$(command -v cadence2)"); case "$$c" in /home/sylvain_ladoire/projects/developpeur/cadence/v2/*) ;; *) m="cadence2 pointe sur « $$c » et non sur le checkout principal ; corriger : cd ~/projects/developpeur/cadence/v2 && npm run build && npm link"; { date -Is; echo "minuteur : $$m"; } > "$$HOME/bench-cadence/complet-refus.txt"; echo "cadence-banc : $$m" >&2; exit 1;; esac'
 # L730 (D-22, Sylvain du 14-11) : garde proportionnée. Avant une publication, le banc mécanique suffit (≈ 30 min) ; le samedi joue le banc complet
 # (court avec juges, puis chaque séquence en deux répétitions). Rouge, il lève l'alerte de « bench statut » (hook de démarrage, tour du lead) et la garde
 # refuse toute publication tant que chaque banc rouge n'est pas rejoué vert sur l'empreinte à publier (quatre règles, docs/v2/banc.md).

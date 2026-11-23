@@ -102,9 +102,11 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // (fuiteSansEffet, trierFuitesReference, critère non bloquant), sans ligne tassée.
   // L798 (revue r1) : bench 1769 (+4), mesure 2486 : la fuite de la référence n'est signalée que jouée après le candidat (refApres), un fichier absent du
   // journal jest est « inconnu », pas réussi (etatTestJest), sans ligne tassée.
-  it('les totaux sont ceux de R29 : noyau 3000, mesure 2486 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742, L752, L756, L762, L775, L777, L798)', () => {
+  // L804 : bench 1855 (+86), mesure 2572 : bench complet construit un v2/dist périmé puis se relance sur le dist neuf, et tout banc complet qui ne mesure pas
+  // laisse sa cause (refus-complet.ts : distPerime, construireV2, relancerV2, complet-refus.txt) que bench statut montre en ⚠, sans ligne tassée.
+  it('les totaux sont ceux de R29 : noyau 3000, mesure 2572 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742, L752, L756, L762, L775, L777, L798, L804)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
-    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2486]);
+    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2572]);
   });
   for (const [nom, g] of Object.entries(budget)) {
     it(`groupe ${nom} : la somme des budgets ne dépasse pas ${g.total}`, () =>

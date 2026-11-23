@@ -12,10 +12,11 @@ import { enteteEnvironnement, environnement, ligneComparaison, modelesExacts, pa
 import { fuitesDuBras, trierFuitesReference } from './fuites.js';
 import { etatGit, juger, travailNonLivre, type Jugement } from './juges.js';
 import { preparer } from './preparer.js';
+import { distPerime, ligneRefus } from './refus-complet.js';
 import { mesurerSansJuge, sansLivrable } from './sans-juge.js';
 import { BANCS_COURT, BARRE_SPEC, banBase, LIBELLE_COURT, bancsARemesurer, bruitParBanc, COMPLET_MAX_JOURS, ecartPaire, SUFFIXE_BRUIT_COMPTE, SUFFIXE_BRUIT_MAIN, ligneHistorique, titreVerdict, parisJour, PUBLIE, rapport, statut, verdict, verdictSansJuge, type MesureSansJuge, type PassageLu, type ResultatBanc, type Verdict } from './verdict.js';
 
-const REPO = join(import.meta.dirname, '..', '..', '..');
+export const REPO = join(import.meta.dirname, '..', '..', '..');
 
 export function empreinte(repo: string): string {
   try {
@@ -28,11 +29,6 @@ export function empreinte(repo: string): string {
 /** Premier sujet de commit « Taille … » de base..HEAD (le bras classe sa demande). */
 const tailleDeclaree = (c: string, base: string): string | undefined => { try { return execFileSync('git', ['log', '--reverse', '--format=%s', `${base}..HEAD`], { cwd: c, encoding: 'utf8' }).split('\n').find((l) => l.startsWith('Taille')); } catch { return undefined; } };
 
-const plusRecent = (dir: string, t: number): string | null => {
-  for (const f of readdirSync(dir, { withFileTypes: true })) { const p = join(dir, f.name), r = f.isDirectory() ? plusRecent(p, t) : statSync(p).mtimeMs > t ? p : null; if (r) return r; }
-  return null;
-};
-
 /** Le dépôt dont le banc lance le code, branche et commit (L689 : le 13-11, `cadence2` du PATH mesurait un clone arrêté sur une autre branche). */
 export const depotMesure = (repo: string): string => {
   const g = (...a: string[]) => { try { return execFileSync('git', a, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { return '?'; } };
@@ -43,10 +39,8 @@ export const depotMesure = (repo: string): string => {
 export function pretAPasser(repo: string, bras: Record<string, DefBras>, racine = ''): string | null {
   const sale = execFileSync('git', ['status', '--porcelain', '--', 'v2/src', 'v2/briefs', 'v2/hooks'], { cwd: repo, encoding: 'utf8' }).trim();
   if (sale) return `v2/src, v2/briefs ou v2/hooks a des changements non commités (l'empreinte ne les voit pas) :\n${sale}`;
-  const cli = join(repo, 'v2', 'dist', 'cli.js');
-  if (!existsSync(cli)) return 'v2/dist/cli.js absent : lancer « npm run build » dans v2';
-  const neuf = plusRecent(join(repo, 'v2', 'src'), statSync(cli).mtimeMs);
-  if (neuf) return `${neuf} est plus récent que v2/dist/cli.js : lancer « npm run build » dans v2`;
+  const dist = distPerime(repo);
+  if (dist) return dist;
   const briefs = join(repo, 'v2', 'briefs') + '/';
   for (const d of Object.values(bras)) for (const f of [d.brief, ...(d.settings ? [d.settings] : [])])
     if (!resolve(racine, f).startsWith(briefs)) return `brief ou réglages du bras ${d.nom} hors de ${briefs} : ${f}`;
@@ -420,6 +414,7 @@ export async function bench(args: string[], io: Io, repo = REPO): Promise<number
     const s = statut(hist, io.now(), emp, modeles(), PUBLIE);
     io.out(`banc : dernier passage ${s.dernier ?? 'aucun'} ; garde : banc ${s.mode} ; publication ${s.publication_ok ? 'permise' : 'refusée'} sur l'empreinte ${emp}${s.publication_ok ? '' : ` : ${pourPublier(repo, s.a_rejouer)}`}`);
     for (const l of alertesGarde(s)) io.out(l);
+    const refus = ligneRefus(racine); if (refus) io.out(refus); // L804 : un banc complet qui n'a pas mesuré se voit au tour du lead, avec sa cause
     if (s.frais_semaine === 0) io.out('⚠ aucun banc frais cette semaine : en ajouter avec « cadence2 bench ajouter »');
     return 0;
   }

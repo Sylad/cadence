@@ -4070,11 +4070,13 @@ lots:
     created: 2026-11-21
   - id: L803
     title: "Écriture courte contrôlée (principes ASD-STE100 transposés au français, D-31) : un contrôle signale toute phrase de plus de 25 mots (20 pour une consigne) dans les entrées Nouveautés et les rapports de revue (ux-reviewer, code-reviewer, qa-reviewer), une idée par phrase, voix active ; réglable par projet ; le bilan du jour du dossier parent (scripts/bilan-livraisons.py) l'appelle aussi. Mesure : longueur moyenne des phrases avant/après sur 2-3 bilans et avis de Sylvain ; retiré sans gain"
-    status: doing
+    status: done
     estimate: 1
     planned: { from: 2026-11-23, to: 2026-11-23 }
     created: 2026-11-21
     started: 2026-11-23
+    review: { date: 2026-11-23, verdict: "conforme revue (agent) conforme, 4 mineurs reportés en L810 : passif nié élidé, découpage (Cf., M., Etc., citations), code indenté, clé ecriture: vide ; tmp/revue-cadence-L803.md", commit: b1b99c9bd49ef7d1d8279081499aab6158eed417 }
+    finished: 2026-11-23
   - id: L804
     title: "Banc refusé pour v2/dist périmé (v2/src plus récent que dist/cli.js) : le banc du samedi 21-11 12:04 a échoué en silence pour cette raison (complet.log), et le lead l'a rencontré la veille avant une publication. Le banc construit v2 lui-même avant de mesurer (ou le service systemd le fait en ExecStartPre), et un échec du minuteur se voit au tour du lead avec sa cause"
     status: done
@@ -4115,6 +4117,12 @@ lots:
     title: "Banc : la pente de duplication s'affiche arrondie à l'unité (« +0 point contre 0 point » marqué ROUGE pour +0,03 contre −0,05 au banc aether-b68 r1 du 22-11) : afficher deux décimales dans le rapport, jamais un arrondi qui fait paraître égales deux valeurs que le seuil distingue ; test sur ce cas (seuil inchangé, décision de Sylvain)"
     status: todo
     estimate: 1
+    created: 2026-11-23
+  - id: L810
+    title: "cadence ecriture, suites de la revue L803 : passif nié avec élision non signalé (« n'est pas livré », ecriture.mjs:169) ; découpage qui coupe après « Cf. », « M. », « Etc. » et dans une citation « … » (ecriture.mjs:118, fausse la moyenne, mesure du lot) ; bloc de code indenté de 4 espaces lu comme prose (ecriture.mjs:94) ; clé ecriture: vide qui coupe les avertissements de raf news check (news-writing.ts:14). Rapport tmp/revue-cadence-L803.md"
+    status: todo
+    estimate: 1
+    after: [ L803 ]
     created: 2026-11-23
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

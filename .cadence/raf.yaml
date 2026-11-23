@@ -4159,6 +4159,16 @@ lots:
     status: todo
     estimate: 1
     created: 2026-11-23
+  - id: L815
+    title: "Étalonner le banc : relancer N fois une même configuration sur les mêmes tâches, en tirer l'écart-type (score, temps, jetons) et le nombre de runs par bras pour conclure ; noter versions de Claude Code et du modèle dans chaque mesure (veille #61 P2, #71 ; sert D-30 du dossier parent)"
+    status: todo
+    estimate: 1
+    created: 2026-11-23
+  - id: L816
+    title: "Audit du respect des consignes : sur les transcriptions du banc, mesurer pour chaque consigne observable du brief et du CLAUDE.md son taux de respect ; retirer ou changer en hook celles jamais suivies (veille #71 P2, arXiv 2611.13709)"
+    status: todo
+    estimate: 1
+    created: 2026-11-23
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

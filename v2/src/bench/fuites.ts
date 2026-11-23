@@ -45,7 +45,7 @@ export function chercherFuites(lignes: string[], r: Regles, home: string, cwd = 
       if (c.type !== 'tool_use') continue;
       if (contournement(c.name ?? '', c.input, home)) vus.certaines.add(`contournement : ${c.name} ${JSON.stringify(c.input).slice(0, 160)}`); // R32
       if (c.id && refuses.has(c.id)) continue;
-      for (const p of cheminsCites(c.name ?? '', c.input, d.cwd, depart, home)) { const k = classer(p, r); if (k) vus[k.classe === 'certaine' ? 'certaines' : 'a_verifier'].add(k.chemin); } // L808 : règle partagée avec le hook
+      for (const p of cheminsCites(c.name ?? '', c.input, d.cwd, depart, home, r.certains)) { const k = classer(p, r); if (k) vus[k.classe === 'certaine' ? 'certaines' : 'a_verifier'].add(k.chemin); } // L808 : règle partagée avec le hook
     }
   }
   return { certaines: [...vus.certaines], a_verifier: [...vus.a_verifier] };

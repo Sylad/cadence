@@ -132,47 +132,60 @@ function accolades(t) {
   const m = /^(.*?)\{([^{}$]*,[^{}]*)\}(.*)$/s.exec(t);
   return m ? m[2].split(',').flatMap((x) => accolades(m[1] + x + m[3])) : [t];
 }
-// Chemin absolu du jeton (~, $HOME, absolu, ou relatif à cwd s'il contient « / » ou « .. »), sinon null.
+// Chemin absolu du jeton (~, $HOME, absolu, « . », ou relatif à cwd s'il contient « / » ou « .. »), sinon null.
 function resoudre(tok, cwd, home, rel, cd = false) {
+  if (rel && /^\.\/?$/.test(tok)) return resolve(cwd);
   const t = tok.replace(/(?<![./])\.+$/, '').replace(/[,:]+$/, '');
   if (/^(~|\$HOME)(\/|$)/.test(t)) return resolve(home, t.replace(/^(~|\$HOME)\/?/, ''));
   if (t.startsWith('/')) return resolve(t);
   return rel && (cd || t.includes('/') || t === '..' || /^c\d+/.test(t)) ? resolve(cwd, t) : null;
 }
+/** L817 : commande qui lit récursivement ses dossiers (find ~ lit ~/projects) ; son dossier courant si elle n'en nomme aucun. */
+const recursive = (nom, etape) => /^(find|fd|fdfind|tree|du|rg|ag|ack|tar|rsync)$/.test(nom)
+  || (/^([ef]?grep|cp|scp|chmod|chown|diff|zip)$/.test(nom) && /\s(-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)(?=\s|$)/.test(etape)) || (nom === 'ls' && /\s(-[a-zA-Z]*R[a-zA-Z]*|--recursive)(?=\s|$)/.test(etape));
+const tout = (p) => p.replace(/\/?$/, '/**');
 
 // Revue L808 r1 (M1) : seul ce qui est LU compte. Un texte écrit (content d'un Write, old_string d'un Edit, motif d'un Grep, message de commit, corps
 // d'un heredoc donné à cat) qui cite un chemin n'ouvre pas ce chemin : 128 fichiers de maritime-atlas citent ~/projects, les éditer n'est pas une fuite.
 const CHAMPS_CHEMIN = ['file_path', 'path', 'notebook_path'];
+/** Filtres qui ne lisent pas comme chemin ou commande ce qu'un echo leur envoie (L817) : un echo écrit dans un fichier par eux reste un texte écrit. */
+const FILTRE = /^(tee|cat|sort|uniq|head|tail|wc|tr|cut|column|fold|nl|[ef]?grep|rg|less|more)$/;
 const INTERPRETE = /(^|[\s;&|(])(python[\d.]*|node|bash|sh|zsh|perl|ruby|deno|bun|tsx|ts-node|psql|sqlite3|awk|sed)(?![\w.-])/;
 
 /** La commande Bash sans ses textes écrits (remplacés par des espaces) : corps d'un heredoc dont la ligne ne lance pas d'interprète (un script donné à
- * python, node, bash… est du code, gardé), message de `git commit|tag|merge|revert|notes|stash -m`, arguments entre guillemets de echo et printf (sauf si leur tube
- * passe par xargs, qui en fait des chemins lus), motif de grep et rg (aucun avec --files ou --type-list). Un mot qui porte `$(` ou un accent grave est gardé (il exécute une commande). Dans le doute : gardé. */
+ * python, node, bash… est du code, gardé), message de `git commit|tag|merge|revert|notes|stash -m`, arguments entre guillemets de echo et printf dont la sortie
+ * va à un fichier ou à un filtre qui ne lit pas (FILTRE ; L817 : sh, while read, xargs, parallel les lisent, et rien n'est effacé dans $(…) ni dans un sous-shell),
+ * motif de grep et rg (premier nom qui n'est pas l'argument d'une option ; aucun avec --files ou --type-list). Un mot qui porte `$(` ou un accent grave est gardé. Dans le doute : gardé. */
 export function commandeLue(cmd) {
   const t = String(cmd).replace(/^([^\n]*<<-?\s*['"]?(\w+)['"]?[^\n]*)\n[\s\S]*?\n\s*\2(?=\n|$)/gm, (tout, tete) => (INTERPRETE.test(tete) ? tout : tete));
   const effaces = [], effacer = (m) => { if (m && !/\$\(|`/.test(m.s)) effaces.push(m); };
-  let mots = [], echos = [], xargs = false; // echos : arguments d'echo et de printf du tube en cours, effacés à sa fin s'il ne passe pas par xargs
+  let mots = [], echos = [], lu = false, prof = 0; // echos : arguments d'echo et de printf du tube, effacés à sa fin si rien ne les lit (lu) ; prof : ( et $( ouverts
   const finir = (tube) => {
     if (!mots.length) return;
     while (/^\w+=/.test(mots[0]?.s ?? '')) mots.shift();
-    const [c, ...args] = mots, nom = c?.s.replace(/^.*\//, '');
+    const [c, ...args] = mots, nom = c?.s.replace(/^.*\//, '') ?? '';
     mots = [];
+    if (nom !== 'echo' && nom !== 'printf' && !FILTRE.test(nom)) lu = true; // revue r2 et L817 : xargs, sh, while read, parallel… lisent ce qu'on leur envoie
     if (nom === 'git' && args.some((a) => /^(commit|tag|merge|revert|notes|stash)$/.test(a.s)))
       args.forEach((a, k) => { if (/^--message=/.test(a.s)) effacer(a); else if (/^(-[a-zA-Z]*m|--message)$/.test(a.s)) effacer(args[k + 1]); });
-    else if (nom === 'echo' || nom === 'printf') echos.push(...args.filter((a) => /^['"]/.test(a.s)));
-    else if (nom === 'xargs') xargs = true; // revue r2 : « echo "/a/b" | xargs cat » lit /a/b
-    else if (/^([ef]?grep|rg)$/.test(nom ?? '')) {
+    else if ((nom === 'echo' || nom === 'printf') && !prof) echos.push(...args.filter((a) => /^['"]/.test(a.s)));
+    else if (/^([ef]?grep|rg)$/.test(nom)) {
       args.forEach((a, k) => { if (/^--regexp=/.test(a.s)) effacer(a); else if (/^(-[a-zA-Z]*e|--regexp)$/.test(a.s)) effacer(args[k + 1]); });
-      // sans -e ni -f : le premier nom est le motif ; avec --files ou --type-list (rg, revue r2), aucun motif : « rg --files <dossier> » lit le dossier
-      if (!args.some((a) => /^(-[a-zA-Z]*[ef]|--regexp|--file|--files|--type-list)$|^--(regexp|file)=/.test(a.s))) effacer(args.find((a) => !a.s.startsWith('-')));
+      // sans -e ni -f : le premier nom qui n'est pas l'argument d'une option (L817 : -m 1, -A 3, -g "*.md") est le motif ; avec --files ou --type-list (rg,
+      // revue r2), aucun motif : « rg --files <dossier> » lit le dossier
+      const opt = nom === 'rg' ? /^-[^-mABCgtTjMEref]*[mABCgtTjMEr]$|^--(max-count|context|after-context|before-context|glob|iglob|type|type-not|max-depth|replace|sort|threads)$/
+        : /^-[^-mABCdDef]*[mABCdD]$|^--(max-count|context|after-context|before-context|include|exclude|exclude-dir|directories|devices|binary-files|label)$/;
+      let k = 0;
+      while (k < args.length && args[k].s.startsWith('-') && args[k].s !== '--') k += opt.test(args[k].s) ? 2 : 1;
+      if (!args.some((a) => /^(-[a-zA-Z]*[ef]|--regexp|--file|--files|--type-list)$|^--(regexp|file)=/.test(a.s))) effacer(args[args[k]?.s === '--' ? k + 1 : k]);
     }
     if (tube) return;
-    if (!xargs) echos.forEach(effacer);
+    if (!lu) echos.forEach(effacer);
     echos = [];
-    xargs = false;
+    lu = false;
   };
   for (let i = 0; i < t.length;) {
-    if (/[\n;|&()]/.test(t[i])) { finir(t[i] === '|' && t[i + 1] !== '|'); i++; continue; }
+    if (/[\n;|&()]/.test(t[i])) { finir(t[i] === '|' && t[i + 1] !== '|'); prof = Math.max(0, prof + (t[i] === '(') - (t[i] === ')')); i++; continue; }
     if (/\s/.test(t[i])) { i++; continue; }
     const d = i;
     for (let q = ''; i < t.length; i++) {
@@ -188,24 +201,46 @@ export function commandeLue(cmd) {
   return effaces.reduce((r, m) => r.slice(0, m.d) + ' '.repeat(m.f - m.d) + r.slice(m.f), t);
 }
 
+/** L817 : le glob p (préfixe littéral pre) peut-il désigner la zone z, un chemin sous elle ou un ancêtre qui la contient (ls ~/proj*, ls ~/*\/x) ? */
+function peutViser(p, pre, z) {
+  const b = pre.replace(/\/$/, ''), g = p.slice(b.length + 1).split('/'), c = z.slice(b.length + 1).split('/');
+  if (!z.startsWith(`${b}/`)) return false;
+  for (let i = 0; i < Math.min(g.length, c.length); i++) { if (g[i].includes('**')) return true; if (!globale(g[i]).test(c[i])) return false; }
+  return true;
+}
+
 /** Chemins absolus (globs gardés) que LIT un appel d'outil : ses champs de chemin (file_path, path, notebook_path ; le motif d'un Glob, depuis son
  * `path`), relatifs au dossier courant, et pour Bash le dossier courant et la commande sans ses textes écrits (commandeLue), avec ses chemins relatifs,
- * ses `cd` et ses accolades. Jamais un contenu écrit ni un motif de recherche. `cwd` : dossier courant de l'appel ; `depart` : à défaut de cwd. */
-export function* cheminsCites(name, input, cwd, depart, home) {
+ * ses `cd` et ses accolades. Jamais un contenu écrit ni un motif de recherche. `cwd` : dossier courant de l'appel ; `depart` : à défaut de cwd.
+ * L817 : Grep et une commande récursive lisent aussi tout sous leurs dossiers (`<d>/**`) ; `cd` seul va dans ~ ; depuis un dossier qui contient une zone
+ * de `certains` (après `cd ~`), tout nom est un chemin relatif (« ls projects »). */
+export function* cheminsCites(name, input, cwd, depart, home, certains = []) {
   const abs = typeof cwd === 'string' && isAbsolute(cwd), base = abs ? cwd : depart;
   const absolu = (v, d) => (/^(~|\$HOME)(\/|$)/.test(v) ? resolve(home, v.replace(/^(~|\$HOME)\/?/, '')) : resolve(d, v));
   const champ = (k) => (typeof input?.[k] === 'string' && input[k] ? input[k] : null);
   for (const k of CHAMPS_CHEMIN) if (champ(k)) yield absolu(champ(k), base);
   if (name === 'Glob' && champ('pattern')) yield absolu(champ('pattern'), champ('path') ? absolu(champ('path'), base) : base);
+  if (name === 'Grep') yield tout(champ('path') ? absolu(champ('path'), base) : base);
   if (name !== 'Bash') return;
   if (abs) yield resolve(cwd);
   if (typeof input?.command !== 'string') return;
   let dir = base;
   for (const seg of commandeLue(input.command).replace(/\$\{HOME\}/g, '$HOME').split(/&&|\|\||;|\n/)) {
     for (const v of accolades(seg)) {
-      const cd = /^\s*cd\s+(\S+)/.exec(v);
-      const cible = cd ? resoudre(cd[1].replace(/^['"]|['"]$/g, ''), dir, home, true, true) : null;
-      for (const tok of v.split(/[\s'"`|&<>(){}=]+/)) { const p = resoudre(tok, dir, home, true); if (p) yield p; }
+      const cd = /^\s*cd(?:\s+(\S+)|\s*$)/.exec(v), nu = certains.some((z) => z.startsWith(dir === '/' ? '/' : `${dir}/`));
+      const cible = cd ? (cd[1] ? resoudre(cd[1].replace(/^['"]|['"]$/g, ''), dir, home, true, true) : home) : null;
+      for (const etape of v.split('|')) {
+        const nom = /^\s*(?:\w+=\S*\s+)*(\S+)/.exec(etape)?.[1].replace(/^.*\//, '') ?? '', rec = recursive(nom, etape);
+        let explicite = false;
+        for (const tok of etape.split(/[\s'"`&<>(){}=]+/)) {
+          const e = resoudre(tok, dir, home, true), p = e ?? (nu && /^[^-$]/.test(tok) ? resolve(dir, tok) : null);
+          if (!p) continue;
+          explicite ||= !!e;
+          yield p;
+          if (rec) yield tout(p);
+        }
+        if (rec && !explicite) yield tout(dir);
+      }
       if (cible) { yield cible; dir = cible; }
     }
   }
@@ -213,7 +248,7 @@ export function* cheminsCites(name, input, cwd, depart, home) {
 
 /** Classement d'un chemin cité selon les règles d'un bras ({ autorises, certains, runs }) : null (permis), ou { chemin, classe } avec le préfixe
  * littéral du chemin (avant son premier glob) et la classe « certaine » (zone interdite, autre clone du banc, glob qui peut en désigner un) ou
- * « a_verifier » (reste du dossier des runs : ancêtres du clone). */
+ * « a_verifier » (reste du dossier des runs : ancêtres du clone ; L817 : ancêtre d'une zone, qui en montre les noms, pas le contenu). */
 export function classer(p, r) {
   const g = p.search(/[*?[]/); // glob : préfixe littéral ; en cas de doute (composant pouvant désigner un clone voisin), certaine
   const pre = g >= 0 ? p.slice(0, p.lastIndexOf('/', g)) || '/' : p;
@@ -221,6 +256,7 @@ export function classer(p, r) {
   const sousRuns = sousUn(pre, [r.runs]);
   const comps = sousRuns ? p.slice(r.runs.length + 1).split('/').slice(2) : [];
   const premier = comps.findIndex((x) => /[*?[]/.test(x)); // seul le premier composant à glob peut désigner un dossier de clone
-  if (sousUn(pre, r.certains) || comps.some((x, i) => /^c\d+(\.|$)/.test(x) || (i === premier && globale(x).test('c2')))) return { chemin: pre, classe: 'certaine' };
-  return sousRuns ? { chemin: pre, classe: 'a_verifier' } : null;
+  if (sousUn(pre, r.certains) || comps.some((x, i) => /^c\d+(\.|$)/.test(x) || (i === premier && globale(x).test('c2')))
+    || (g >= 0 && r.certains.some((z) => peutViser(p, pre, z))) || (sousRuns && p.includes('**'))) return { chemin: pre, classe: 'certaine' };
+  return sousRuns || (pre !== '/' && r.certains.some((z) => z.startsWith(`${pre}/`))) ? { chemin: pre, classe: 'a_verifier' } : null;
 }

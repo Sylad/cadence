@@ -72,6 +72,23 @@ describe('fuites', () => {
     expect(chercherFuites([appel({ command: `echo "${H}/projects/x" | xargs cat` })], r, H, C).certaines).toEqual([`${H}/projects/x`]);
     expect(chercherFuites([appel({ command: `rg -l '~/projects/x' src; echo "${H}/projects/x" >> notes.md` })], r, H, C).certaines).toEqual([]);
   });
+  // L817 (revue L808 r3) : la recherche du 22-11 sous sa forme la plus plausible ; ~ seul, glob, cd puis nom relatif, commande récursive.
+  it('L817 : find ~, ls ~/proj*, cd $HOME puis nom relatif, Grep sur ~ : certaines ; ls ~ : à vérifier ; echo lu par sh : compté', () => {
+    const cert = (command: string) => chercherFuites([appel({ command })], r, H, C).certaines;
+    expect(cert('find ~ -name playwright')).toEqual([H]);
+    expect(cert('ls ~/proj*')).toEqual([H]);
+    expect(cert('ls ~/*/developpeur')).toEqual([H]);
+    expect(cert('cd $HOME; ls projects')).toEqual([`${H}/projects`]);
+    expect(cert('cd; cat projects/x')).toEqual([`${H}/projects/x`]);
+    expect(cert('ls ~/bench-cadence/*/1-t')).toEqual([`${H}/bench-cadence`]);
+    expect(cert(`echo "${H}/projects/x" | sh`)).toEqual([`${H}/projects/x`]);
+    expect(cert('grep -m 1 ~/projects/x notes.md')).toEqual([]);
+    expect(cert('grep -r x ../..')).toEqual([`${H}/bench-cadence/runs/r1`]); // lit tous les clones du run (c2 compris) ; grep -r x . reste dans le clone
+    expect(cert('grep -r x . && rg y')).toEqual([]);
+    expect(chercherFuites([outil('Grep', { pattern: 'playwright', path: H })], r, H, C).certaines).toEqual([H]);
+    expect(chercherFuites([appel({ command: 'ls ~' })], r, H, C)).toEqual({ certaines: [], a_verifier: [H] });
+    expect(chercherFuites([appel({ command: 'ls ~/.cache; tr / _ < a' })], r, H, C)).toEqual({ certaines: [], a_verifier: [] });
+  });
   it('fuitesDuBras lit aussi les transcripts de sous-agents', () => {
     const home = dossierTemp('fu-');
     const clone = `${home}/bench-cadence/runs/r1/1-t/c1`;

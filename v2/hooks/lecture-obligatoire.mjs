@@ -68,7 +68,7 @@ export function lectureHorsClone(e, env) {
   if (!clone || !racine || !home || !pieces || !zones || !/^[^/]+$/.test(banc ?? '') || banc === '..') return 'Appel refusé : CADENCE_CLONE, CADENCE_BANC_RACINE, HOME, CADENCE_PIECES, CADENCE_LECTURE_BORNEE ou CADENCE_LECTURE_ZONES absent ou illisible, les limites du bras sont introuvables.';
   const r = { autorises: [clone, `${clone}.captures`, `${clone}.question.md`, `${clone}.install.log`, `${clone}.tests-base.log`, join(racine, 'bancs', banc), dossierTranscripts(home, clone), ...pieces, ...zones.autorises],
     certains: [...zonesCertaines(home, racine), ...zones.certains], runs: join(racine, 'runs') };
-  for (const p of cheminsCites(e?.tool_name ?? '', e?.tool_input, e?.cwd, clone, home)) {
+  for (const p of cheminsCites(e?.tool_name ?? '', e?.tool_input, e?.cwd, clone, home, r.certains)) {
     const k = classer(p, r);
     if (k?.classe === 'certaine') return `Appel refusé : il lit hors de ton dépôt (${k.chemin}). Reste dans ${clone} : ce qui te manque se cherche dans le clone. `
       + 'Un paquet Node se trouve depuis le dossier du script : pose ton script dans le sous-projet dont les node_modules ont ce paquet (par exemple frontend/), ou lance-le de là.';

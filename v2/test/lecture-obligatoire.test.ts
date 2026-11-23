@@ -322,6 +322,46 @@ describe('L808 : lecture hors du clone refusée au banc, avec la règle du déte
     expect(commandeLue('node - <<EOF\nrequire("/a/b")\nEOF')).toContain('/a/b');
     expect(commandeLue('tee x.md <<EOF\n/a/b\nEOF')).not.toContain('/a/b');
   });
+  // L817 (revue L808 r3) : un echo n'est effacé que si sa sortie va à un fichier ou à un filtre qui ne lit pas (tee, sort…), jamais dans $(…) ou un
+  // sous-shell ; ~ et $HOME seuls, les globs, cd puis nom relatif et les commandes récursives sont jugés ; l'argument d'une option n'est pas le motif.
+  it('L817 : echo lu par sh, while read, parallel, $(…), sous-shell ; find ~, ls ~/proj*, cd puis nom relatif : refusés et comptés', () => {
+    const m = monde(); m.ecrire([]);
+    const home = join(m.r, 'home'), regles = reglesDuBras(home, m.r, 'b', m.clone), P = projets(m);
+    const passent: [string, object][] = [
+      ['Bash', { command: `grep -m 1 ${P}/x notes.md` }], ['Bash', { command: `grep -A 3 -B2 "${P}/x" docs/a.md` }], ['Bash', { command: `rg -g "*.md" -t md ${P}/x src` }],
+      ['Bash', { command: `echo "${P}/x" | tee -a notes.md` }], ['Bash', { command: `printf '%s\\n' "${P}/x" | sort | uniq | head -1 >> notes.md` }],
+      ['Bash', { command: 'ls ~/.cache ~/.npm; find . -name playwright; grep -rn x .. ; cd ~/.cache && ls' }], ['Grep', { pattern: 'x', path: join(m.clone, 'src') }],
+      ['Bash', { command: 'tr / _ < a.txt; ls ~' }], ['Glob', { pattern: '**/*.ts' }],
+    ];
+    for (const [name, input] of passent) {
+      expect([name, input, hook(outilE(m, name, input), borne(m)).code]).toEqual([name, input, 0]);
+      expect([name, input, chercherFuites([appel(name, input)], regles, home, m.clone).certaines]).toEqual([name, input, []]);
+    }
+    const refuses: [string, object][] = [
+      ['Bash', { command: `echo "${P}/x" | sh` }], ['Bash', { command: `echo "cat ${P}/x" | bash` }], ['Bash', { command: `echo "${P}/x" | parallel cat` }],
+      ['Bash', { command: `printf "%s" "${P}/x" | while read f; do cat "$f"; done` }], ['Bash', { command: `cat $(echo "${P}/x")` }],
+      ['Bash', { command: `(echo "${P}/x") | xargs cat` }], ['Bash', { command: `diff a.md <(echo "${P}/x" | xargs cat)` }],
+      ['Bash', { command: 'find ~ -name playwright' }], ['Bash', { command: 'find $HOME -name playwright -type d' }], ['Bash', { command: 'ls ~/proj*' }],
+      ['Bash', { command: 'ls ~/*/developpeur' }], ['Bash', { command: 'cd $HOME; ls projects' }], ['Bash', { command: 'cd; cat projects/x' }],
+      ['Bash', { command: 'cd ~ && find . -name playwright' }], ['Bash', { command: 'rg -l playwright ~' }], ['Bash', { command: 'grep -rl x $HOME' }],
+      ['Bash', { command: 'ls -R ~ | grep playwright' }], ['Bash', { command: 'du -sh /' }], ['Bash', { command: 'ls projects', }, ],
+      ['Grep', { pattern: 'playwright', path: '~' }], ['Glob', { pattern: '**/playwright', path: '~' }], ['Glob', { pattern: '~/p*/developpeur' }],
+    ];
+    for (const [name, input] of refuses) {
+      const cwd = name === 'Bash' && (input as { command: string }).command === 'ls projects' ? home : m.clone; // dossier courant déjà dans ~ (cd d'un appel précédent)
+      expect([name, input, hook(outilE(m, name, input, cwd), borne(m)).code]).toEqual([name, input, 2]);
+      const l = JSON.stringify({ type: 'assistant', cwd, message: { content: [{ type: 'tool_use', id: 'x', name, input }] } });
+      expect([name, input, chercherFuites([l], regles, home, m.clone).certaines.length > 0]).toEqual([name, input, true]);
+    }
+  });
+  it('L817 : commandeLue garde un echo lu, efface un echo écrit ; le motif de grep et rg suit les options à argument', () => {
+    const c = (s: string) => commandeLue(s).replace(/ +/g, ' ');
+    expect(c('echo "/a/b" | sh; echo "/c" | bash -s; echo "/d" | parallel cat')).toBe('echo "/a/b" | sh; echo "/c" | bash -s; echo "/d" | parallel cat');
+    expect(c('cat $(echo "/a/b"); (echo "/c") | xargs cat')).toBe('cat $(echo "/a/b"); (echo "/c") | xargs cat');
+    expect(c('echo "/a/b" | tee f | sort; echo "/c" > g; echo "/d"')).toBe('echo | tee f | sort; echo > g; echo ');
+    expect(c('grep -m 1 /a/b c.md; grep -rA 3 x/y z; rg -g "*.md" -r t x/y z; rg -rt x/y z')).toBe('grep -m 1 c.md; grep -rA 3 z; rg -g "*.md" -r t z; rg -rt z');
+    expect(c('grep -r x/y z; rg --max-count 2 x/y z; grep -- -x/y z')).toBe('grep -r z; rg --max-count 2 z; grep -- z');
+  });
   // Revue L808 r1 (2) : en séquence, les règles de l'étape (reglesEtape) arrivent par CADENCE_LECTURE_ZONES ; le test « même règle » sur une vraie
   // séquence est dans passage.test.ts (« L808 : en séquence… »).
   it('revue r1 : CADENCE_LECTURE_ZONES ajoute des zones permises et refusées ; illisible = refus', () => {

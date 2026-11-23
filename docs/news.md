@@ -51,6 +51,8 @@ captures:
 | `cadence news build [-o dir]` | `nouveautes.json` + `index.html` + screenshots (default `docs/nouveautes/site`) |
 
 `--dir` changes the entries folder (default `docs/nouveautes` at the git root).
+Inside a `cadence run` session (`CADENCE_CLONE` set by the run), the default is the run's worktree even when the command is launched from another
+tree of the same repository, such as the main one: an entry left there would make the run's integration refuse (L807).
 The Markdown is deliberately small: headings (`#` to `######`, rendered one level lower, `<h2>` to `<h6>`; a heading takes its own line and cuts the paragraph or list around it), paragraphs, `-` lists (a bullet may continue on the next lines, indented), `**bold**`,
 `` `code` ``, `[links](../url)`; everything else is escaped text. The JSON holds
 `{ project, generated, entries: [{ slug, title, date, lots, captures, html }] }`,

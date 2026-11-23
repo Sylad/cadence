@@ -5,7 +5,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { defaultPlan, PLAN_DEFAULT, PLAN_LEGACY, readNewsConfig, readPlanConfig } from '../config.js';
 import type { Day } from '../dates.js';
 import { shellQuote } from '../deliver.js';
-import { gitRoot, isTracked } from '../git.js';
+import { gitCommonDir, gitRoot, isTracked } from '../git.js';
 import { publicTitleTooLong } from '../news.js';
 import { type Lot, Plan, RafError } from '../plan.js';
 
@@ -68,7 +68,7 @@ export function buildCtx(base: EarlyCtx & { command: string }): Ctx {
   const planPath = resolve(io.cwd, values.file ?? io.env.RAF_FILE ?? (planConfig?.path !== undefined ? resolve(root, planConfig.path) : fallback!.path));
   if (fallback?.legacy && !installing) (io.notice ?? io.err)(legacyPlanLine(root, fallback.legacy));
   const loadPlan = () => Plan.load(planPath, { ...planConfig?.settings, config: configPath });
-  const newsDir = resolve(io.cwd, values.dir ?? join(root, 'docs/nouveautes'));
+  const newsDir = newsDirOf(root, values.dir, io);
   // Limite DÉCLARÉE (news.publicTitleMax) : sans clé, seul « raf check » avertit ; avec, la pose d'un titre public est refusée.
   const refuseLongTitle = (text: string, hint = '') => {
     const max = readNewsConfig(configPath).publicTitleMax;
@@ -79,6 +79,26 @@ export function buildCtx(base: EarlyCtx & { command: string }): Ctx {
     if (rest.length < n) throw new RafError(`usage : raf ${usage}`);
   };
   return { ...base, configPath, planConfig, planPath, chosen, loadPlan, newsDir, refuseLongTitle, need };
+}
+
+/**
+ * L807 : dans une session de `cadence run` (CADENCE_CLONE, posé par le run pour sa session), le worktree du run quand la commande est lancée depuis un
+ * autre arbre du même dépôt — l'arbre principal, après un `cd` de la session. Le 22-11 (warhammer L98 r1), `news new` y a laissé un squelette d'entrée
+ * qui a fait refuser l'intégration du run. Ailleurs (pas de run, autre dépôt, déjà dans le worktree) : null, la racine du dossier courant fait foi.
+ */
+function runClone(root: string, io: Io): string | null {
+  const clone = io.env.CADENCE_CLONE;
+  if (!clone || resolve(clone) === resolve(root)) return null;
+  try {
+    return gitCommonDir(clone) === gitCommonDir(root) ? resolve(clone) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Le dossier des Nouveautés : `--dir` depuis le dossier courant, sinon docs/nouveautes du worktree du run (L807) ou de la racine du dépôt. */
+function newsDirOf(root: string, dir: string | undefined, io: Io): string {
+  return resolve(io.cwd, dir ?? join(runClone(root, io) ?? root, 'docs/nouveautes'));
 }
 
 /** `--verbose` (L453) : la ligne `id  état  titre entier` du lot touché par `done`, `ux`, `review`, `note`, `move`, `public` ; sans lui, rien de plus (une sous-tâche n'a pas de ligne). */

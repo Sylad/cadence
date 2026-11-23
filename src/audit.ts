@@ -369,15 +369,18 @@ interface DeliveryLot {
 export function deliveryLots(plan: Plan, root: string, sha: string, base: string | null): DeliveryLot[] {
   const inRange = planCommits(plan, root, { range: base ? `${base}..${sha}` : sha });
   const { byLot } = linkCommits(plan.lots(), inRange, plan.refs);
+  // L805 : la même règle que le hook pre-push (L784) — un commit qui ne touche que le plan, `.cadence/` (registre des demandes) et les sorties de `plan.onWrite`
+  // n'est pas du travail du lot qu'il cite (vécu ol 22-11 : « plan(L269): … » bloquait la livraison de L262).
+  const work = (commits: Commit[]) => workCommits(plan, root, commits).filter((c) => !isPlanSideOnly(c.sha, plan, root));
   const lots: DeliveryLot[] = [];
   for (const l of plan.lots()) {
-    if (!workCommits(plan, root, byLot.get(l.id) ?? []).length) continue;
+    if (!work(byLot.get(l.id) ?? []).length) continue;
     const entry = (blocking: boolean, state: string) => lots.push({ id: l.id, title: l.title, blocking, state });
     if (l.status === 'done') entry(false, 'terminé');
     else if (l.status === 'dropped') entry(false, 'abandonné');
     else {
       // Couverture jugée sur les commits du lot jusqu'à `sha` seulement : un `fix` posé au-dessus du sha livré n'est pas livré.
-      const late = l.review ? unreviewed(plan, root, l.review, lotCommits(plan, root, l.id)).filter((c) => isAncestor(root, c.sha, sha)).length : 0;
+      const late = l.review ? unreviewed(plan, root, l.review, lotCommits(plan, root, l.id)).filter((c) => isAncestor(root, c.sha, sha) && !isPlanSideOnly(c.sha, plan, root)).length : 0;
       const state = l.status === 'todo' ? 'à faire' : 'en cours';
       // Prêt = revue CONFORME couvrant les commits (côté vague, un lot n'est ready qu'après une revue conforme).
       if (l.review && late === 0 && !isNonConformingVerdict(l.review.verdict)) entry(false, 'prêt');

@@ -248,7 +248,9 @@ without `allowDirty`.
 **Outside a wave: the lots under the sha (L474).** `--sha` also refuses, with no wave running, a sha whose history carries work commits of a lot of the
 plan that is neither done nor ready — a commit cited « L49 » that sits above commits of L50 and L51 delivers them too (30-10: `09217b0` « L49 alone »
 shipped two lots nobody had reviewed). The interval checked runs from the last delivery of the journal (when it is in the history of `<sha>`) up to
-`<sha>`; with no such delivery, the whole history, the plan's adoption day and the plan-only, acknowledged and release commits left out as everywhere. A lot passes
+`<sha>`; with no such delivery, the whole history, the plan's adoption day and the plan-only, acknowledged and release commits left out as everywhere; a plan-side commit in the sense of the
+pre-push hook (L784: its files are the plan, `.cadence/` such as the request register, or the outputs of `plan.onWrite`) is not work of the lot it cites either
+(L805: on 22-11 « plan(L269): … », plan + request, held back the delivery of L262), nor a commit « after the review » of a reviewed lot. A lot passes
 when it is `done` or dropped, or **ready**: its code review verdict is compliant and covers all its commits (a verdict starting with `non conforme` / `not compliant` keeps the lot back, state `relu non conforme`). A lot to do or in progress, not reviewed or reviewed before later commits, holds the sha back; the
 refusal (exit 2, before anything runs) names each such lot with its state. `--dry-run` prints every lot of the interval with its state (`terminé`, `prêt`,
 `abandonné`, `en cours, non relu`, `à faire, non relu`, `en cours, relu avant N commit(s)`, `en cours, relu non conforme`) after the same refusal checks, and refuses the same way when one blocks. A plain `cadence deliver` (HEAD) and a delivery during a wave (the

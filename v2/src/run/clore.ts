@@ -2,8 +2,8 @@
 // 5e passe, changement de conception (quatre revues, quatre façons de perdre du travail tant que --clore supprimait sur une preuve d'intégration) : --liste ne
 // fait que montrer, --clore ne retire rien qu'il n'ait d'abord archivé sous refs/cadence/archive/. Plus de patch-id, de reconnaissance par le contenu ni de --force.
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { etatVu, occupantRun, oublierReglages, type Etat } from './run.js';
+import { existsSync, readFileSync } from 'node:fs';
+import { etatVu, occupantRun, oublierReglages, sauver, type Etat } from './run.js';
 
 /** Un run qui vit encore ou se reprend (--reponse) n'est pas fini : ni « intégré à la main », ni clos — sauf, sans processus vivant, quand sa tête est déjà
  * sur la cible (L767). */
@@ -115,7 +115,7 @@ export function clore(e: Etat, out: (l: string) => void): number {
   if (!existsSync(e.worktree)) oublierReglages(e.worktree);
   const etat = JSON.parse(readFileSync(e.fichier, 'utf8')) as Etat;
   etat.clos = { date: new Date().toISOString(), cible: i.cible, tete: tetes[0]?.sha ?? '', integre: i.integre, archives: tetes.map((t) => t.ref), ...(restes.length ? { restes } : {}) };
-  writeFileSync(e.fichier, JSON.stringify(etat, null, 1));
+  sauver({ ...etat, fichier: e.fichier }); // écriture atomique (L807 : un lecteur concurrent ne lit jamais un état vide)
   out(`cadence run ${e.id} : clos — ${i.integre ? `sa tête est sur ${e.cible} (${i.cible.slice(0, 7)})` : `non intégré, commits absents de la cible : ${i.absents}`} ; `
     + `archives : ${tetes.map((t) => `${t.ref} (${t.sha.slice(0, 7)})`).join(', ') || 'aucune, aucune tête connue'} ; ${restes.join(' ; ') || 'worktree et branche retirés'} ; `
     + 'les retrouver : cadence run --archives');

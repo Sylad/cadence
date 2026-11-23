@@ -137,7 +137,7 @@ const FLAGS_CLI: Record<string, string[]> = {
 const prefixe = (k: string) => (k.startsWith('src/bench/') || k === 'src/sequence/cli.ts' || k === 'src/cli.ts' ? 'bench' : 'cadence2'); // l'aide de cli.ts et le banc séquence décrivent les options de « bench »
 // Budgets de R29 : relever un total ou un module (même sous le total) est une violation ; le baisser est permis.
 const BUDGET_R29: Record<string, { total: number; modules: Record<string, number> }> = {
-  noyau: { total: 3000, modules: { plan: 350, accueil: 200, run: 1209, porte: 250, deliver: 450, hooks: 231 } }, // R32 : hooks, mécanisme du bras candidat ; issue #57 : run 455, run.ts détassé, messages gardés à toute fin ; L722 : run 466 (+11), le départ nomme les fichiers non commités de l'arbre principal (pas de ligne tassée)
+  noyau: { total: 3000, modules: { plan: 350, accueil: 200, run: 1212, porte: 250, deliver: 450, hooks: 231 } }, // R32 : hooks, mécanisme du bras candidat ; issue #57 : run 455, run.ts détassé, messages gardés à toute fin ; L722 : run 466 (+11), le départ nomme les fichiers non commités de l'arbre principal (pas de ligne tassée)
   // L723 : run 520, rebase seul quand la cible avance pendant la porte (conflit rendu à la session, porte rejouée, arbre principal sale nommé), sans ligne tassée
   // L723 (revue, M1) : run 539, un conflit de rebase résolu est ajouté à l'état (conflits, détail de fin) et au journal sans remplacer le rapport du travail, sans ligne tassée
   // L722 (revue r1) : run 532 (-7), la lecture des fichiers non commités vient de scripts/arbre-non-commite.mjs, partagée avec src (copie retirée de run.ts)
@@ -194,6 +194,7 @@ const BUDGET_R29: Record<string, { total: number; modules: Record<string, number
   // L801 : run 1205 (+3) : l'étape analyse (clé analyse:, scripts/analyse.mjs) entre le build et les tests de la porte, contre la cible, sans ligne tassée.
   // L801 (revue r3, M2) : run 1209 (+4) : la porte verte reprend au journal et au détail de l'état integre ce que l'analyse dit à relire (ligne de base
   // neuve, config changée par déclaration : lignesARelire de scripts/analyse.mjs), sans ligne tassée.
+  // L807 : run 1212 (+3) : état d'un run écrit de façon atomique (sauver, partagé avec clore.ts), un lecteur concurrent lisait un JSON vide, sans ligne tassée.
   // L775 : bench 1609 (+21), sequence 717 (+2), mesure 2326 : un appel refusé par le hook du bras n'est plus compté en fuite (refusParHook), sans ligne tassée.
   // L777 : bench 1672 (+63), mesure 2389 : « tests d'origine verts » compte les tests d'origine réussis par bras, marge de bruit (MARGE_CACHES, retirée en revue r1), sans ligne tassée.
   // L777 (revue r1) : bench 1693 (+21), mesure 2410 : marge retirée (candidat ≥ A test par test), lanceur compté seulement s'il a un bilan dans les deux journaux

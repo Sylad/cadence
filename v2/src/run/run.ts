@@ -4,7 +4,7 @@
 // (une reprise de la même session si elle est rouge), intégration en avance rapide ; si la cible a avancé entre-temps, rebase et porte rejoués (L723).
 // Le plan (raf) et deliver restent ceux de la v1.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
@@ -64,7 +64,10 @@ const git = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encod
 const essaiGit = (cwd: string, ...a: string[]) => spawnSync('git', a, { cwd, encoding: 'utf8' }), dossierRuns = (repo: string) => join(dirname(repo), '.cadence-run');
 /** Le fichier d'état du run `id` du dépôt qui contient `repo` (--reponse, --clore). */
 export const fichierRun = (repo: string, id: string) => { const racine = git(repo, 'rev-parse', '--show-toplevel'); return join(dossierRuns(racine), `${basename(racine)}-${id}.json`); };
-const sauver = (e: Etat) => { writeFileSync(e.fichier, JSON.stringify(e, null, 1)); return e; }, lireEtat = (f: string) => JSON.parse(readFileSync(f, 'utf8')) as Etat;
+// Écriture atomique (fichier temporaire puis rename) : writeFileSync vide le fichier avant de l'écrire, et un lecteur concurrent (cadence run --liste, un
+// autre run du dépôt, le test L773 de deux runs --fond) lisait alors un JSON vide (« Unexpected end of JSON input »). Le temporaire, nommé `<nom>.json.<pid>.tmp`,
+// n'est pas lu comme un état (filtre `.json`) et part avec le run à la purge (annexes de purger.ts).
+export const sauver = (e: Etat) => { const t = `${e.fichier}.${process.pid}.tmp`; writeFileSync(t, JSON.stringify(e, null, 1)); renameSync(t, e.fichier); return e; }; const lireEtat = (f: string) => JSON.parse(readFileSync(f, 'utf8')) as Etat;
 
 // L695 (D-9) : le run tient la branche cible du début à la fin ; le pre-commit de raf (raf hook install) y refuse un commit du lead, qui le ferait
 // échouer en avance rapide, et raf add|note|done|review|ux|demande écrivent dans le plan en attente (L722). Même format que src/repo-held.ts, qui le lit.

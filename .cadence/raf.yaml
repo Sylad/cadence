@@ -4045,6 +4045,8 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-11-20
+    notes:
+      - { date: 2026-11-23, text: "22-11 : banc aether-b68-court r2, le bras cadence-run a écrit dans /home/sylvain_ladoire/projects/developpeur/maritime-atlas/qa/node_modules/playwright et dans le dossier parent à l'étape 1 ; banc aether-b68 r1, le bras A dans /home/sylvain_ladoire/projects/developpeur/node_modules à l'étape 5 — même cause probable (résolution de node_modules hors du clone)" }
   - id: L800
     title: "Test orchestrate-reponse-notee-l670 sensible au minutage : rouge une fois dans la suite complète le 20-11 (run L798 correction 2), vert seul — le rendre déterministe"
     status: done
@@ -4080,11 +4082,13 @@ lots:
     created: 2026-11-22
   - id: L805
     title: "deliver --sha : la garde des lots compte comme du travail un commit de plan au sens du hook pre-push (registre .cadence/demandes, fichiers plan.onWrite) — deliveryLots doit filtrer avec isPlanSideOnly comme L784 (vécu ol 22-11 : 8c12b1d plan(L269) a bloqué la livraison de L262, contourné par raf ignore)"
-    status: todo
+    status: doing
     estimate: 0.5
     quickwin: true
     planned: { from: 2026-11-23, to: 2026-11-23 }
     created: 2026-11-22
+    started: 2026-11-23
+    review: { date: 2026-11-23, verdict: "conforme (revue du lead) : deliveryLots filtre isPlanSideOnly aux deux endroits (travail du lot, commits après la revue), même règle que L784 ; test R1-R4 dont le cas inverse (commit avec code reste bloquant) ; tsc et suite verts au run", commit: 0c14687a5535a27c8c8bb7132313fedbc138b3db }
   - id: L806
     title: "Hook pre-push : un commit qui cite le lot d'un AUTRE dépôt (« lot du plan de <app> », articles écrits dans codex) est confondu avec le lot homonyme du dépôt courant et le push est refusé faute de verdict (vécu 22-11 : evatosorus L41 vs codex L41) — reconnaître la référence externe et lire le verdict dans le plan de l'app"
     status: todo
@@ -4097,6 +4101,16 @@ lots:
     status: todo
     estimate: 1
     created: 2026-11-22
+  - id: L808
+    title: "Banc séquence aether-b68-court r2 du 22-11 ROUGE sur la qualité (rapport ~/bench-cadence/rapports/2026-11-22-1821-fb065f2285f3-aether-b68-court-r2.md) : cadence-run 2 régressions contre 0 et sorties 5/8 contre 7/8 pour A (fiche au clic « D » quand la carte montre « L » ; centres non affichés avec Isobares, légende sans les centres). Lire les transcriptions des deux bras, établir pour chaque sortie manquée ce que cadence-run a fait autrement (brief, hook de lecture, pièces non lues…) et proposer le mécanisme qui la rattrape ; mesure : la séquence rejouée verte"
+    status: todo
+    estimate: 1
+    created: 2026-11-23
+  - id: L809
+    title: "Banc : la pente de duplication s'affiche arrondie à l'unité (« +0 point contre 0 point » marqué ROUGE pour +0,03 contre −0,05 au banc aether-b68 r1 du 22-11) : afficher deux décimales dans le rapport, jamais un arrondi qui fait paraître égales deux valeurs que le seuil distingue ; test sur ce cas (seuil inchangé, décision de Sylvain)"
+    status: todo
+    estimate: 1
+    created: 2026-11-23
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -4070,10 +4070,11 @@ lots:
     created: 2026-11-21
   - id: L803
     title: "Écriture courte contrôlée (principes ASD-STE100 transposés au français, D-31) : un contrôle signale toute phrase de plus de 25 mots (20 pour une consigne) dans les entrées Nouveautés et les rapports de revue (ux-reviewer, code-reviewer, qa-reviewer), une idée par phrase, voix active ; réglable par projet ; le bilan du jour du dossier parent (scripts/bilan-livraisons.py) l'appelle aussi. Mesure : longueur moyenne des phrases avant/après sur 2-3 bilans et avis de Sylvain ; retiré sans gain"
-    status: todo
+    status: doing
     estimate: 1
     planned: { from: 2026-11-23, to: 2026-11-23 }
     created: 2026-11-21
+    started: 2026-11-23
   - id: L804
     title: "Banc refusé pour v2/dist périmé (v2/src plus récent que dist/cli.js) : le banc du samedi 21-11 12:04 a échoué en silence pour cette raison (complet.log), et le lead l'a rencontré la veille avant une publication. Le banc construit v2 lui-même avant de mesurer (ou le service systemd le fait en ExecStartPre), et un échec du minuteur se voit au tour du lead avec sa cause"
     status: done

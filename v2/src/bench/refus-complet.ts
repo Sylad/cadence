@@ -34,7 +34,15 @@ export function distPerime(repo: string): string | null {
   return neuf ? `${neuf} est plus récent que v2/dist/cli.js : lancer « npm run build » dans v2` : null;
 }
 
-/** `npm run build` dans v2 : null si la construction réussit, sinon la fin de sa sortie d'erreur. */
+/** null si rien n'est non commité sous v2/src, v2/briefs et v2/hooks ; sinon la raison. Contrôlé avant toute construction (revue L804 M1) : du travail
+ * en cours ne doit jamais être compilé dans le v2/dist lié par npm link, celui qui sert au hook de démarrage, au tour du lead et aux runs. */
+export function nonCommite(repo: string): string | null {
+  const sale = execFileSync('git', ['status', '--porcelain', '--', 'v2/src', 'v2/briefs', 'v2/hooks'], { cwd: repo, encoding: 'utf8' }).trim();
+  return sale ? `v2/src, v2/briefs ou v2/hooks a des changements non commités (l'empreinte ne les voit pas) :\n${sale}` : null;
+}
+
+/** `npm run build` dans v2 : null si la construction réussit, sinon la fin de sa sortie d'erreur. En échec, rien n'est écrit dans dist (noEmitOnError de
+ * v2/tsconfig.json, revue L804 m1) : un dist plus récent que src après un échec ferait mesurer au banc suivant du code qui ne compile pas. */
 export function construireV2(repo: string): string | null {
   try { execFileSync('npm', ['run', 'build'], { cwd: join(repo, 'v2'), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 10 * 60_000 }); return null; }
   catch (e) {
@@ -43,11 +51,13 @@ export function construireV2(repo: string): string | null {
   }
 }
 
-/** Relance `cadence2 <args>` avec le v2 qu'on vient de construire : le processus courant tourne encore l'ancien dist. Code de sortie de l'enfant. */
-export function relancerV2(repo: string, args: string[], env: NodeJS.ProcessEnv): Promise<number> {
+/** Relance `cadence2 <args>` avec le v2 qu'on vient de construire : le processus courant tourne encore l'ancien dist. Code de sortie de l'enfant.
+ * Une relance qui ne démarre pas (2) ou qu'un signal arrête (1) n'a rien pu écrire : sa cause passe par `noter` (revue L804 m2). `exe` : substituable en test. */
+export function relancerV2(repo: string, args: string[], env: NodeJS.ProcessEnv, noter: (cause: string) => void, exe = process.execPath): Promise<number> {
   return new Promise((ok) => {
-    const p = spawn(process.execPath, [join(repo, 'v2', 'bin', 'cadence2.js'), ...args], { stdio: 'inherit', env });
-    p.on('error', () => ok(2)); p.on('exit', (c) => ok(c ?? 1));
+    const p = spawn(exe, [join(repo, 'v2', 'bin', 'cadence2.js'), ...args], { stdio: 'inherit', env });
+    p.on('error', (e) => { noter(`la relance sur le dist neuf n'a pas démarré : ${e.message}`); ok(2); });
+    p.on('exit', (c, sig) => { if (c === null) noter(`la relance sur le dist neuf a été arrêtée par le signal ${sig ?? 'inconnu'}`); ok(c ?? 1); });
   });
 }
 

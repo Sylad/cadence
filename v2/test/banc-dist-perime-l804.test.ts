@@ -1,22 +1,26 @@
 // L804 : le 21-11 à 12:04, le banc complet du samedi a été refusé pour un v2/dist périmé (v2/src plus récent que dist/cli.js) ; seul complet.log le disait.
 // Le banc construit désormais v2 avant de mesurer, et tout refus du banc complet se voit dans `bench statut`, donc au tour du lead, avec sa cause.
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tourBancLines } from '../../src/bench-tour.js';
 import { bench } from '../src/bench/cli.js';
 import { complet, type Construction } from '../src/bench/complet.js';
-import { construireV2, distPerime, ENV_CONSTRUIT, FICHIER_REFUS, ligneRefus, relancerV2 } from '../src/bench/refus-complet.js';
+import { construireV2, distPerime, ENV_CONSTRUIT, FICHIER_REFUS, ligneRefus, nonCommite, relancerV2 } from '../src/bench/refus-complet.js';
 import { ioTest } from './cli.test.js';
 import { dossierTemp } from './temp.js';
 
-/** Un dépôt dont v2/dist/cli.js est plus vieux que v2/src : l'état du 21-11. */
+const git = (repo: string, ...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: repo, stdio: 'ignore' });
+/** Un dépôt git propre dont v2/dist/cli.js est plus vieux que v2/src (commité) : l'état du 21-11. */
 function depotPerime(): string {
   const repo = dossierTemp('l804-depot-');
   mkdirSync(join(repo, 'v2', 'src', 'bench'), { recursive: true }); mkdirSync(join(repo, 'v2', 'dist'));
+  writeFileSync(join(repo, '.gitignore'), 'v2/dist/\n');
   writeFileSync(join(repo, 'v2', 'dist', 'cli.js'), 'ancien');
   writeFileSync(join(repo, 'v2', 'src', 'bench', 'cli.ts'), 'neuf');
+  git(repo, 'init', '-q'); git(repo, 'add', '.'); git(repo, 'commit', '-qm', 'base');
   const vieux = new Date(Date.now() - 3_600_000); utimesSync(join(repo, 'v2', 'dist', 'cli.js'), vieux, vieux);
   return repo;
 }
@@ -35,7 +39,7 @@ const faux = (court = 0, erreur?: string) => {
 /** La construction réelle (distPerime) sur le dépôt donné ; construire et relancer notés. */
 function construction(repo: string, o: { echec?: string; rafraichit?: boolean; code?: number } = {}) {
   const fait = { construit: 0, relances: [] as { args: string[]; env: NodeJS.ProcessEnv }[] };
-  const c: Construction = { repo, perime: distPerime,
+  const c: Construction = { repo, perime: distPerime, nonCommite,
     construire: () => { fait.construit++; if (o.rafraichit !== false && !o.echec) { const t = new Date(Date.now() + 5000); utimesSync(join(repo, 'v2', 'dist', 'cli.js'), t, t); } return o.echec ?? null; },
     relancer: async (_r, args, env) => { fait.relances.push({ args, env }); return o.code ?? 0; } };
   return { c, fait };
@@ -65,6 +69,17 @@ describe('L804 : un v2/dist périmé est construit avant de mesurer', () => {
     expect(await complet([], enfant, { ...d, construction: c })).toBe(0);
     expect(appels.map((a) => a[1])).toEqual(['court', 's1', 'statut']);
     expect(ligneRefus(r)).toBeNull(); // le banc a mesuré : l'ancien refus disparaît
+  });
+  it('revue M1 : du travail non commité dans v2/src (ou briefs, hooks) refuse le banc AVANT toute construction, le dist lié reste intact', async () => {
+    for (const fichier of ['src/bench/cli.ts', 'briefs/a.md', 'hooks/h.sh']) {
+      const repo = depotPerime(), r = racine('s1');
+      mkdirSync(join(repo, 'v2', fichier, '..'), { recursive: true }); writeFileSync(join(repo, 'v2', fichier), 'travail en cours');
+      const { appels, d } = faux(); const { c, fait } = construction(repo);
+      expect(await complet([], ioTest({ BENCH_ROOT: r, HOME: r }), { ...d, construction: c })).toBe(2);
+      expect([fait.construit, fait.relances.length, appels.length]).toEqual([0, 0, 0]);
+      expect(readFileSync(join(repo, 'v2', 'dist', 'cli.js'), 'utf8')).toBe('ancien');
+      expect(ligneRefus(r)).toMatch(new RegExp(`v2 non construit : .*non commités.*v2/${fichier.split('/')[0]}`));
+    }
   });
   it('construction en échec : code 2, aucune relance, cause dans le statut', async () => {
     const repo = depotPerime(), r = racine('s1');
@@ -125,10 +140,54 @@ describe('L804 : construction et relance réelles, contrôles du service', () =>
     expect(await relancerV2(repo, ['bench', 'complet'], { ...process.env, [ENV_CONSTRUIT]: '1' })).toBe(3);
     expect(JSON.parse(readFileSync(trace, 'utf8'))).toEqual({ a: ['bench', 'complet'], e: '1' });
   });
-  it('le contrôle « node introuvable » du service écrit sa cause là où statut la lit', () => {
+  it('revue m1 : une construction réelle (tsc, v2/tsconfig.json) en erreur de type n\'écrit rien dans dist, qui reste périmé', () => {
+    const repo = depotPerime(), tsc = createRequire(import.meta.url).resolve('typescript/bin/tsc');
+    copyFileSync(join(import.meta.dirname, '..', 'tsconfig.json'), join(repo, 'v2', 'tsconfig.json'));
+    writeFileSync(join(repo, 'v2', 'package.json'), JSON.stringify({ name: 'x', private: true, scripts: { build: `node ${JSON.stringify(tsc)} -p tsconfig.json` } }));
+    writeFileSync(join(repo, 'v2', 'src', 'bench', 'cli.ts'), 'export {};\n');
+    writeFileSync(join(repo, 'v2', 'src', 'cli.ts'), 'export const x: number = "pas un nombre";\n');
+    expect(construireV2(repo)).toMatch(/TS2322/);
+    expect(readFileSync(join(repo, 'v2', 'dist', 'cli.js'), 'utf8')).toBe('ancien');
+    expect(distPerime(repo)).toMatch(/plus récent que v2\/dist\/cli\.js/); // le banc suivant reconstruit, il ne mesure pas ce code
+    writeFileSync(join(repo, 'v2', 'src', 'cli.ts'), 'export const x: number = 1;\n');
+    expect(construireV2(repo)).toBeNull();
+    expect(readFileSync(join(repo, 'v2', 'dist', 'cli.js'), 'utf8')).toMatch(/x = 1/);
+  });
+  it('revue m2 : une relance qui ne démarre pas ou qu\'un signal arrête écrit sa cause dans complet-refus.txt', async () => {
+    const repo = v2('true'), r = racine('s1'), maintenant = new Date('2026-11-28T09:00:00Z');
+    const noter = (cause: string) => { writeFileSync(join(r, FICHIER_REFUS), `${maintenant.toISOString()}\n${cause}\n`); };
+    expect(await relancerV2(repo, ['bench', 'complet'], process.env, noter, join(repo, 'absent'))).toBe(2);
+    expect(ligneRefus(r)).toMatch(/non joué : la relance sur le dist neuf n'a pas démarré : spawn .*ENOENT/);
+    writeFileSync(join(repo, 'v2', 'bin', 'cadence2.js'), "process.kill(process.pid, 'SIGKILL');");
+    expect(await relancerV2(repo, ['bench', 'complet'], process.env, noter)).toBe(1);
+    expect(ligneRefus(r)).toMatch(/non joué : la relance sur le dist neuf a été arrêtée par le signal SIGKILL/);
+    // de bout en bout : complet passe à la relance un noter qui écrit sous la racine du banc
+    const depot = depotPerime(), r2 = racine('s1');
+    const { c } = construction(depot); c.relancer = (rp, a, e, n) => relancerV2(rp, a, e, n, join(depot, 'absent'));
+    expect(await complet([], ioTest({ BENCH_ROOT: r2, HOME: r2 }), { ...faux().d, construction: c })).toBe(2);
+    expect(ligneRefus(r2)).toMatch(/n'a pas démarré/);
+  });
+  const controle = (motif: string) => {
     const unite = readFileSync(join(import.meta.dirname, '..', 'systeme', 'cadence-banc.service'), 'utf8');
-    const ligne = unite.split('\n').find((l) => l.startsWith('ExecStartPre=/bin/bash') && l.includes('node introuvable'))!;
-    const script = ligne.replace(/^ExecStartPre=\/bin\/bash -c '/, '').replace(/'$/, '').replaceAll('$$', '$');
+    const ligne = unite.split('\n').find((l) => l.startsWith('ExecStartPre=/bin/bash') && l.includes(motif))!;
+    return ligne.replace(/^ExecStartPre=\/bin\/bash -c '/, '').replace(/'$/, '').replaceAll('$$', '$');
+  };
+  it('revue m3 : le contrôle du lien cadence2 du service refuse un lien hors du checkout principal et écrit sa cause, laisse passer le bon', () => {
+    const principal = '/home/sylvain_ladoire/projects/developpeur/cadence/v2/';
+    const script = controle(principal);
+    const home = dossierTemp('l804-home-'), bin = join(home, 'bin'), ailleurs = join(home, 'ailleurs', 'v2', 'bin');
+    mkdirSync(join(home, 'bench-cadence')); mkdirSync(bin); mkdirSync(ailleurs, { recursive: true });
+    for (const o of ['date', 'readlink']) symlinkSync(`/bin/${o}`, join(bin, o));
+    writeFileSync(join(ailleurs, 'cadence2.js'), ''); symlinkSync(join(ailleurs, 'cadence2.js'), join(bin, 'cadence2'));
+    const lancer = (s: string) => execFileSync('/bin/bash', ['-c', s], { env: { HOME: home, PATH: bin }, stdio: 'ignore' });
+    expect(() => lancer(script)).toThrow();
+    expect(ligneRefus(join(home, 'bench-cadence'))).toMatch(new RegExp(`non joué : minuteur : cadence2 pointe sur « ${join(ailleurs, 'cadence2.js')} » et non sur le checkout principal`));
+    rmSync(join(home, 'bench-cadence', 'complet-refus.txt'));
+    expect(() => lancer(script.replace(principal, join(home, 'ailleurs', 'v2') + '/'))).not.toThrow(); // le bon lien passe, sans trace
+    expect(ligneRefus(join(home, 'bench-cadence'))).toBeNull();
+  });
+  it('le contrôle « node introuvable » du service écrit sa cause là où statut la lit', () => {
+    const script = controle('node introuvable');
     const home = dossierTemp('l804-home-'), bin = join(home, 'bin'); mkdirSync(join(home, 'bench-cadence')); mkdirSync(bin);
     symlinkSync('/bin/date', join(bin, 'date')); // un PATH sans node
     expect(() => execFileSync('/bin/bash', ['-c', script], { env: { HOME: home, PATH: bin }, stdio: 'ignore' })).toThrow();

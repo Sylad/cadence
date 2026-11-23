@@ -5,7 +5,7 @@ import type { Io } from '../cli.js';
 import { sequence } from '../sequence/cli.js';
 import { racineBanc } from './banc.js';
 import { bench, bruitDuSamedi, numerosARemesurer, REPO } from './cli.js';
-import { construireV2, distPerime, effacerRefus, ENV_CONSTRUIT, noterRefus, relancerV2 } from './refus-complet.js';
+import { construireV2, distPerime, effacerRefus, ENV_CONSTRUIT, nonCommite, noterRefus, relancerV2 } from './refus-complet.js';
 import { PUBLIE } from './verdict.js';
 
 export const USAGE_COMPLET = 'usage : cadence2 bench complet [--sequences id1,id2] [--juge modèle]';
@@ -17,8 +17,11 @@ export const sequencesDe = (racine: string): string[] => {
 };
 
 /** L804 : construire v2 quand son dist est périmé, puis se relancer sur le dist neuf. `repo` : le dépôt du code mesuré. Substituable dans les tests. */
-export type Construction = { repo: string; perime: (repo: string) => string | null; construire: (repo: string) => string | null; relancer: (repo: string, args: string[], env: NodeJS.ProcessEnv) => Promise<number> };
-export const CONSTRUCTION: Construction = { repo: REPO, perime: distPerime, construire: construireV2, relancer: relancerV2 };
+export type Construction = {
+  repo: string; perime: (repo: string) => string | null; nonCommite: (repo: string) => string | null; construire: (repo: string) => string | null;
+  relancer: (repo: string, args: string[], env: NodeJS.ProcessEnv, noter: (cause: string) => void) => Promise<number>;
+};
+export const CONSTRUCTION: Construction = { repo: REPO, perime: distPerime, nonCommite, construire: construireV2, relancer: relancerV2 };
 
 type Deps = { bench: typeof bench; sequence: typeof sequence; bruit: typeof bruitDuSamedi; construction?: Construction };
 
@@ -38,6 +41,8 @@ export async function complet(args: string[], io: Io, d: Deps = { bench, sequenc
     const c = d.construction;
     const vieux = c?.perime(c.repo);
     if (c && vieux) {
+      const sale = c.nonCommite(c.repo); // avant toute construction : jamais de travail en cours compilé dans le dist lié (revue L804 M1)
+      if (sale) { suivi.err(`bench complet refusé, v2 non construit : ${sale}`); return refuser(erreurs.join(' ')); }
       if (io.env.CADENCE_BANC_CONSTRUIT) { // ENV_CONSTRUIT, posée par la relance : pas de seconde construction
         suivi.err(`bench complet refusé : ${vieux} (encore après la construction)`); return refuser(erreurs.join(' '));
       }
@@ -45,7 +50,7 @@ export async function complet(args: string[], io: Io, d: Deps = { bench, sequenc
       const echec = c.construire(c.repo);
       if (echec) { suivi.err(`bench complet refusé : la construction de v2 (npm run build) a échoué : ${echec}`); return refuser(erreurs.join(' ')); }
       io.out('banc complet : v2 construit, relance sur le dist neuf');
-      return await c.relancer(c.repo, ['bench', 'complet', ...args], { ...io.env, [ENV_CONSTRUIT]: '1' });
+      return await c.relancer(c.repo, ['bench', 'complet', ...args], { ...io.env, [ENV_CONSTRUIT]: '1' }, (cause) => { noterRefus(racine, io.now(), cause); });
     }
     const code = await mesurer(args, suivi, d, racine);
     return code === 2 ? refuser(erreurs.join(' ') || 'banc refusé (code 2), cause absente du journal') : code;

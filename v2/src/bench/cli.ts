@@ -12,7 +12,7 @@ import { enteteEnvironnement, environnement, ligneComparaison, modelesExacts, pa
 import { fuitesDuBras, trierFuitesReference } from './fuites.js';
 import { etatGit, juger, travailNonLivre, type Jugement } from './juges.js';
 import { preparer } from './preparer.js';
-import { distPerime, ligneRefus } from './refus-complet.js';
+import { distPerime, ligneRefus, nonCommite } from './refus-complet.js';
 import { mesurerSansJuge, sansLivrable } from './sans-juge.js';
 import { BANCS_COURT, BARRE_SPEC, banBase, LIBELLE_COURT, bancsARemesurer, bruitParBanc, COMPLET_MAX_JOURS, ecartPaire, SUFFIXE_BRUIT_COMPTE, SUFFIXE_BRUIT_MAIN, ligneHistorique, titreVerdict, parisJour, PUBLIE, rapport, statut, verdict, verdictSansJuge, type MesureSansJuge, type PassageLu, type ResultatBanc, type Verdict } from './verdict.js';
 
@@ -37,10 +37,8 @@ export const depotMesure = (repo: string): string => {
 
 /** Le passage ne mesure que ce que l'empreinte décrit : null = prêt, sinon la raison du refus. */
 export function pretAPasser(repo: string, bras: Record<string, DefBras>, racine = ''): string | null {
-  const sale = execFileSync('git', ['status', '--porcelain', '--', 'v2/src', 'v2/briefs', 'v2/hooks'], { cwd: repo, encoding: 'utf8' }).trim();
-  if (sale) return `v2/src, v2/briefs ou v2/hooks a des changements non commités (l'empreinte ne les voit pas) :\n${sale}`;
-  const dist = distPerime(repo);
-  if (dist) return dist;
+  const sale = nonCommite(repo) ?? distPerime(repo);
+  if (sale) return sale;
   const briefs = join(repo, 'v2', 'briefs') + '/';
   for (const d of Object.values(bras)) for (const f of [d.brief, ...(d.settings ? [d.settings] : [])])
     if (!resolve(racine, f).startsWith(briefs)) return `brief ou réglages du bras ${d.nom} hors de ${briefs} : ${f}`;

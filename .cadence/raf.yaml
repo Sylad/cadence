@@ -4081,6 +4081,7 @@ lots:
     planned: { from: 2026-11-22, to: 2026-11-22 }
     created: 2026-11-22
     started: 2026-11-23
+    review: { date: 2026-11-23, verdict: "non conforme, 1 correction (tmp/revue-cadence-L804.md) : M1 complet.ts:155-161 construit avant le contrôle des non commités (travail en cours compilé dans le dist lié par npm link) ; m1 tsc sans noEmitOnError ; m2 relance échouée sans trace ; m3 lien cadence2 du service non testé ; budget relevé justifié", commit: be8e8550e5172030fc06aae5a23a1fdcf1a3eb0e }
   - id: L805
     title: "deliver --sha : la garde des lots compte comme du travail un commit de plan au sens du hook pre-push (registre .cadence/demandes, fichiers plan.onWrite) — deliveryLots doit filtrer avec isPlanSideOnly comme L784 (vécu ol 22-11 : 8c12b1d plan(L269) a bloqué la livraison de L262, contourné par raf ignore)"
     status: done

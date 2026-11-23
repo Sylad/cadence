@@ -11,7 +11,7 @@ The author shortens the flagged sentences. Nothing in it is specific to one repo
 |---|---|---|
 | long sentence | a sentence of more than `phrase` words | 25 |
 | long instruction | an instruction of more than `consigne` words | 20 |
-| passive voice | « être » (or « avoir été ») followed by a past participle: « est écrit », « a été lancée » | on |
+| passive voice | « être » (or « avoir été ») followed by a past participle: « est écrit », « a été lancée », « n'est pas livré » | on |
 | semicolon | a `;` joins two ideas: one idea per sentence | on |
 
 The output gives each signal with its place and an extract, then one summary line per group:
@@ -24,13 +24,17 @@ Nouveautés : 1 fichier, 12 phrases, 230 mots, moyenne 19,2 mots par phrase, 3 a
 
 The **average** (words per sentence) is the measure of the lot: compare it before and after on 2 or 3 daily reports.
 On 2026-11-23, the 20 News entries of cadence averaged 24,9 words per sentence, 40,6 % of them above 25.
+Measured again after the sentence splitting was fixed (L810): still 165 sentences and 24,9 words per sentence,
+40,6 % above 25. The News entries held no false cut. The passives went from 37 to 40 (the negated passive with elision).
 
 ## How the text is read
 
-- Markdown: the front matter, headings, fenced code, HTML comments and table separators are left out.
+- Markdown: the front matter, headings, fenced code, indented code (4 spaces or a tab, after a blank line and outside a list),
+  HTML comments and table separators are left out.
   A paragraph, a list item and a table cell are each a block. A block always ends a sentence.
 - A sentence ends at `.`, `!`, `?` or `…` followed by a blank and a capital, a digit or an opening quote.
-  So « p. ex. la » and « etc. et » do not cut.
+  So « p. ex. la » and « etc. et » do not cut. Nor does an abbreviation (« Cf. », « M. », « Mme. », « p. ex. », « n°. », « fig. »…),
+  « Etc. » alone, or a full stop inside a quotation « … ». « A, B, etc. Le lot » does cut, as does « 3 m. Le vent ».
 - A word is a run without blanks that holds a letter or a digit. « l'appel », « mini-blue » and an inline
   code span each count as one word. A link counts as its text, a bare URL as one word. A dash or an arrow counts for nothing.
 - A JSON report (a structured review) is read string by string. Its place is the JSON path: `qa.json#constats[0].texte`.
@@ -65,7 +69,8 @@ ecriture:
   depuis: 2026-11-23  # raf news check: only entries dated this day or after
 ```
 
-Every key is optional. Without the key, the defaults above apply. A malformed key is refused by `cadence ecriture`
+Every key is optional. Without the key, the defaults above apply. An empty key (`ecriture:` alone, or all its keys
+commented out) is declared: the defaults apply and `raf news check` warns. A malformed key is refused by `cadence ecriture`
 and by the check of `cadence.yaml` that `cadence config` runs before writing.
 
 **`raf news check`.** When `cadence.yaml` declares `ecriture:`, `raf news check` adds one line `⚠ écriture : …` per signal

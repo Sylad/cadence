@@ -76,30 +76,54 @@ function apresFrontMatter(lignes) {
   return fin > 0 ? fin + 1 : 0;
 }
 
-/** Une ligne lue dans l'état `e` (`r` : blocs rendus, `cur` : bloc ouvert, `barriere` : clôture de code attendue). */
-function lireLigne(e, l, n) {
+// Un bloc de code indenté (4 espaces ou une tabulation) : il s'ouvre après une ligne vide (il ne coupe pas un paragraphe), hors d'une liste
+// (dans une liste, l'indentation continue la puce) ; il dure tant que les lignes restent indentées ou vides.
+const INDENTE = /^( {4}|\t)/;
+function codeIndente(e, brute) {
+  if (e.indente && (INDENTE.test(brute) || !brute.trim())) return true;
+  e.indente = INDENTE.test(brute) && brute.trim() !== '' && !e.cur && !e.liste;
+  return e.indente;
+}
+
+/** Vrai pour une ligne de code clôturé (``` ou ~~~), clôtures comprises ; tient `e.barriere`, la clôture attendue. */
+function codeCloture(e, l) {
   const clotureCode = /^(```|~~~)/.exec(l);
-  if (e.barriere || clotureCode) {
-    if (!e.barriere) e.barriere = clotureCode[1];
-    else if (l.startsWith(e.barriere)) e.barriere = null;
-    return e.fermer();
-  }
-  if (!l || /^<!--.*-->$/.test(l) || /^\|?\s*:?-{3,}/.test(l)) return e.fermer();
+  if (!e.barriere && !clotureCode) return false;
+  if (!e.barriere) e.barriere = clotureCode[1];
+  else if (l.startsWith(e.barriere)) e.barriere = null;
+  return true;
+}
+
+/** Une ligne qui ouvre un bloc (titre, puce, tableau) : ferme le bloc en cours, ouvre le sien ; faux pour une ligne de paragraphe. */
+function ouvrirBloc(e, l, n) {
   const m = marqueur(l);
-  if (m) e.fermer();
+  if (!m) return false;
+  e.fermer();
   if (m === 'tableau') for (const c of l.split('|')) if (c.trim()) e.r.push({ ligne: n, texte: c.trim() });
-  if (m === 'puce') e.cur = { ligne: n, texte: l.replace(/^([-*+]|\d+[.)]|>+)\s*/, '') };
-  if (m) return;
+  if (m === 'puce') {
+    e.liste = true;
+    e.cur = { ligne: n, texte: l.replace(/^([-*+]|\d+[.)]|>+)\s*/, '') };
+  }
+  return true;
+}
+
+/** Une ligne lue dans l'état `e` (`r` : blocs rendus, `cur` : bloc ouvert, `barriere` : clôture de code attendue, `liste` : dans une liste). */
+function lireLigne(e, brute, n) {
+  const l = brute.trim();
+  if ((!e.barriere && codeIndente(e, brute)) || codeCloture(e, l)) return e.fermer();
+  if (l && !e.cur && !INDENTE.test(brute) && !marqueur(l)) e.liste = false; // une ligne paresseuse continue la puce
+  if (!l || /^<!--.*-->$/.test(l) || /^\|?\s*:?-{3,}/.test(l)) return e.fermer();
+  if (ouvrirBloc(e, l, n)) return;
   e.cur ??= { ligne: n, texte: '' };
   e.cur.texte += ` ${l}`;
 }
 
-/** Les blocs d'un texte markdown `{ ligne, texte }` : paragraphe, élément de liste, cellule de tableau. Front matter, code, titres et commentaires ôtés. */
+/** Les blocs d'un texte markdown `{ ligne, texte }` : paragraphe, élément de liste, cellule de tableau. Front matter, code (clôturé ou indenté), titres et commentaires ôtés. */
 export function blocs(texte) {
   const lignes = texte.replace(/\r\n?/g, '\n').split('\n');
-  const e = { r: [], cur: null, barriere: null };
+  const e = { r: [], cur: null, barriere: null, indente: false, liste: false };
   e.fermer = () => { if (e.cur?.texte.trim()) e.r.push({ ligne: e.cur.ligne, texte: e.cur.texte.trim() }); e.cur = null; };
-  for (let i = apresFrontMatter(lignes); i < lignes.length; i++) lireLigne(e, lignes[i].trim(), i + 1);
+  for (let i = apresFrontMatter(lignes); i < lignes.length; i++) lireLigne(e, lignes[i], i + 1);
   e.fermer();
   return e.r;
 }
@@ -108,14 +132,41 @@ const MOT = /[\p{L}\p{N}]/u;
 /** Les mots d'une phrase : suites séparées par des blancs qui portent une lettre ou un chiffre (« l'appel », « mini-blue » et un code comptent pour un). */
 export const mots = (phrase) => phrase.split(/\s+/).filter((t) => MOT.test(t));
 
+// Abréviations qui ne finissent jamais une phrase : « Cf. Le lot » ou « p. ex. Le lot » ne coupent pas après elles.
+const ABREVIATION = /(?:^|[\s(«"“])(?:cf|mm|mme|mmes|mlle|mlles|me|dr|pr|ex|p|pp|n°|no|nos|art|fig|chap|vol|env|resp|éd|cad|c\.-à-d)\.$/iu;
+// « M. » (monsieur) en capitale seulement : « 3 m. Le vent » finit une phrase.
+const MONSIEUR = /(?:^|[\s(«"“])M\.$/u;
+// « etc. » peut finir une phrase (« A, B, etc. Le lot suit. ») : elle ne coupe que si quelque chose la précède dans la phrase (« Etc. Le lot » non).
+const ETC_SEUL = /^\P{L}*etc\.$/iu;
+const OUVRANTS = /[«“]/g;
+const FERMANTS = /[»”]/g;
+const compte = (t, re) => (t.match(re) ?? []).length;
+
+/** Vrai si une coupure à `i` tombe dans une citation « … » (ou “ … ”) ouverte avant et fermée après, dans le même bloc. */
+function dansCitation(texte, i) {
+  const avant = texte.slice(0, i);
+  const apres = texte.slice(i);
+  return compte(avant, OUVRANTS) > compte(avant, FERMANTS) && compte(apres, FERMANTS) > compte(apres, OUVRANTS);
+}
+
 /**
  * Les phrases d'un bloc nettoyé : coupure après « . ! ? … » suivis d'un blanc puis d'une majuscule, d'un chiffre ou d'un guillemet ouvrant ;
- * « p. ex. la » ou « etc. et » ne coupent donc pas. La fin du bloc termine la phrase.
+ * « p. ex. la » ou « etc. et » ne coupent donc pas. Pas de coupure non plus après une abréviation (Cf., M., Mme., p. ex., n°.), après « Etc. »
+ * seul, ni à l'intérieur d'une citation « … » (L810). La fin du bloc termine la phrase.
  */
 function decouper(texte) {
   const codes = [];
-  return nettoyer(texte, codes).split(/(?<=[.!?…])\s+(?=[\p{Lu}\p{N}«"“(\uE000])/u).map((p) => p.trim()).filter((p) => mots(p).length)
-    .map((brut) => ({ brut, texte: brut.replace(JETON, (_, i) => codes[Number(i)]) }));
+  const t = nettoyer(texte, codes);
+  const r = [];
+  let debut = 0;
+  for (const c of t.matchAll(/(?<=[.!?…])\s+(?=[\p{Lu}\p{N}«"“(\uE000])/gu)) {
+    const morceau = t.slice(debut, c.index).trim();
+    if (ABREVIATION.test(morceau) || MONSIEUR.test(morceau) || ETC_SEUL.test(morceau) || dansCitation(t, c.index)) continue;
+    r.push(morceau);
+    debut = c.index + c[0].length;
+  }
+  r.push(t.slice(debut).trim());
+  return r.filter((p) => mots(p).length).map((brut) => ({ brut, texte: brut.replace(JETON, (_, i) => codes[Number(i)]) }));
 }
 /** Les phrases d'un bloc, telles qu'on les lit (le code en ligne rendu tel quel). */
 export const phrasesDuBloc = (texte) => decouper(texte).map((p) => p.texte);
@@ -157,11 +208,11 @@ const PAS_PARTICIPES = new Set(['aussi', 'ainsi', 'ici', 'parmi', 'lui', 'oui', 
 // passé composé des verbes de mouvement ou d'état conjugués avec « être » : « est arrivé » n'est pas une voix passive
 const ETRE_ACTIF = /^(allé|arrivé|parti|venu|revenu|devenu|parvenu|intervenu|survenu|apparu|entré|rentré|sorti|resté|tombé|né|mort|monté|descendu|passé|retourné)(e|s|es)?$/;
 
-/** La forme passive d'une phrase (« est écrit », « a été lancée », « sont pas relus »), ou null. Une heuristique : elle signale, elle ne prouve pas. */
+/** La forme passive d'une phrase (« est écrit », « a été lancée », « sont pas relus », « n'est pas livré »), ou null. Une heuristique : elle signale, elle ne prouve pas. */
 export function passif(phrase) {
   const t = minuscules(phrase);
   for (let i = 0; i < t.length; i++) {
-    if (!AUX.has(t[i])) continue;
+    if (!AUX.has(t[i].replace(/^n['’]/, ''))) continue; // « n'est pas livré » : la négation élidée colle à l'auxiliaire
     let j = i + 1;
     while (j < t.length && ADVERBES.has(t[j]) && !(t[j] === 'été' && j + 1 >= t.length)) j++;
     const p = t[j];

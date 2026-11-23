@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { analyserFichier, ligneSignal, lireEcriture } from '../scripts/ecriture.mjs';
 import { type Entry, loadEntries } from './news.js';
 import { RafError } from './plan.js';
-import { readYamlKey } from './yaml-keys.js';
+import { isObject, readYamlFile } from './yaml-keys.js';
 
 /**
  * Les signaux d'écriture courte (L803, scripts/ecriture.mjs) des entrées Nouveautés, pour `raf news check` : seulement quand cadence.yaml déclare
@@ -10,11 +10,12 @@ import { readYamlKey } from './yaml-keys.js';
  * Des avertissements : ils ne comptent pas dans les écarts et ne bloquent rien — le contrôle signale, l'auteur réécrit.
  */
 function writingWarnings(configFile: string, dir: string, entries: Entry[]): string[] {
-  const value = readYamlKey(configFile, 'ecriture');
-  if (value == null) return [];
+  // déclarée = active, même vide (`ecriture:` sans valeur, ou toutes ses sous-clés en commentaire) : les réglages par défaut (L810)
+  const doc = readYamlFile(configFile);
+  if (!isObject(doc) || !('ecriture' in doc)) return [];
   let r;
   try {
-    r = lireEcriture(value, 'cadence.yaml');
+    r = lireEcriture(doc.ecriture, 'cadence.yaml');
   } catch (e) {
     throw new RafError((e as Error).message);
   }

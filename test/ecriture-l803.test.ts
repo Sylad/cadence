@@ -72,6 +72,27 @@ describe('du markdown aux phrases', () => {
       .toEqual(['Voir p. ex. la page `a b c`.', 'Ensuite, etc. et puis.', '2 lots sont faits !', 'Fin…', '« Oui » dit-il.']);
   });
 
+  it('L810 : pas de coupure après une abréviation (Cf., M., Mme., p. ex.), après « Etc. » seul, ni dans une citation « … »', () => {
+    expect(phrasesDuBloc('Cf. M. Dupont qui a codé.')).toEqual(['Cf. M. Dupont qui a codé.']);
+    expect(phrasesDuBloc('Etc. Le lot suit.')).toEqual(['Etc. Le lot suit.']);
+    expect(phrasesDuBloc('Voir p. ex. Le lot. Puis Mme. Durand part.')).toEqual(['Voir p. ex. Le lot.', 'Puis Mme. Durand part.']);
+    expect(phrasesDuBloc('Il a dit « Bonjour. Ça va ? » puis il part. Fin.')).toEqual(['Il a dit « Bonjour. Ça va ? » puis il part.', 'Fin.']);
+    // une vraie fin de phrase reste une coupure : « etc. » après une liste, « 3 m. » (mètres), « n° 3. », un guillemet jamais fermé
+    expect(phrasesDuBloc('A, B, etc. Le lot suit.')).toEqual(['A, B, etc.', 'Le lot suit.']);
+    expect(phrasesDuBloc('La vague fait 3 m. Le vent tourne.')).toEqual(['La vague fait 3 m.', 'Le vent tourne.']);
+    expect(phrasesDuBloc('Le lot n° 3. Puis la suite.')).toEqual(['Le lot n° 3.', 'Puis la suite.']);
+    expect(phrasesDuBloc('Un « seul. Ouvrant.')).toEqual(['Un « seul.', 'Ouvrant.']);
+  });
+
+  it('L810 : un bloc de code indenté de 4 espaces (ou une tabulation) est ôté comme un bloc clôturé ; dans une liste, l’indentation continue la puce', () => {
+    const code = `    ${phrase(31)}\n\tencore du code`;
+    expect(blocs(`Texte.\n\n${code}\n\nAprès.\n`)).toEqual([{ ligne: 1, texte: 'Texte.' }, { ligne: 6, texte: 'Après.' }]);
+    expect(analyser(`Texte.\n\n${code}\n`).phrases.flatMap((p) => p.signaux)).toEqual([]);
+    // une ligne indentée qui suit un paragraphe le continue (elle ne l'interrompt pas)
+    expect(blocs('Un paragraphe\n    qui continue.')).toEqual([{ ligne: 1, texte: 'Un paragraphe qui continue.' }]);
+    expect(blocs('- une puce\n\n    suite de la puce\n')).toEqual([{ ligne: 1, texte: 'une puce' }, { ligne: 3, texte: 'suite de la puce' }]);
+  });
+
   it('un mot porte une lettre ou un chiffre : « l’appel », « mini-blue » comptent pour un, un tiret ou une flèche pour zéro', () => {
     expect(mots("l'appel de mini-blue — 18 h 30 → fini")).toEqual(["l'appel", 'de', 'mini-blue', '18', 'h', '30', 'fini']);
   });
@@ -111,6 +132,13 @@ describe('les signaux', () => {
     expect(passif('La revue a été lancée hier.')).toBe('été lancée');
     expect(passif('Les captures ne sont pas relues.')).toBe('sont pas relues');
     expect(passif('Les lots seront livrés demain.')).toBe('seront livrés');
+  });
+
+  it('L810 : le passif nié avec élision est signalé (« n’est pas livré », « n’étaient pas écrits »)', () => {
+    expect(passif("Le lot n'est pas livré.")).toBe("n'est pas livré");
+    expect(passif('Ce n’est pas écrit.')).toBe('n’est pas écrit');
+    expect(passif("Les tests n'étaient jamais écrits.")).toBe("n'étaient jamais écrits");
+    expect(passif("Ce n'est pas un lot.")).toBeNull();
   });
 
   it('pas de voix passive pour un verbe de mouvement au passé composé, un adjectif ou un adverbe', () => {
@@ -235,6 +263,17 @@ describe('raf news check (L803)', () => {
     expect(avec.out).toContain('⚠ écriture : 2026-11-23-neuve.md:8  30 mots (seuil 25)');
     expect(avec.out).toContain('⚠ écriture : 2026-11-23-neuve.md:8  voix passive ? (« est écrit »)');
     expect(avec.out).not.toContain('écriture : 2026-11-20-vieille');
+  });
+  it('L810 : une clé ecriture: vide (YAML null) vaut les réglages par défaut : déclarée = active', () => {
+    const dir = gitRepo();
+    cli(dir, 'init', '--no-hook');
+    cli(dir, 'add', 'Un lot');
+    entree(dir, '2026-11-23-neuve.md', '2026-11-23', `${phrase(30)} Le fichier est écrit.`);
+    const yaml = join(dir, 'cadence.yaml');
+    (existsSync(yaml) ? appendFileSync : writeFileSync)(yaml, '\necriture:\n  # phrase: 30\n');
+    const r = cli(dir, 'news', 'check');
+    expect(r.out).toContain('⚠ écriture : 2026-11-23-neuve.md:8  30 mots (seuil 25)');
+    expect(r.out).toContain('voix passive ? (« est écrit »)');
   });
 });
 

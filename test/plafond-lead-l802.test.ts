@@ -49,9 +49,14 @@ describe('plafond du lead (L802)', () => {
     expect((await cad(env, 'lead', 'plafond')).out).toBe('plafond du lead : aucun · créneaux sur 5 (réglage CADENCE_MAX_SESSIONS)');
     const set = await cad(env, 'lead', 'plafond', '3');
     expect(set.code).toBe(0);
-    expect(set.out).toBe('plafond du lead : 3 (réglage 5) · créneaux, lancements de vague, bande et lead tour sur 3 ; le retirer : cadence lead plafond aucun');
-    expect((await cad({ CADENCE_MAX_SESSIONS: '2' }, 'lead', 'plafond')).out).toBe('plafond du lead : 3, sans effet (réglage 2, le lead ne le relève pas) · créneaux sur 2');
+    expect(set.out).toBe('plafond du lead : 3 (réglage 5), posé depuis 0 min (2026-11-20 18:50 UTC) · créneaux, lancements de vague, bande et lead tour sur 3 ; le retirer : cadence lead plafond aucun');
+    expect((await cad({ CADENCE_MAX_SESSIONS: '2' }, 'lead', 'plafond')).out).toBe('plafond du lead : 3, sans effet (réglage 2, le lead ne le relève pas), posé depuis 0 min (2026-11-20 18:50 UTC) · créneaux sur 2');
     expect((await cad(env, 'lead', 'plafond', 'aucun')).out).toBe('plafond du lead : aucun · créneaux sur 5 (réglage CADENCE_MAX_SESSIONS)');
+    // sans argument, il dit depuis quand le plafond est posé (le champ `since` du fichier) : un plafond du rythme du quota survit à la remise à zéro
+    writeLeadCap(process.env.CADENCE_HOME!, 3, new Date('2026-11-18T16:20:00Z'));
+    expect((await cad(env, 'lead', 'plafond')).out).toBe('plafond du lead : 3 (réglage 5), posé depuis 2 j 2 h (2026-11-18 16:20 UTC) · créneaux, lancements de vague, bande et lead tour sur 3 ; le retirer : cadence lead plafond aucun');
+    writeFileSync(join(process.env.CADENCE_HOME!, LEAD_CAP_FILE), '{"cap":3}');
+    expect((await cad(env, 'lead', 'plafond')).out).toBe('plafond du lead : 3 (réglage 5) · créneaux, lancements de vague, bande et lead tour sur 3 ; le retirer : cadence lead plafond aucun');
     for (const bad of ['0', 'trois', '2.5']) {
       const r = await cad(env, 'lead', 'plafond', bad);
       expect(r.code).not.toBe(0);

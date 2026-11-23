@@ -17,7 +17,7 @@ export type BackgroundCommandInfo = CommandInfo
 /** Un passage du banc de cadence 2, une ligne de `historique.jsonl` (ligneHistorique de v2/src/bench/verdict.ts) ; `sequence` : ligne `type: 'sequence'` (v2/src/sequence/verdict.ts). */
 export type BancPassage = { date: string; candidat: string; bancs: string[]; hebdo: boolean; vert: boolean; rouges: string[]; sequence?: boolean; niveau?: string }
 
-/** Les sous-agents de la session qui travaillent (L802 : `running` ou `pending`, jamais un agent au repos qui attend un message) ; `names` les nomme tous. */
+/** Les sous-agents de la session qui travaillent (L802 : `running`, `pending` ou `waiting`, retenu par un travail ; jamais un agent `idle`, au repos qui attend un message) ; `names` les nomme tous. */
 export type AgentsSummary = { running: number; names: string[] }
 
 /** Ce qu'un modèle a consommé sur la session : tokens (entrée + sortie + cache) et dollars qui lui sont attribués. */

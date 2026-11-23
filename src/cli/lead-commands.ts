@@ -11,6 +11,7 @@ import { findProjects, isProject, leadTour, readDepth, tourCiLines, tourFreeLine
 import { tourMemoryLines } from '../memory-index.js';
 import { localOverdueLines } from '../local-task.js';
 import { expiredHoldLines, shownCap, slotsLine } from '../orchestrate/command.js';
+import { longDuration } from '../orchestrate/guard.js';
 import { readLeadCap, writeLeadCap } from '../orchestrate/plafond-lead.js';
 import { addHold, cadenceHome, liveRuns, releaseHold, runNamedBy } from '../orchestrate/registry.js';
 import { perfHeader } from '../perf.js';
@@ -116,9 +117,12 @@ function leadPlafond(rest: string[], io: Io): number {
   }
   const lead = readLeadCap(home);
   const { cap, setting } = shownCap(io.env);
+  // depuis quand (revue L802) : un plafond posé pour le rythme du quota survit à la remise à zéro, son âge le rappelle ; `since` illisible : rien
+  const since = lead ? Date.parse(lead.since) : NaN;
+  const age = Number.isFinite(since) ? `, posé depuis ${longDuration(io.now().getTime() - since)} (${lead!.since.slice(0, 16).replace('T', ' ')} UTC)` : '';
   if (!lead) io.out(`plafond du lead : aucun · créneaux sur ${setting} (réglage CADENCE_MAX_SESSIONS)`);
-  else if (lead.cap >= setting) io.out(`plafond du lead : ${lead.cap}, sans effet (réglage ${setting}, le lead ne le relève pas) · créneaux sur ${cap}`);
-  else io.out(`plafond du lead : ${lead.cap} (réglage ${setting}) · créneaux, lancements de vague, bande et lead tour sur ${cap} ; le retirer : cadence lead plafond aucun`);
+  else if (lead.cap >= setting) io.out(`plafond du lead : ${lead.cap}, sans effet (réglage ${setting}, le lead ne le relève pas)${age} · créneaux sur ${cap}`);
+  else io.out(`plafond du lead : ${lead.cap} (réglage ${setting})${age} · créneaux, lancements de vague, bande et lead tour sur ${cap} ; le retirer : cadence lead plafond aucun`);
   return 0;
 }
 

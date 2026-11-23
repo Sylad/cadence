@@ -957,20 +957,32 @@ test('un sous-agent terminé emporte ses commandes au rafraîchissement, un sous
   expect(Object.keys(hud.info())).toEqual(['b1', 'b3'])
 })
 
-test('L802 — le compteur d’agents ne compte que ceux qui travaillent (running, pending) : un agent au repos (waiting) ou fini ne retient pas la fermeture', async ($, on) => {
+test('L802 — le compteur d’agents compte ceux qui travaillent ou sont retenus (running, pending, waiting) : un agent au repos (idle) ou fini ne retient pas la fermeture', async ($, on) => {
+  // AgentStatus du SDK : `waiting` = retenu (sa commande de fond, l'approbation d'un plan, un appel Agent imbriqué) ; `idle` = au repos, il attend un message
   const agentList = {
     current: (): unknown => ({
       value: [
         { id: 'a1', status: 'running', name: 'livreur', type: 'cadence:livreur' },
         { id: 'a2', status: 'pending', type: 'cadence:qa-reviewer' },
         { id: 'a3', status: 'waiting', name: 'revue-L800', type: 'cadence:code-reviewer' },
+        { id: 'a5', status: 'idle', name: 'au-repos', type: 'general-purpose' },
         { id: 'a4', status: 'completed', name: 'fini', type: 'general-purpose' },
       ],
     }),
   }
   const { hud, refresh } = await mounted($, on, agentList)
   await refresh()
-  expect(hud.state('agents')).toEqual({ running: 2, names: ['livreur', 'cadence:qa-reviewer'] })
+  expect(hud.state('agents')).toEqual({ running: 3, names: ['livreur', 'cadence:qa-reviewer', 'revue-L800'] })
+})
+
+test('L802 — un seul sous-agent retenu (waiting, sans commande vue) suffit : la bande ne dit jamais « rien ne tourne »', async ($, on) => {
+  const agentList = { current: (): unknown => ({ value: [{ id: 'a3', status: 'waiting', name: 'plan-L800', type: 'Plan' }] }) }
+  const { hud, refresh } = await mounted($, on, agentList)
+  await refresh()
+  expect(hud.state('agents')).toEqual({ running: 1, names: ['plan-L800'] })
+  agentList.current = () => ({ value: [{ id: 'a3', status: 'idle', name: 'plan-L800', type: 'Plan' }] })
+  await refresh()
+  expect(hud.state('agents')).toEqual({ running: 0, names: [] })
 })
 
 test('si $.agent.list() échoue, le rafraîchissement ne retire aucune commande (une liste vide ne dit pas que tous les sous-agents ont fini)', async ($, on) => {

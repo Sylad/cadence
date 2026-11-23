@@ -216,8 +216,11 @@ export const register: Register = on => {
           : null
         // un sous-agent fini (ou disparu) emporte ses commandes même si son avis de fin n'a pas été vu
         if (listed) for (const gone of endedOwners(ownersNow, list)) await endCommand($, gone)
-        // L802 (D-30) : seuls comptent les sous-agents qui travaillent ; un agent au repos (« waiting » : fini, il attend un message) ne retient pas la fermeture
-        const live = list.filter(a => a.status === 'running' || a.status === 'pending')
+        // L802 (D-30) : comptent les sous-agents qui travaillent ou sont retenus (AgentStatus du SDK : `running`, `pending`, et `waiting`, retenu par sa
+        // commande de fond, l'approbation d'un plan ou un appel Agent imbriqué) ; un agent au repos entre deux tours (`idle`, il attend un message) ou fini
+        // ne retient pas la fermeture
+        const LIVE_AGENT = new Set(['running', 'pending', 'waiting'])
+        const live = list.filter(a => LIVE_AGENT.has(a.status))
         const summary: AgentsSummary = {
           running: live.length,
           names: live.map(a => a.name ?? a.type),

@@ -12,7 +12,7 @@ ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │
 
 Context of the session (green / orange / red at 50 and 75 %), the 5-hour and 7-day quota
 windows with the time to their reset, the cost of the session and its split per model, the
-subagents of this session that work (`running` or `pending`; an agent at rest that waits for a message is not counted, L802), the background commands in progress (`2 cmd`: Bash run in the background and Monitor, subagents' included, as the app's "background commands" card counts them), and every live `cadence orchestrate` wave: budget, sessions, one
+subagents of this session that work (`running`, `pending`, or `waiting`, held by its background command, a plan's approval or a nested Agent call; an `idle` agent at rest between turns, waiting for a message, is not counted, L802), the background commands in progress (`2 cmd`: Bash run in the background and Monitor, subagents' included, as the app's "background commands" card counts them), and every live `cadence orchestrate` wave: budget, sessions, one
 aligned line per active lot (status, step, model, elapsed, start of the title; `porte@tests 3 min` while the program's build or test gate runs with no session, L395), the lots still
 waiting. A lot the plan already closed (`closed` of `cadence lead tour --json`, the criterion of the lots panel, `estClos`) is no longer a line (L609, whatever its wave status): one grey line under the open lots, indented by 2 columns, counts them, `livrés : N` (closed with `delivered`) then `· clos non livrés : M` only if M > 0, and does not exist when none is closed; it is read-only, the detail is in `/hud lots`. Until the tour has been read, with a `cadence` too old to say which lots are closed, or when the tour failed before any read, every lot stays listed and no counter shows. When no wave is running, the last finished one stays on a grey line for 30 minutes
 after it ended, then disappears. A background command counted for more than an hour, or with no
@@ -56,11 +56,11 @@ time limit has run out stops counting in the slots but is not dropped (L278). A 
 something it sees alive (L802): a working subagent of this session whose name is or cites the label, or a live run whose id or lot the label cites. Then the
 red row stays with the work in progress, `⚠ session du lead échue : correctif-B28  depuis 5 h 00 · échue depuis 2 h 10 · tourne encore`; otherwise it is a
 forgotten reservation, written grey under the history: `réservation échue, rien ne tourne : correctif-B28  échue depuis 2 h 10 · cadence lead release correctif-B28`.
-Either stays until `cadence lead release <label>` or a renewed `lead hold`.
+Either stays until `cadence lead release <label>` or a renewed `lead hold`. They are read from disk (`holds/` of the cadence home), like the waves.
 
 **The cap applied (L802).** `M` of `sur M` is the cap in force: `CADENCE_MAX_SESSIONS` (2 by default) lowered by the cap the lead set with
 [`cadence lead plafond <n>`](lead.md#lead-plafond) (`plafond-lead.json` of the cadence home), never raised. When the lead holds itself below the setting the
-line says so: `créneaux libres : 1 sur 3 (plafond du lead, réglage 5)`. `test/plafond-lead-l802.test.ts` plays the real collector on that file. They are read from disk (`holds/` of the cadence home), like the waves.
+line says so: `créneaux libres : 1 sur 3 (plafond du lead, réglage 5)`. `test/plafond-lead-l802.test.ts` plays the real collector on that file.
 
 **The `cadence run`s and their state (L687, D-1).** Above the slots line, one aligned line per **live** run (L802: a finished run goes to the grey history line, see « Can I close? »): `▶ run cadence:L687  en cours  opus 12 min · $1.20  HUD 2.0 (D-1) : …`
 — repository folder and lot (the run id without a lot), its state, then for a live run the model and the time since it started (`attend le quota · reprise 14:05`

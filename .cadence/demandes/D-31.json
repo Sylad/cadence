@@ -3,7 +3,9 @@
   "texte": "oui, inscris le lot pour lundi",
   "contexte": "Réponse à la proposition du lead (21-11, 18 h) d'appliquer les principes de l'ASD-STE100 (phrases courtes, une idée par phrase, mots simples ; vidéo Melvynx « Claude répond comme un manuel d'avion ») aux textes lus sans la conversation : bilan du jour, Nouveautés, rapports de revue, par un contrôle mesuré plutôt qu'une ligne d'instructions.",
   "date": "2026-11-21",
-  "etat": "ouverte",
-  "preuve": null,
-  "lots": ["L803"]
+  "etat": "livrée",
+  "preuve": "L803 b1b99c9b (cadence ecriture, 26 tests, revue conforme, éval verte) poussé a0f554a6 le 2026-11-23 ; mesure de départ 24,9 mots/phrase sur 20 Nouveautés ; suites en L810",
+  "lots": [
+    "L803"
+  ]
 }

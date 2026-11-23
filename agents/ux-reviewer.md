@@ -130,6 +130,9 @@ session and a call by hand without it have none.
   measure it rests on (e.g. `major — /players: target 18×18 px, WCAG 2.5.8`); `Not verified: <what could not be run or seen>`
   (`Not verified: none` when nothing); `Sub-tasks: <n> — <the lines to add to the plan, by their first words>`; `Report: <the path>`.
   Add a last line `Captures: <the absolute path of the capture folder>` (the folder the brief names): the report file does not replace the captures, which the lead opens itself.
+- Write the report short (L803, `docs/ecriture.md` of the package): one idea per sentence, 25 words at most, 20 for an
+  instruction, active voice. Once the file is written, run `cadence ecriture <the path>` when the command exists. It only reports:
+  shorten each flagged sentence yourself, without changing a finding, a measure or the verdict, then reply.
 - If you cannot write the file, say so on the first line of the reply and give the whole report in the reply, as if
   the brief had no report file: a verdict whose evidence nobody can read is lost.
 - With no `Report file:` line in the brief, give the complete report in your reply.

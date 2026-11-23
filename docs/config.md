@@ -126,3 +126,9 @@ red gate, with the files put back as they were; this has its own correction, it 
 Before every rebase and every resumed session, all the run's regeneration commits are removed and played again on the updated tree.
 Output written to files that git ignores is seen by the gate but never committed. `dir` is relative to the repository, without `..`,
 `/` or `~`; any other key, or a malformed entry, is refused by `cadence run` and by the gate that validates `cadence.yaml`, with the key at fault.
+
+## Short writing: `ecriture:`
+
+`ecriture:` sets the thresholds of `cadence ecriture` (L803): words per sentence (`phrase`, 25), per instruction (`consigne`, 20),
+and whether the passive voice (`passif`) and the semicolon (`pointVirgule`) are flagged. Declared, it also makes `raf news check` warn
+about the entries dated `depuis` or later; a warning blocks nothing. Details: [ecriture.md](ecriture.md).

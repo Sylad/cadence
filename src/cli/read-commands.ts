@@ -11,6 +11,7 @@ import { ganttData, renderGantt } from '../gantt.js';
 import { linkCommits } from '../link.js';
 import { EXPORT_SCHEMA, eventLine, exportPlan, planEvents } from '../plan-events.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues, stampEntries } from '../news.js';
+import { writingCheck } from '../news-writing.js';
 import { type Lot, Plan, RafError, type Status, STATUSES } from '../plan.js';
 import { dueLine, recurringByDue } from '../recurring.js';
 import { quickwinLines, quickwins, readMax } from '../quickwins.js';
@@ -238,7 +239,10 @@ export function cmdQuickwins(c: Ctx): number {
 /** raf news … : les entrées Nouveautés. */
 export function cmdNews(c: Ctx): number {
   const { rest, values, io, today, root, configPath, loadPlan, newsDir, refuseLongTitle } = c;
-  return news(rest, loadPlan(), newsDir, today, values, io, refuseLongTitle, () => hypothesesOf(root, configPath, loadPlan().refs));
+  const code = news(rest, loadPlan(), newsDir, today, values, io, refuseLongTitle, () => hypothesesOf(root, configPath, loadPlan().refs));
+  // L803 : après « raf news check », les phrases longues, passives ou à point-virgule des entrées, en avertissement (clé ecriture:, docs/ecriture.md)
+  writingCheck(rest[0], configPath, newsDir, io.out);
+  return code;
 }
 
 /** cadence ref coverage lit le plan (les lots faits qui citent les éléments) : il passe après le choix du plan, les autres ref n'y touchent pas (L367). */

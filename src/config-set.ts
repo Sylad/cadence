@@ -13,6 +13,7 @@ import { findProjects, isProject, readDepth, readLeadChain, readLeadContextThres
 import { readEvalEntries } from './lot-evals.js';
 import { lireRegeneration } from '../scripts/regeneration.mjs';
 import { lireAnalyse } from '../scripts/analyse.mjs';
+import { lireEcriture } from '../scripts/ecriture.mjs';
 import { readYamlKey } from './yaml-keys.js';
 import { readMemoryIndexMax } from './memory-index.js';
 import { readPriority } from './orchestrate/continue.js';
@@ -46,6 +47,7 @@ export function validateConfig(file: string, root: string): void {
   readReferencesConfig(file);
   try { lireRegeneration(readYamlKey(file, 'run'), file); } catch (e) { throw new RafError((e as Error).message); } // L781 : run.regenerate, le code de cadence run
   try { lireAnalyse(readYamlKey(file, 'analyse'), file); } catch (e) { throw new RafError((e as Error).message); } // L801 : analyse, le code de la porte de cadence run
+  try { lireEcriture(readYamlKey(file, 'ecriture'), file); } catch (e) { throw new RafError((e as Error).message); } // L803 : ecriture, le code de cadence ecriture
   readMigrateConfig(file);
   readMemoryIndexMax(file);
   readLeadUx(dirname(file));

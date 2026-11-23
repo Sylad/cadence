@@ -112,3 +112,9 @@ evals:
     cases: [orchestrate-id-avec-slash]
   - paths: [skills/session-start/**, skills/session-close/**, skills/lead/**, skills/deliver/**, agents/livreur.md, agents/code-reviewer.md, docs/raf.md, docs/lead.md, docs/skills.md]
     cases: [raf-done-sans-revue]
+
+# Écriture courte contrôlée (L803, D-31) : raf news check signale, en avertissement, les phrases de plus de 25 mots (20 pour une consigne),
+# la voix passive et le point-virgule des Nouveautés datées de ce jour ou après ; « cadence ecriture » donne la moyenne de mots par phrase.
+# Mesure : 24,9 mots par phrase sur les 20 Nouveautés au 23-11 ; à comparer sur 2-3 bilans du jour, retiré sans gain (docs/ecriture.md).
+ecriture:
+  depuis: 2026-11-23

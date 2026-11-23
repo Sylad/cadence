@@ -200,6 +200,9 @@ review session and a review started by hand have none.
   `Verdict: <the one-line verdict>`, `Blocking: <n> — <one short phrase per blocking finding>` (`Blocking: 0` when there is none),
   `Follow-ups: <n> — <the lines to add to the plan, by their first words>` (`Follow-ups: 0` when there is none),
   `Report: <the path>`. Add a fifth line, `Not walked: <n> pages`, only when pages were not reached.
+- Write the report short (L803, `docs/ecriture.md` of the package): one idea per sentence, 25 words at most, 20 for an
+  instruction, active voice. Once the file is written, run `cadence ecriture <the path>` when the command exists. It only reports:
+  shorten each flagged sentence yourself, without changing a finding, a measure or the verdict, then reply.
 - If you cannot write the file, say so on the first line of the reply and give the whole report in the reply, as if
   the brief had no report file: a verdict whose evidence nobody can read is lost.
 - With no `Report file:` line in the brief, give the complete report in your reply.

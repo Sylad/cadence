@@ -4120,7 +4120,7 @@ lots:
     estimate: 1
     created: 2026-11-23
     started: 2026-11-23
-    review: { date: 2026-11-23, verdict: "non conforme (code-reviewer, 183 tests ciblés verts) : 1 majeur — le hook au banc juge toutes les chaînes de l'entrée (lecture.mjs textes) : un Write/Edit dans le clone dont le contenu cite ~/projects, un motif de Grep ou un message de commit est refusé « lit hors de ton dépôt » (128 fichiers de maritime-atlas citent ~/projects) ; mineurs : en séquence le hook n'applique pas les zones certaines de reglesEtape (passage.ts:175-181) alors que le détecteur les compte ; run.ts:188 ne retire pas CADENCE_LECTURE_BORNEE de l'environnement hérité", commit: e34ed2ececcfb539d824f5d7cc6807bd8b831565 }
+    review: { date: 2026-11-23, verdict: 'non conforme (r2) : 3 correctifs attendus faits et testés ; 1 majeur régressif — commandeLue (v2/hooks/lecture.mjs:164) efface le dossier de « rg --files ~/projects/… » sans -e/-f : ni refusé ni compté par fuites.ts:48, alors que le détecteur le comptait avant ; 1 mineur lecture.mjs:161 echo "…" | xargs cat ; rapport tmp/revue-cadence-L808-r2.md', commit: 78f7cf95a52d7e8e3f1503f03ebde8c611b2ca1a }
   - id: L809
     title: "Banc : la pente de duplication s'affiche arrondie à l'unité (« +0 point contre 0 point » marqué ROUGE pour +0,03 contre −0,05 au banc aether-b68 r1 du 22-11) : afficher deux décimales dans le rapport, jamais un arrondi qui fait paraître égales deux valeurs que le seuil distingue ; test sur ce cas (seuil inchangé, décision de Sylvain)"
     status: todo

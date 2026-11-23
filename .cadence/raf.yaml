@@ -4116,11 +4116,12 @@ lots:
     finished: 2026-11-23
   - id: L808
     title: "Banc séquence aether-b68-court r2 du 22-11 ROUGE sur la qualité (rapport ~/bench-cadence/rapports/2026-11-22-1821-fb065f2285f3-aether-b68-court-r2.md) : cadence-run 2 régressions contre 0 et sorties 5/8 contre 7/8 pour A (fiche au clic « D » quand la carte montre « L » ; centres non affichés avec Isobares, légende sans les centres). Lire les transcriptions des deux bras, établir pour chaque sortie manquée ce que cadence-run a fait autrement (brief, hook de lecture, pièces non lues…) et proposer le mécanisme qui la rattrape ; mesure : la séquence rejouée verte"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-23
     started: 2026-11-23
-    review: { date: 2026-11-23, verdict: 'non conforme (r2) : 3 correctifs attendus faits et testés ; 1 majeur régressif — commandeLue (v2/hooks/lecture.mjs:164) efface le dossier de « rg --files ~/projects/… » sans -e/-f : ni refusé ni compté par fuites.ts:48, alors que le détecteur le comptait avant ; 1 mineur lecture.mjs:161 echo "…" | xargs cat ; rapport tmp/revue-cadence-L808-r2.md', commit: 78f7cf95a52d7e8e3f1503f03ebde8c611b2ca1a }
+    review: { date: 2026-11-23, verdict: "conforme (code-reviewer r3, 214 tests ciblés verts, tsc 0) : constats r2 corrigés ; 1 mineur — echo/printf envoyés à sh, while read, $(…) ou un sous-shell encore effacés (lecture.mjs:162,174) ; tmp/revue-cadence-L808-r3.md", commit: 4e1c609c39d033f2cc67ab45e79c3d1047f0987f }
+    finished: 2026-11-23
   - id: L809
     title: "Banc : la pente de duplication s'affiche arrondie à l'unité (« +0 point contre 0 point » marqué ROUGE pour +0,03 contre −0,05 au banc aether-b68 r1 du 22-11) : afficher deux décimales dans le rapport, jamais un arrondi qui fait paraître égales deux valeurs que le seuil distingue ; test sur ce cas (seuil inchangé, décision de Sylvain)"
     status: todo
@@ -4166,6 +4167,11 @@ lots:
     created: 2026-11-23
   - id: L816
     title: "Audit du respect des consignes : sur les transcriptions du banc, mesurer pour chaque consigne observable du brief et du CLAUDE.md son taux de respect ; retirer ou changer en hook celles jamais suivies (veille #71 P2, arXiv 2611.13709)"
+    status: todo
+    estimate: 1
+    created: 2026-11-23
+  - id: L817
+    title: "Lecture bornée du banc, suite de L808 (revue r3, tmp/revue-cadence-L808-r3.md du dossier parent) : (1) les arguments d'echo/printf restent effacés quand ils vont à sh/bash, while read, parallel, $(…) ou un sous-shell — appliquer « dans le doute : gardé » (lecture.mjs:151-174) ; (2) find ~, ls ~/proj*, cd $HOME puis chemin relatif ne sont vus ni par le hook ni par le détecteur (forme la plus plausible de la recherche du 22-11) ; (3) grep -m 1 <chemin> prend l'argument d'option pour le motif. Hook et détecteur gardent la même règle, testée ensemble."
     status: todo
     estimate: 1
     created: 2026-11-23

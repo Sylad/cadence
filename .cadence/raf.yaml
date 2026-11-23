@@ -4172,11 +4172,17 @@ lots:
     created: 2026-11-23
   - id: L817
     title: "Lecture bornée du banc, suite de L808 (revue r3, tmp/revue-cadence-L808-r3.md du dossier parent) : (1) les arguments d'echo/printf restent effacés quand ils vont à sh/bash, while read, parallel, $(…) ou un sous-shell — appliquer « dans le doute : gardé » (lecture.mjs:151-174) ; (2) find ~, ls ~/proj*, cd $HOME puis chemin relatif ne sont vus ni par le hook ni par le détecteur (forme la plus plausible de la recherche du 22-11) ; (3) grep -m 1 <chemin> prend l'argument d'option pour le motif. Hook et détecteur gardent la même règle, testée ensemble."
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-23
     started: 2026-11-23
-    review: { date: 2026-11-23, verdict: "non conforme (code-reviewer r1, 255 tests ciblés verts, tsc 0) : 1 majeur — un « .. » nu n'est pas résolu (lecture.mjs:137), donc find .. | grep -r x .. | cd .. && cat c2/x lisent le clone voisin sans être vus ; mineur : branche t === '..' morte (l.141). tmp/revue-cadence-L817.md", commit: 946695f4992a8419070562fbf55c4dd132e1deaf }
+    review: { date: 2026-11-23, verdict: "conforme (r2, tmp/revue-cadence-L817-r2.md) : « .. » résolu, find ..|grep -r x ..|rg x ..|du -sh ..|cd .. && cat c2/x refusés et comptés, aucune lecture légitime refusée ; 204 tests ciblés verts, tsc 0, 2 tests rouges sur l'ancien code", commit: 83a85f7af8f7288a709bfa083a558ed59ca12575 }
+    finished: 2026-11-23
+  - id: L818
+    title: "docs/v2/banc.md:138 dit encore qu'un grep -r .. n'est « pas relevé du tout » : faux depuis L817 (refusé et compté) — aligner la doc (revue r2 de L817)"
+    status: todo
+    estimate: 1
+    created: 2026-11-23
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

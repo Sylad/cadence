@@ -282,10 +282,15 @@ describe('L624 — une porte qui attend son créneau sur l\'hôte rend aussi le 
       const lot = /on lot `(L\d)`/.exec(args[1] ?? '')?.[1];
       if (!lot) return claudeOut(reviewReport());
       gatesAtStart.push(ctxs.map((c) => (c.lot.repo === o.cwd ? undefined : c.lot.gate && { ...(c.lot.gate.remote ? { remote: true as const } : {}), ...(c.lot.gate.waiting ? { waiting: true as const } : {}) })));
+      if (gatesAtStart.length === 3) writeFileSync(barrier, ''); // la troisième implémentation est partie : les portes peuvent finir
       return claudeOut(workReport({ commits: [commitFile(o.cwd, `${lot}-${Math.random()}.txt`, `feat(${lot}): x`)] }));
     };
     const wave = { ...hs[0].wave, claude: claude as never };
-    const config = { test: 'sleep 1.5', gate: { host: 'machine-pool-r1', maxParallel: 1 } };
+    // L807 : la porte attend le départ de la troisième implémentation (barrière, 20 s au plus) au lieu d'un « sleep 1.5 » : sous la charge de la suite
+    // complète, la porte du lot a finissait avant ce départ et le test rougissait sans défaut. Si la troisième ne part qu'après la porte de a (le défaut
+    // gardé par ce test), la barrière expire et l'assertion reste rouge.
+    const barrier = join(tempDir(), 'troisieme-partie');
+    const config = { test: `i=0; while [ ! -e '${barrier}' ] && [ $i -lt 400 ]; do sleep 0.05; i=$((i+1)); done`, gate: { host: 'machine-pool-r1', maxParallel: 1 } };
     ctxs.push(...hs.map((h, i) => ({ ...h.lot('L1', {}, config), wave })));
     ctxs[1].lot.project = 'b';
     ctxs[2].lot.project = 'c';

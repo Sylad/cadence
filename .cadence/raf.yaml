@@ -4069,6 +4069,7 @@ lots:
     estimate: 1
     created: 2026-11-21
     started: 2026-11-23
+    review: { date: 2026-11-23, verdict: "conforme (lead) r1 7c5c5d42 : waiting compté avec running/pending, idle et finis exclus (AgentStatus du SDK), 2 tests rouges sur l'ancien filtre ; lead plafond dit depuis quand ; doc et fragment corrigés ; porte-mod 523/523, tsc 0", commit: 7c5c5d42615d94efa95f342d8a741db1ea8621c3 }
   - id: L803
     title: "Écriture courte contrôlée (principes ASD-STE100 transposés au français, D-31) : un contrôle signale toute phrase de plus de 25 mots (20 pour une consigne) dans les entrées Nouveautés et les rapports de revue (ux-reviewer, code-reviewer, qa-reviewer), une idée par phrase, voix active ; réglable par projet ; le bilan du jour du dossier parent (scripts/bilan-livraisons.py) l'appelle aussi. Mesure : longueur moyenne des phrases avant/après sur 2-3 bilans et avis de Sylvain ; retiré sans gain"
     status: done
@@ -4106,14 +4107,16 @@ lots:
       - { date: 2026-11-22, text: "22-11 : même confusion dans cadence deliver — livrer cc1af3b dans codex a écrit delivered sur le L41 de codex (df376bc, annulé par a9be721) au lieu du L41 d'evatosorus" }
   - id: L807
     title: "cadence news new <lot> lancé par un cadence run écrit l'entrée dans l'arbre principal au lieu du worktree du run : le 22-11 (warhammer L98 r1) le squelette laissé dans l'arbre principal a fait refuser l'intégration (refus-integration, fichier que le run modifie aussi) — écrire dans le dossier courant du run, ou faire ignorer à l'intégration un squelette identique à celui que news new produit"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-22
+    started: 2026-11-23
   - id: L808
     title: "Banc séquence aether-b68-court r2 du 22-11 ROUGE sur la qualité (rapport ~/bench-cadence/rapports/2026-11-22-1821-fb065f2285f3-aether-b68-court-r2.md) : cadence-run 2 régressions contre 0 et sorties 5/8 contre 7/8 pour A (fiche au clic « D » quand la carte montre « L » ; centres non affichés avec Isobares, légende sans les centres). Lire les transcriptions des deux bras, établir pour chaque sortie manquée ce que cadence-run a fait autrement (brief, hook de lecture, pièces non lues…) et proposer le mécanisme qui la rattrape ; mesure : la séquence rejouée verte"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-23
+    started: 2026-11-23
   - id: L809
     title: "Banc : la pente de duplication s'affiche arrondie à l'unité (« +0 point contre 0 point » marqué ROUGE pour +0,03 contre −0,05 au banc aether-b68 r1 du 22-11) : afficher deux décimales dans le rapport, jamais un arrondi qui fait paraître égales deux valeurs que le seuil distingue ; test sur ce cas (seuil inchangé, décision de Sylvain)"
     status: todo

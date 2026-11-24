@@ -108,13 +108,17 @@ anything, and the ratchet closes them:
   `feat(L1,L2): …`), only lots the plan at the start declares `config: true`. A config that one commit of a code lot (or of an
   unknown lot, or with no scope) also touches, or that is modified without a commit, stays refused; a commit of a config lot that touches
   code is refused by file name, like on the lot's own branch; such a commit writes only the fragment of a lot its scope cites.
+  **The lot is judged on its net diff** (L826): a file counts only if it still differs from the start (`git diff` from the
+  merge-base, plus new untracked files). A commit that puts a doc or code file back as it was at the start (a revert, a
+  `fix(L1): …` that undoes it) is enough, with no squash; the refusal names only the files of the net diff.
   **A config lot may raise the baseline** (L824), but only to the **exact** measure of its tip: a new rule or a lower threshold
   makes existing code count, and a lot that cannot touch code could otherwise never be delivered. The baseline must then equal
   the measure key by key (no key missing, none extra, no value above or below: no margin); any difference is refused and
   listed as `key : baseline → measure`. `npm run qualite:cliquet -- --contre main` in such a lot writes the measure as it is.
   The lot is the one of the branch (`cadence/<wave>/<project>--<lot>`); without a lot in the branch name (the gate of a
   `cadence run`, the integration gate) every commit since the start must cite only `config: true` lots (commits that touch
-  only `.cadence/` are neutral) and nothing but `qualite-baseline.json` may be uncommitted: one commit of a code lot in the
+  only `.cadence/` are neutral, and so are commits none of whose files is left in the net diff — L826: a code commit undone by a
+  revert) and nothing but `qualite-baseline.json` may be uncommitted: one commit of a code lot whose change remains in the
   range closes the way, since the measure of the tip would carry its code, and so does a commit that lists no file (a merge,
   whose resolution `git log --name-only` does not show, or an empty commit). A lot without `config: true` keeps the refusal of
   any rise, and a config lot still touches no code (rule above).

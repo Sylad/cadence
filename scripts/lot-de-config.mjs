@@ -45,6 +45,10 @@ export const differences = (couples) => couples.filter(([, depart, actuel]) => d
 const lotsCites = (c) => /^[^(:]*\(([^)]+)\)/.exec(c.sujet)?.[1].split(',').map((i) => i.trim()) ?? [];
 const estDeConfig = (c, ref) => lotsCites(c).length > 0 && lotsCites(c).every((id) => ref.lotsConfig?.has(id));
 
+// Les fichiers qui diffèrent réellement du départ (L826) : `ref.touches()` (git diff du départ à l'arbre, et fichiers neufs non ignorés). Un fichier qu'un
+// commit a changé puis qu'un autre a ramené à son état de départ n'y est pas : un lot se juge à ce qu'il laisse, pas à son chemin.
+const diffNet = (ref) => new Set(ref.touches?.() ?? []);
+
 // Vrai si le libellé « fichier (état) » d'une config changée n'est dû qu'à des commits de lots de config (au moins un) : un commit de code qui y touche, ou un arbre sale, la laisse refusée
 function deLotsDeConfig(libelle, commits, ref) {
   const fichier = /^(.*?)(#\S*)? \([^()]*\)$/.exec(libelle)[1];
@@ -66,7 +70,9 @@ export function configChangee(racine, ref, jeu) {
   }
   const commits = ref.commits?.() ?? [];
   const changees = jeu.changees().filter((libelle) => !deLotsDeConfig(libelle, commits, ref));
-  const hors = commits.filter((c) => estDeConfig(c, ref)).flatMap((c) => c.fichiers.filter(horsConfig(lotsCites(c), jeu.estConfig)));
+  // jugé sur le diff NET depuis le départ (L826) : un fichier hors config qu'un commit de correction a ramené à son état de départ ne compte plus
+  const net = diffNet(ref);
+  const hors = commits.filter((c) => estDeConfig(c, ref)).flatMap((c) => c.fichiers.filter(horsConfig(lotsCites(c), jeu.estConfig)).filter((f) => net.has(f)));
   if (hors.length) return { code: 1, texte: `${[...new Set(hors)].join(', ')} : un lot déclaré « config: true » au plan ne touche que les fichiers de config et leurs tests (le reste est du code : un autre lot).` };
   if (!changees.length) return null;
   return { code: 1, texte: `${changees.join(', ')} diffère(nt) de ${ref.nom} : ${jeu.raison}.` };
@@ -77,8 +83,8 @@ export const fichiersDifferents = (racine, ref, fichiers) => differences(fichier
 
 /**
  * Le lot de config qui peut faire monter la base (L824), null sinon : sur sa branche, le lot que le plan du départ déclare `config: true` (`ref.lotConfig`) ;
- * sans nom de lot (porte d'un run, porte d'intégration), quand CHAQUE commit depuis le départ, hors ceux qui ne touchent que le plan (`.cadence/`), ne cite
- * que des lots `config: true` et que rien d'autre que la base (`baseline`) n'est hors commit. Un commit de code dans l'intervalle ferme la voie : la mesure du sommet
+ * sans nom de lot (porte d'un run, porte d'intégration), quand CHAQUE commit depuis le départ, hors ceux qui ne touchent que le plan (`.cadence/`) et ceux
+ * dont aucun fichier ne diffère plus du départ (L826 : défaits par un retour arrière), ne cite que des lots `config: true` et que rien d'autre que la base (`baseline`) n'est hors commit. Un commit de code dans l'intervalle ferme la voie : la mesure du sommet
  * porterait son code, et la base « exacte » le figerait. Un commit sans fichier listé (une fusion, que `git log --name-only` ne détaille pas, ou un commit vide)
  * la ferme aussi : sa résolution peut porter du code que personne ne voit.
  */
@@ -87,7 +93,11 @@ export function lotDeConfigQuiMonte(ref, baseline) {
   if (ref.lotConfig) return ref.lotConfig;
   const tous = ref.commits?.() ?? [];
   if (tous.some((c) => !c.fichiers.length)) return null;
-  const commits = tous.filter((c) => !c.fichiers.every((f) => f.startsWith('.cadence/')));
+  // un commit qui ne cite pas un lot de config ne ferme la voie que s'il laisse une trace dans le diff NET (L826) : un commit de code entièrement défait
+  // par un retour arrière ne porte plus rien au sommet mesuré
+  const net = diffNet(ref);
+  const pese = (c) => estDeConfig(c, ref) || c.fichiers.some((f) => net.has(f));
+  const commits = tous.filter((c) => !c.fichiers.every((f) => f.startsWith('.cadence/'))).filter(pese);
   if (!commits.length || !commits.every((c) => estDeConfig(c, ref))) return null;
   if (!ref.nonCommites || ref.nonCommites().some((f) => f !== baseline)) return null;
   return [...new Set(commits.flatMap(lotsCites))].join(', ');

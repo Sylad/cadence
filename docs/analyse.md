@@ -85,7 +85,10 @@ way the tool itself recognises its directive, whatever the layout of the comment
    up: it would leave room to grow back in the next lot). **A tool changes identity only in a lot the plan declares
    `config: true`**: an entry of `analyse:` removed or changed (name, command, format, dir, report, baseline, configs), or a
    file of `configs` that differs from the start, is refused unless every commit that touches it cites only such lots, or the
-   run is on the branch of such a lot (which then touches nothing but configs, baselines and tests). The rule and its reading
+   run is on the branch of such a lot (which then touches nothing but configs, baselines and tests). Such a lot is judged on
+   its **net diff** from the start (L826): a doc or code file that one commit changed and a later commit put back exactly as
+   it was no longer counts, so a revert commit is enough (no squash); a net diff that still touches anything else is refused,
+   naming those files only. The rule and its reading
    of the plan are shared with [qualite.md](qualite.md) (`scripts/lot-de-config.mjs`). A project **without a native plan**
    has no such lot: there a config changes by a declared change
    ([Changing a config without a native plan](#changing-a-config-without-a-native-plan)). **A baseline is born only

@@ -1,0 +1,11 @@
+{
+  "id": "D-32",
+  "texte": "ouep",
+  "date": "2026-11-24",
+  "etat": "ouverte",
+  "preuve": "",
+  "lots": ["L827"],
+  "precisions": [
+    {"date": "2026-11-24", "texte": "Contexte (lead) : réponse à « Je l'ouvre ? » — proposition d'une commande raf config <lot> qui pose config: true et relit le plan, après la clé de L823 jamais écrite (commit 3dd3af0)."}
+  ]
+}

@@ -4254,6 +4254,33 @@ lots:
     status: todo
     estimate: 1
     created: 2026-11-24
+  - id: L827
+    title: "L827 raf config <lot> : déclarer un lot config: true par une commande qui écrit la clé dans le plan puis la relit (refus si le lot n'existe pas, s'il est done, ou si le plan est en lecture seule) ; --off pour la retirer. Vécu 24-11 : le lead l'a posée par un script Python qui n'a rien écrit, commit 3dd3af0 annonçant la clé sans la contenir, run L823 refusé par la porte, ~1 h perdue. Mesure : plus aucune édition de .cadence/raf.yaml à la main pour déclarer un lot de config (D-32)"
+    status: todo
+    estimate: 1
+    created: 2026-11-24
+    notes:
+      - { date: 2026-11-24, text: "Constat du lead (24-11) : raf add --set config=true existe déjà pour un lot NEUF ; ce qui manque, c'est l'équivalent sur un lot existant. Forme à juger par le run : raf config <lot> [--off], ou plus général raf set <lot> champ=valeur (relecture après écriture dans les deux cas). Demande D-32." }
+  - id: L828
+    title: "L828 raf add --id <id existant> renumérote en silence (vécu 24-11 avatar : L75 demandé, L76 créé, message de commit à amender) : refuser avec le prochain id libre, ou le dire en tête de sortie"
+    status: todo
+    estimate: 1
+    created: 2026-11-24
+  - id: L829
+    title: "L829 cadence run --clore refusé sur un run en attente d'une réponse (vécu 24-11) : il faut répondre puis clore ; accepter --clore sur un run en attente (la question est abandonnée, notée dans l'état du run)"
+    status: todo
+    estimate: 1
+    created: 2026-11-24
+  - id: L830
+    title: "L830 Garde pre-push : après un rebase sur des commits d'autrui (bot), les commits du lot deviennent « sans verdict postérieur » et le verdict raf review/ux est à reposer à la main (vécu 24-11 codex L88) ; reconnaître un rebase qui ne change pas le diff du lot (patch-id identique) et garder le verdict"
+    status: todo
+    estimate: 1
+    created: 2026-11-24
+  - id: L831
+    title: "L831 raf demande new \"texte\" : créer une entrée du registre par commande (numéro suivant, date, état ouverte, --lot), mise en attente comme raf add quand un run tient la branche ; aujourd'hui le JSON s'écrit à la main et ne se commite pas tant qu'un run tient main (vécu 24-11, D-32)"
+    status: todo
+    estimate: 1
+    created: 2026-11-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

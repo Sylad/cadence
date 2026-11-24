@@ -3918,6 +3918,7 @@ lots:
     estimate: 0.5
     created: 2026-11-18
     started: 2026-11-24
+    review: { date: 2026-11-24, verdict: "non conforme (code-reviewer, tmp/revue-cadence-L779.md) : 1 majeur — start différé : le lot reste todo, donc tirable au tour et à raf next, et ses ressources uses: libres pendant son propre run (attente-commands.ts:12,37-45, ready-free.ts:84,132) ; 2 mineurs — start en attente d'un lot déjà doing par un autre chemin bloque toute l'attente (attente-commands.ts:41, repo-held.ts:123-126) ; commentaire modifié dans v2/src/run/run.ts:73 (empreinte du banc) alors que le commit dit aucun changement de v2", commit: 9170bbd7053967f159d88f774974e3e0e87d6b7a }
   - id: L780
     title: "Parité porte ↔ CI : un préfixe d'environnement dont la valeur est une substitution $(…) avec guillemets imbriqués et pipes est sauté en entier, plus de faux écart (issue #65 du compte pro, D-28 ; voisin de #32)"
     status: todo

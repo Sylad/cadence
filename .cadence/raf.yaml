@@ -3995,11 +3995,12 @@ lots:
     created: 2026-11-19
   - id: L791
     title: "Langue des fichiers écrits dans un projet (issue #67, compte pro) : clé language: dans cadence.yaml (défaut inchangé) suivie par les gabarits copiés (tests/acceptation-runner.mjs), le spec-writer (fiche.yaml) et l'acceptance-writer (commentaires, noms de tests, et cadence spec check qui attend ces noms) ; plan et messages à l'humain restent dans sa langue — mesuré chez le pro : 383 lignes de commentaires en français"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-19
     started: 2026-11-24
-    review: { date: 2026-11-24, verdict: "conforme après 3 corrections : majeur docs/spec.md ne couvre pas language: en ; mineurs : message d'états manquants changé sans la clé, brief spec.md:8 et exemples (etat-vide) qui contredisent les états anglais — tmp/revue-cadence-L791.md", commit: a519593c81e6dd081269be7957b51df18d2415a2 }
+    review: { date: 2026-11-24, verdict: "conforme — passe 2 relue par le lead (9cdcbc3c) : docs/spec.md couvre language: en, message d'avant rétabli et figé par un test, brief spec anglais ; 13 tests L791 + 310 ciblés verts, tsc 0", commit: 9cdcbc3c0e759bda04af269bb84979298cc738f1 }
+    finished: 2026-11-24
   - id: L792
     title: "Issue #68 (compte pro) : le brief de cadence run ne nomme pas cadence spec check — une session chargée d'amener des fiches d'écran à « fiche valide » n'a jamais lancé la commande, a reconstruit les règles depuis git et s'est crue à 0 écart (97 restaient ; run 20261119121911-828448). Cause : découverte, pas permission. Nommer les commandes de vérification du projet (spec check, et celles de cadence.yaml) dans le brief quand le lot ou la demande touche des fiches, et le tester sur le texte du brief rendu"
     status: done

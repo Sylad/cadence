@@ -4228,7 +4228,7 @@ lots:
   - id: L823
     title: "L823 Cliquet qualité étendu à v2/ (cadence 2 : run, banc) et aux plugins : eslint.config ne couvre que src, bin et scripts ; v2/src/run/run.ts fait 559 lignes et v2/src/bench/cli.ts 473 (seuil max-lines 400) sans être mesurés. Attendu : v2/src/** (et plugins/*/hooks) dans la mesure de scripts/qualite.mjs, base figée à l'existant (rien ne peut empirer), même porte et même CI ; ne change aucun code de v2/ (pas de banc requis)"
     config: true
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-24
     notes:
@@ -4236,6 +4236,8 @@ lots:
       - { date: 2026-11-24, text: "Run du 24-11 13 h (20261124125605-2412729, clos) : refusé par la porte, la base ne peut que baisser. Décision du lead : L824 d'abord, puis L823 déclaré config: true et relancé. Règles : naming-convention limitée aux variables, fonctions et types (44) ; hors cliquet : no-nested-template-literals (358), no-nested-conditional (303), no-os-command-from-path (113, faux positif CLI), todo-tag (24) ; tout le reste de sonarjs et typescript-eslint recommended dans le cliquet. Mesure : +13 s à la porte." }
       - { date: 2026-11-24, text: "Consigne du pro (issue #73) : un lot config: true ne doit contenir QUE la config dès son premier commit (la doc et le test dans un lot ordinaire après) tant que L826 n'est pas fait ; et (revue L824, constat 2) ne pas ajouter de fichier *.test.* dans ce lot : il serait figé dans la base." }
     started: 2026-11-24
+    review: { date: 2026-11-24, verdict: "conforme (2dc0b9b0) : base == mesure (960 clés), cliquet vert contre c6cd45a9, périmètre 320 fichiers, CI et porte lisent la même config ; doc qualite.md et fragment changelog renvoyés au lot ordinaire L832 (consigne #73) — tmp/revue-cadence-L823.md", commit: 2dc0b9b04d1c66c66a178f1f9ebafc0fcdb39e4a }
+    finished: 2026-11-24
   - id: L824
     title: "L824 Cliquet qualité : un lot déclaré config: true peut faire monter la base, mais seulement à la mesure EXACTE de son sommet (base == mesure, clé par clé, sans marge) — prérequis de L823 (D-31) ; tests + docs/qualite.md"
     status: done
@@ -4280,6 +4282,12 @@ lots:
     title: "L831 raf demande new \"texte\" : créer une entrée du registre par commande (numéro suivant, date, état ouverte, --lot), mise en attente comme raf add quand un run tient la branche ; aujourd'hui le JSON s'écrit à la main et ne se commite pas tant qu'un run tient main (vécu 24-11, D-32)"
     status: todo
     estimate: 1
+    created: 2026-11-24
+  - id: L832
+    title: "L832 Suite de L823 (lot ordinaire) : docs/qualite.md (périmètre v2/src et plugins/*/hooks, règles sonarjs et typescript-eslint recommended, nommage, 4 règles hors cliquet ; texte prêt dans le rapport du run 20261124140114-2119148) et fragment changelog.d/L823.md ; décider si v2/bin, v2/hooks, v2/scripts entrent aussi dans la mesure, et étendre knip et jscpd à v2 (rapport tmp/revue-cadence-L823.md)"
+    status: todo
+    estimate: 1
+    after: [ L823 ]
     created: 2026-11-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

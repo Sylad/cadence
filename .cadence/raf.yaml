@@ -3995,9 +3995,10 @@ lots:
     created: 2026-11-19
   - id: L791
     title: "Langue des fichiers écrits dans un projet (issue #67, compte pro) : clé language: dans cadence.yaml (défaut inchangé) suivie par les gabarits copiés (tests/acceptation-runner.mjs), le spec-writer (fiche.yaml) et l'acceptance-writer (commentaires, noms de tests, et cadence spec check qui attend ces noms) ; plan et messages à l'humain restent dans sa langue — mesuré chez le pro : 383 lignes de commentaires en français"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-19
+    started: 2026-11-24
   - id: L792
     title: "Issue #68 (compte pro) : le brief de cadence run ne nomme pas cadence spec check — une session chargée d'amener des fiches d'écran à « fiche valide » n'a jamais lancé la commande, a reconstruit les règles depuis git et s'est crue à 0 écart (97 restaient ; run 20261119121911-828448). Cause : découverte, pas permission. Nommer les commandes de vérification du projet (spec check, et celles de cadence.yaml) dans le brief quand le lot ou la demande touche des fiches, et le tester sur le texte du brief rendu"
     status: done

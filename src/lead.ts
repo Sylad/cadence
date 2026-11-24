@@ -14,6 +14,7 @@ import { priorityRank, readPriority } from './orchestrate/continue.js';
 import { readNext, sharedStateDir, stateDir } from './state.js';
 import { freeLine, readyFree, type FreeLot } from './ready-free.js';
 import { cadenceHome } from './orchestrate/registry.js';
+import { startedElsewhere, withStarted } from './started-elsewhere.js';
 import { staleNotes, staleText } from './stale-notes.js';
 import { ciGapsField, ciParityText, type CiGap } from './orchestrate/ci-parity.js';
 import { noTestGate, noTestText, type NoTestGate } from './orchestrate/no-test.js';
@@ -268,7 +269,8 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE, name = basena
     const plan = planLoader(root)();
     const lots = plan.lots();
     const all = linkCommits(lots, planCommits(plan, root), plan.refs);
-    const { doing, ready, blocked } = nextUp(lots);
+    // Revue L779 r1 : un lot dont le start attend, ou que sert un cadence run vivant, est en cours, pas « suivant ».
+    const { doing, ready, blocked } = nextUp(withStarted(lots, startedElsewhere(root, cadenceHome())));
     const work = workByLot(plan, root, all, doing.map((l) => l.id));
 
     row.doing = doing.map((l) => {

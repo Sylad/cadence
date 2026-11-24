@@ -12,14 +12,36 @@ type Run = (argv: string[], io: Io) => number | Promise<number>;
 const DEFERRABLE = new Set(['add', 'note', 'start', 'done', 'review', 'ux', 'demande']);
 let applying = false;
 
-/** Joue les écritures en attente avec `run` (des commandes synchrones : add, note, start, done, review, ux, demande). */
-function apply(root: string, io: Io, run: Run): number {
+/**
+ * Revue L779 r1 : un start en attente dont le lot a changé d'état entre-temps (démarré par orchestrate ou hook.autostart, clos) n'a plus d'objet ;
+ * joué, il échouerait et retiendrait toutes les écritures qui le suivent. Rend la ligne qui l'écarte, ou null quand le start est à jouer.
+ */
+function staleStart(argv: string[], c: EarlyCtx): string | null {
+  if (argv[0] !== 'start' || !argv[1]) return null;
+  let status: string | undefined;
+  try {
+    status = buildCtx({ ...c, command: 'start' }).loadPlan().lots().find((l) => l.id === argv[1])?.status;
+  } catch {
+    return null; // plan illisible : le start joué dira pourquoi
+  }
+  if (status === 'doing') return `raf start ${argv[1]} sans objet : ${argv[1]} est déjà doing (démarré par un autre chemin) — retiré du plan en attente`;
+  if (status === 'done' || status === 'dropped') return `raf start ${argv[1]} écarté : ${argv[1]} est ${status} — retiré du plan en attente`;
+  return null;
+}
+
+/** Joue les écritures en attente avec `run` (des commandes synchrones : add, note, start, done, review, ux, demande) ; un start sans objet est retiré sans être joué. */
+function apply(c: EarlyCtx, run: Run): number {
   applying = true;
   try {
-    return applyPending(root, (argv) => {
-      const code = run(argv, io);
+    return applyPending(c.root, (argv) => {
+      const stale = staleStart(argv, c);
+      if (stale) {
+        c.io.out(stale);
+        return 0;
+      }
+      const code = run(argv, c.io);
       return typeof code === 'number' ? code : 1;
-    }, io.out);
+    }, c.io.out);
   } finally {
     applying = false;
   }
@@ -75,7 +97,7 @@ export function heldPlanWrite(command: string, argv: string[], c: EarlyCtx, run:
     c.io.out(deferPlanWrite(c.root, holder, [...argv, ...checked(command, c)], c.io.now()));
     return 0;
   }
-  if (readPending(c.root).length > 0) apply(c.root, c.io, run);
+  if (readPending(c.root).length > 0) apply(c, run);
   return null;
 }
 
@@ -95,5 +117,5 @@ export function cmdAttente(c: EarlyCtx, run: Run): number {
     io.out('rien en attente');
     return 0;
   }
-  return apply(root, io, run);
+  return apply(c, run);
 }

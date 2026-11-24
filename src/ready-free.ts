@@ -8,6 +8,7 @@ import { decisionPending } from './orchestrate/continue.js';
 import { deducedResources } from './orchestrate/lot-diff.js';
 import { liveWaves } from './orchestrate/registry.js';
 import { declaredFor, readResources } from './resources.js';
+import { startedElsewhere, withStarted } from './started-elsewhere.js';
 import { lotFinished, RunStore, type LotState } from './orchestrate/state.js';
 import { lotBranch } from './orchestrate/worktree.js';
 
@@ -45,6 +46,9 @@ function sharingProjects(dir: string): string[] {
 
 const plansOf = (dir: string): Lot[] => planLoader(repoOf(dir))().lots();
 
+/** Le plan, avec en cours les lots démarrés hors du plan (revue L779 r1 : start en attente, --lot d'un cadence run vivant de `home`). */
+const startedPlansOf = (dir: string, home: string): Lot[] => withStarted(plansOf(dir), startedElsewhere(repoOf(dir), home));
+
 /** Un lot qu'une vague tient : son dépôt et son id suffisent à le reconnaître et à retrouver ses `uses:`. */
 export type Held = Pick<LotState, 'repo' | 'lot'>;
 
@@ -71,6 +75,21 @@ function deducedByWave(wave: string, live: LotState[]): string[] {
 }
 
 /**
+ * Ce que tient le plan de `dir` : les ressources de ses lots `doing`, et (revue L779 r1) ses lots démarrés hors du plan — start en attente, --lot d'un
+ * cadence run vivant —, en cours eux aussi et à ne pas proposer, même au tirage d'une vague (`lotHold`). Un plan illisible ne tient aucune ressource connue.
+ */
+function heldByPlan(dir: string, home: string): { uses: string[]; started: string[] } {
+  const repo = repoOf(dir);
+  const startedIds = startedElsewhere(repo, home);
+  const started = [...startedIds.keys()].map((id) => lotAt(repo, id));
+  try {
+    return { uses: nextUp(withStarted(plansOf(dir), startedIds)).doing.flatMap((l) => l.uses ?? []), started };
+  } catch {
+    return { uses: [], started }; // plan illisible : sa ligne de tour le dit
+  }
+}
+
+/**
  * Les ressources prises à cet instant : celles des lots `doing` des projets `dirs` et de ceux qui partagent leurs ressources (`sharingProjects` : lancé depuis l'un d'eux,
  * on voit aussi les autres), celles des lots non finis des vagues vivantes (un lot de vague n'est `doing` dans le plan qu'une fois sa session partie ; avec, L558 R5,
  * celles que le diff de leur branche de worktree déduit des ressources à chemins, relu à chaque appel, un diff illisible ne déduisant rien, R12)
@@ -80,11 +99,9 @@ function taken(dirs: string[], home: string, held: Held[]): { resources: Set<str
   const resources = new Set<string>();
   const running = new Set<string>();
   for (const dir of new Set([...dirs, ...dirs.flatMap(sharingProjects)])) {
-    try {
-      for (const l of nextUp(plansOf(dir)).doing) for (const r of l.uses ?? []) resources.add(r);
-    } catch {
-      // plan illisible : sa ligne de tour le dit, il ne tient aucune ressource connue
-    }
+    const own = heldByPlan(dir, home);
+    for (const r of own.uses) resources.add(r);
+    for (const l of own.started) running.add(l);
   }
   for (const { wave, lots } of liveLots(home)) {
     held = [...held, ...lots];
@@ -102,7 +119,7 @@ function taken(dirs: string[], home: string, held: Held[]): { resources: Set<str
 }
 
 /**
- * Pourquoi ce lot du projet `dir` ne peut pas partir (L498) : une vague vivante le joue déjà (`running`), ou une de ses ressources `uses:` est tenue (`resource`, la première) ; `{}` quand rien ne le retient.
+ * Pourquoi ce lot du projet `dir` ne peut pas partir (L498) : une vague vivante le joue déjà ou il est démarré hors du plan — start en attente, --lot d'un cadence run vivant, revue L779 r1 (`running`), ou une de ses ressources `uses:` est tenue (`resource`, la première) ; `{}` quand rien ne le retient.
  * Même lecture des ressources prises que `readyFree` ; `held` : les lots que la vague qui tire vient déjà de prendre.
  */
 export function lotHold(dir: string, lot: Pick<Lot, 'id' | 'uses'>, home: string, held: Held[] = []): { running?: true; resource?: string } {
@@ -123,7 +140,7 @@ export function readyFree(dirs: string[], home: string, held: Held[] = []): Map<
   for (const dir of dirs) {
     let ready: Lot[];
     try {
-      ready = nextUp(plansOf(dir)).ready;
+      ready = nextUp(startedPlansOf(dir, home)).ready;
     } catch {
       continue;
     }

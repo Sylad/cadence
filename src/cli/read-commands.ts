@@ -17,10 +17,13 @@ import { dueLine, recurringByDue } from '../recurring.js';
 import { quickwinLines, quickwins, readMax } from '../quickwins.js';
 import { schedule } from '../schedule.js';
 import { coverageCommand } from '../ref/coverage.js';
+import { cadenceHome } from '../orchestrate/registry.js';
+import { startedElsewhere, withStarted } from '../started-elsewhere.js';
 import { type Ctx, type Io, knownLot, planFileIn } from './context.js';
 
-function describe(l: Lot, commits: number): string {
+function describe(l: Lot, commits: number, startedBy?: string): string {
   const bits = [`${l.estimate} j`];
+  if (startedBy) bits.push(startedBy);
   if (commits) bits.push(`${commits} commit(s)`);
   if (l.tasks.length) bits.push(`sous-tâches ${l.tasks.filter((t) => t.status === 'done').length}/${l.tasks.length}`);
   return `${l.quickwin ? '⚡ ' : ''}${l.id}  ${l.title}  (${bits.join(', ')})`;
@@ -29,14 +32,16 @@ function describe(l: Lot, commits: number): string {
 function now(plan: Plan, root: string, newsDir: string, today: Day, io: Io): number {
   const lots = plan.lots();
   const linked = linkCommits(lots, planCommits(plan, root), plan.refs);
-  const { doing, ready, blocked } = nextUp(lots);
+  // Revue L779 r1 : un lot dont le start attend (branche tenue), ou que sert un cadence run vivant, est en cours, pas « à suivre ».
+  const started = startedElsewhere(root, cadenceHome());
+  const { doing, ready, blocked } = nextUp(withStarted(lots, started));
   const work = workByLot(plan, root, linked, [...doing, ...ready.slice(0, 5)].map((l) => l.id));
   const count = (id: string) => work.get(id)?.length ?? 0;
   io.out(`${plan.project} — ${today}`);
 
   io.out('\nEn cours');
   if (doing.length === 0) io.out('  (rien)');
-  for (const l of doing) io.out(`  ${describe(l, count(l.id))}`);
+  for (const l of doing) io.out(`  ${describe(l, count(l.id), started.get(l.id))}`);
 
   io.out('\nÀ suivre');
   if (ready.length === 0) io.out('  (rien de prêt)');

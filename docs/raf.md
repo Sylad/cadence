@@ -160,6 +160,11 @@ pid now belongs to another process (`start` differs: a run killed before a reboo
   typed, written in the queued line as `--vu <sha|aucun>` and `--vu-depot <repo>=<sha|aucun>` (internal options, refused
   outside the pending plan). Applied later, the verdict covers that commit only: a commit of the lot that came in between
   (integrated by the run, a fix after a gate) stays unreviewed, and `raf done` refuses until the review is redone.
+- A queued `raf start <lot>` leaves the lot `todo` in the plan until it is applied. `raf now`, `cadence lead tour`,
+  `cadence session start`, the free-resources line and the draw of a wave count it as in progress anyway (marked
+  `raf start en attente`), and so is the `--lot` of a live `cadence run` (marked `cadence run <id>`): not drawable, its
+  `uses:` held. Applied after the lot was started some other way (orchestrate, `hook.autostart`) or closed, the start is
+  dropped with a line that says so, and the writes after it go through (review L779 r1).
 - `cadence run` releases the branch at its end, integrated or not, and runs `raf attente appliquer`. After a gate, the
   first `raf add|note|start|done|review|ux` or write of `raf demande` on the free branch applies the pending writes first. The
   plan (or the register) is then modified, for the lead to commit.

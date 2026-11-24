@@ -10,6 +10,8 @@ import { staleNoteLines, staleNotes, staleText } from './stale-notes.js';
 import { windowLines } from './plan-window.js';
 import { quickwinLines, quickwins } from './quickwins.js';
 import { unpublished, unpublishedLine } from './unpublished.js';
+import { cadenceHome } from './orchestrate/registry.js';
+import { startedElsewhere, withStarted } from './started-elsewhere.js';
 import { lockAlive, readLock, readNext, readSessionMark, writeSessionMark } from './state.js';
 
 export interface SessionCtx {
@@ -140,7 +142,8 @@ export function sessionStart(ctx: SessionCtx, opts: { since: string; idle: numbe
   const lock = lockStatus(ctx.shared);
   if (lock) out(`\n${lock.line}`);
 
-  const { doing, ready, blocked } = nextUp(lots);
+  // Revue L779 r1 : un lot dont le start attend, ou que sert un cadence run vivant, est en cours.
+  const { doing, ready, blocked } = nextUp(withStarted(lots, startedElsewhere(ctx.root, cadenceHome())));
   const work = workByLot(plan, ctx.root, all, doing.map((l) => l.id));
   out('\nEn cours');
   if (doing.length === 0) out('  (rien)');

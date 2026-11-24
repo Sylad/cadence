@@ -180,9 +180,52 @@ the command is part of the identity, so pointing it at another ruleset is refuse
   after `orchestrate.build` and before `orchestrate.test`; a red analysis goes back to the same session like any red gate,
   with the violations named. A project with only `analyse:` and no build or test still has a gate. `cadence verify --gate`
   and the waves of `cadence orchestrate` do not play it yet.
-- **The CI**: `npx cadence analyse --contre origin/main` (full-depth checkout), after the build.
+- **The CI**: `npx cadence analyse --contre <the commit before the push>` (full-depth checkout), after the build — the
+  [CI recipe](#the-ci-recipe) below, never `--contre origin/main`.
 - **The weekly measure**: each lowering is a commit of `.cadence/analyse/`; `git log -p -- .cadence/analyse/` shows the
   frozen violations going down, and every `cadence analyse` line ends with « N violation(s), M gelée(s) ».
+
+## The CI recipe
+
+`--contre` names the **start** of what is judged. On a push to `main`, `origin/main` is the pushed commit itself: the
+start is HEAD, each baseline is compared to itself, and a new violation committed with its baseline raised by hand in the
+same commit passes (issue #72: `--contre HEAD` exit 0, `--contre HEAD~2` exit 1). Compare to the commit **before** the
+push, `github.event.before`; on a pull request to its base, `github.event.pull_request.base.sha`. A new branch
+(`before` is `0000…`), a force push whose `before` is gone and a manual run (`workflow_dispatch`) have no such commit: the
+recipe then compares a branch to the default branch, and the default branch to its parent.
+
+```yaml
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  analyse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - run: npm ci
+      - name: cadence analyse
+        env:
+          AVANT: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          DEFAUT: ${{ github.event.repository.default_branch }}
+        run: |
+          if [ -z "$AVANT" ] || [ -z "${AVANT//0/}" ] || ! git cat-file -e "$AVANT^{commit}" 2>/dev/null; then
+            if [ "$(git rev-parse HEAD)" != "$(git rev-parse "origin/$DEFAUT")" ]; then AVANT="origin/$DEFAUT"
+            else AVANT=$(git rev-parse --verify --quiet HEAD~1 || true); fi
+          fi
+          npx cadence analyse ${AVANT:+--contre "$AVANT"}
+```
+
+Without any earlier commit (the first commit of a repository) it measures against the baseline alone. **Never put
+`.cadence/analyse/**` (nor `cadence.yaml` or a file of `configs`) in `paths-ignore`** of the workflow: a push that
+changes only a baseline would then run no analysis at all, and a baseline raised alone would wait for the next push,
+whose `before` already holds it. The command refuses the wrong reference itself: when the start of `--contre <ref>`
+is HEAD and HEAD raises a baseline against its parent (a key higher, or absent from the parent), it exits 1 with
+« --contre … désigne le commit jugé lui-même » and the keys; a baseline born in HEAD is only said (it is not judged as
+new there), and an unchanged or lowered baseline is judged as before.
+`test/analyse-contre-head-l811.test.ts` plays the case of the issue and this recipe as written.
 
 ## Recipe per technology
 

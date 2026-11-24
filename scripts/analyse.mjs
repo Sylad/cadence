@@ -497,10 +497,49 @@ function garder(io, o, tous, parse, ref) {
   return true;
 }
 
+/**
+ * Issue #72 (L811) : `--contre <ref>` dont le départ (merge-base HEAD <ref>) est HEAD lui-même — `--contre HEAD`, ou `origin/main` sur la CI d'un push à main,
+ * qui vaut alors le commit poussé. Le départ est le commit jugé : chaque base s'y compare à elle-même, et une base relevée à la main dans ce commit passe
+ * avec la violation qu'elle couvre. Comparé au premier parent de HEAD : une base qui existait au parent et que HEAD relève (clé plus haute ou absente du
+ * parent) est un refus (`refus`, code 1) ; une base née dans HEAD n'est pas jugée comme neuve (tenue à sa mesure) : c'est dit (`avis`), sans refus — un lot
+ * vide jugé juste après le commit qui adopte un outil reste vert. Une base inchangée ou baissée ne perd rien (la mesure reste jugée contre elle), et un
+ * commit sans parent n'a rien à quoi se comparer : null.
+ */
+export function departEgalHead(racine, ref, outils) {
+  const git = (...args) => spawnSync('git', args, { cwd: racine, encoding: 'utf8' });
+  const head = git('rev-parse', '--verify', '--quiet', 'HEAD').stdout.trim();
+  const mb = git('merge-base', 'HEAD', ref);
+  if (!head || mb.status !== 0 || mb.stdout.trim() !== head) return null;
+  const parent = git('rev-parse', '--verify', '--quiet', 'HEAD^').stdout.trim();
+  if (!parent) return null;
+  const lire = (sha, chemin) => { const r = git('show', `${sha}:${chemin}`); if (r.status !== 0) return null; try { return JSON.parse(r.stdout); } catch { return {}; } };
+  const relevees = [];
+  const nees = [];
+  for (const o of outils) {
+    const avant = lire(parent, o.baseline);
+    const apres = lire(head, o.baseline) ?? {};
+    const hautes = Object.entries(apres).filter(([k, n]) => n > (avant?.[k] ?? 0)).map(([cle, n]) => ({ cle, avant: avant?.[cle] ?? 0, apres: n }));
+    if (!hautes.length) continue;
+    if (avant === null) nees.push(o.baseline);
+    else relevees.push(`${o.baseline} :\n${hautes.map(ligne).join('\n')}`);
+  }
+  if (!relevees.length && !nees.length) return null;
+  const court = head.slice(0, 7);
+  const debut = `--contre ${ref} désigne le commit jugé lui-même (départ du lot = HEAD, ${court}) : chaque ligne de base s'y compare à elle-même`;
+  const conseil = `Comparer au commit d'avant : « cadence analyse --contre HEAD~1 » en local, \${{ github.event.before }} sur la CI d'un push (docs/analyse.md#the-ci-recipe).`;
+  return {
+    refus: relevees.length ? { code: 1, texte: `${debut}, et ce commit en relève par rapport à son parent ${parent.slice(0, 7)} — une violation nouvelle passerait sous la base relevée. ${conseil}\n${relevees.join('\n')}` } : null,
+    avis: nees.length ? `${debut} ; ligne(s) de base née(s) dans ce commit, non jugée(s) comme neuve(s) (tenue(s) à la mesure) : ${nees.join(', ')}. ${conseil}` : null,
+  };
+}
+
 /** Contre le départ (`--contre`), d'abord l'identité de TOUS les outils déclarés (même avec --outil) et les bases neuves, dites ; puis chaque outil joué et jugé. */
 function jugerTout(io, o, tous, parse) {
   const retard = o.contre ? retardSurBranche(io.cwd, o.contre) : null;
   if (retard) { io.err(`analyse : ${retard.texte.replace('node scripts/qualite.mjs', 'cadence analyse')}`); return 1; }
+  const meme = o.contre ? departEgalHead(io.cwd, o.contre, tous) : null;
+  if (meme?.refus) { io.err(`analyse : ${meme.refus.texte}`); return 1; }
+  if (meme?.avis) io.err(`analyse : ${meme.avis}`);
   const ref = o.contre ? lireRef(resolve(io.cwd), o.contre) : null;
   if (ref && !garder(io, o, tous, parse, ref)) return 1;
   const depart = ref && { ...ref, analyse: outilsAuDepart(ref, parse) };

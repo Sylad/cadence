@@ -25,3 +25,5 @@ export function declarationsDuLot(racine: string, contre: string): Required<Decl
 export function gardeIdentite(racine: string, ref: import('./qualite.mjs').Ref, outils: OutilAnalyse[], parse: (texte: string) => unknown, declare?: Declarations): { refus: { code: number; texte: string } | null; neuves: string[]; configs: string[] };
 /** Les lignes d'une porte verte à relire (« analyse : ligne de base neuve : … », « analyse : config changée : … »), que cadence run reprend à son journal. */
 export function lignesARelire(sortie: string): string[];
+/** `--contre <ref>` dont le départ est HEAD lui-même (issue #72) : `refus` si HEAD relève une base de son parent, `avis` si une base y naît ; null sinon. */
+export function departEgalHead(racine: string, ref: string, outils: OutilAnalyse[]): { refus: { code: number; texte: string } | null; avis: string | null } | null;

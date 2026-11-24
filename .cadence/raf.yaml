@@ -4306,6 +4306,8 @@ lots:
     started: 2026-11-24
     review: { date: 2026-11-24, verdict: "conforme (lead, diff 36063ff7 relu : concurrency tests-<ref> cancel-in-progress, publish.yml hors groupe ; dry-run --ignore-scripts, le rejeu dans le cycle npm publish reste fait par cadence release et publish.yml ; doc et test ci-mutualisee-l834 ; à mesurer au prochain push : annulation réelle et durée)", commit: 36063ff73f8f7a832e195a14c8dadfd325a10558 }
     finished: 2026-11-24
+    notes:
+      - { date: 2026-11-24, text: "Mesuré au premier run CI après le lot (bcf1a4de, 24-11) : 30 min 12 s (Node 22 : 19 min 10 s ; Node 24 : 30 min 8 s), vert, contre ~55 min avant (−45 %, comme estimé). Node 24 reste le plus long : piste pour L835" }
   - id: L835
     title: "D-33 étude : où part le temps entre la fin d'un lot et la prod, tous projets (porte locale, CI, banc, déploiement, attentes) et ce qui se mutualise"
     status: todo

@@ -4025,9 +4025,10 @@ lots:
     finished: 2026-11-20
   - id: L795
     title: "cadence perf ne voit rien des lots faits par cadence run : toutes les lignes en n/d, seul « livrés » compte (alerte −37 % sans explication) — issue #69 du compte pro"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-20
+    started: 2026-11-24
   - id: L796
     title: "cadence run tient toute la branche : verrou des fichiers touchés, intégration par rebase quand main a bougé sur des fichiers disjoints, raf start commité par le run (lot rendu refus-integration par son propre raf start non commité, ~50 min) — issue #70 du compte pro, voisine de #66"
     status: done

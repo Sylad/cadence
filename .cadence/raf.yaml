@@ -4227,11 +4227,18 @@ lots:
     created: 2026-11-24
   - id: L823
     title: "L823 Cliquet qualité étendu à v2/ (cadence 2 : run, banc) et aux plugins : eslint.config ne couvre que src, bin et scripts ; v2/src/run/run.ts fait 559 lignes et v2/src/bench/cli.ts 473 (seuil max-lines 400) sans être mesurés. Attendu : v2/src/** (et plugins/*/hooks) dans la mesure de scripts/qualite.mjs, base figée à l'existant (rien ne peut empirer), même porte et même CI ; ne change aucun code de v2/ (pas de banc requis)"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-24
     notes:
       - { date: 2026-11-24, text: "Précision du lead (24-11, question de Sylvain « lisibilité du code genre pmd/checkstyle ? ») : la config n'active que 6 règles de taille et de complexité ; ajouter sous le même cliquet (existant figé) sonarjs recommended (équivalent PMD : code smells, conditions identiques, catch vides…), typescript-eslint recommended, et @typescript-eslint/naming-convention (équivalent des règles de nommage de Checkstyle). Mesurer d'abord le nombre de violations par règle et le rendre dans le rapport ; une règle à plus de 200 violations ou bruyante se discute avant d'être activée. Mise en forme (Prettier) hors lot : à proposer à part, elle réécrirait tout le dépôt." }
+      - { date: 2026-11-24, text: "Run du 24-11 13 h (20261124125605-2412729, clos) : refusé par la porte, la base ne peut que baisser. Décision du lead : L824 d'abord, puis L823 déclaré config: true et relancé. Règles : naming-convention limitée aux variables, fonctions et types (44) ; hors cliquet : no-nested-template-literals (358), no-nested-conditional (303), no-os-command-from-path (113, faux positif CLI), todo-tag (24) ; tout le reste de sonarjs et typescript-eslint recommended dans le cliquet. Mesure : +13 s à la porte." }
+    started: 2026-11-24
+  - id: L824
+    title: "L824 Cliquet qualité : un lot déclaré config: true peut faire monter la base, mais seulement à la mesure EXACTE de son sommet (base == mesure, clé par clé, sans marge) — prérequis de L823 (D-31) ; tests + docs/qualite.md"
+    status: todo
+    estimate: 1
+    created: 2026-11-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

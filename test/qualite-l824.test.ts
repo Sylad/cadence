@@ -103,6 +103,41 @@ describe('L824 — un lot config: true peut faire monter la base, seulement à l
       expect(verifier()).toMatchObject({ code: 1, texte: expect.stringContaining('remonte') });
     });
 
+    it('un commit de fusion dans l’intervalle ferme la voie, même quand sa résolution n’ajoute que du code invisible au log', () => {
+      const { dir, commit, verifier } = depot({ branche: 'cadence/run-1' });
+      const git = (...a: string[]) => execFileSync('git', a, { cwd: dir, stdio: 'ignore' });
+      git('checkout', '-qb', 'autre');
+      commit('feat(L1): règle', { 'eslint.config.mjs': regle });
+      git('checkout', '-q', 'cadence/run-1');
+      commit('feat(L1): base', { [BASELINE]: serialiser(SOMMET) });
+      // « evil merge » : la résolution glisse src/evil.ts, que git log --name-only ne liste pas pour une fusion
+      git('merge', '-q', '--no-ff', '--no-commit', 'autre');
+      writeFileSync(join(dir, 'src/evil.ts'), 'export const e = 1;\n');
+      git('add', 'src/evil.ts');
+      git('commit', '-qm', 'feat(L1): fusion');
+      expect(verifier()).toMatchObject({ code: 1, texte: expect.stringContaining('remonte') });
+    });
+
+    it('un commit à scope multi-lots dont un lot de code ferme la voie', () => {
+      const { commit, verifier } = depot({ branche: 'cadence/run-1' });
+      commit('feat(L1,L2): base', { [BASELINE]: serialiser(SOMMET) });
+      expect(verifier()).toMatchObject({ code: 1, texte: expect.stringContaining('remonte') });
+    });
+
+    it('un commit sans scope ferme la voie', () => {
+      const { commit, verifier } = depot({ branche: 'cadence/run-1' });
+      commit('feat(L1): règle', { 'eslint.config.mjs': regle });
+      commit('fix: base', { [BASELINE]: serialiser(SOMMET) });
+      expect(verifier()).toMatchObject({ code: 1, texte: expect.stringContaining('remonte') });
+    });
+
+    it('un lot qui se déclare config: true dans son propre commit de plan reste refusé (le plan est lu au départ)', () => {
+      const { commit, verifier } = depot({ config: false, branche: 'cadence/run-1' });
+      commit('plan: L1 config', { '.cadence/raf.yaml': PLAN(true) });
+      commit('feat(L1): base', { [BASELINE]: serialiser(SOMMET) });
+      expect(verifier()).toMatchObject({ code: 1, texte: expect.stringContaining('remonte') });
+    });
+
     it('un changement non commité autre que la base ferme la voie', () => {
       const { commit, ecrire, verifier } = depot({ branche: 'cadence/run-1' });
       commit('feat(L1): règle et base', { 'eslint.config.mjs': regle, [BASELINE]: serialiser(SOMMET) });

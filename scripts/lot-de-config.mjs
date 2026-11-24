@@ -79,12 +79,15 @@ export const fichiersDifferents = (racine, ref, fichiers) => differences(fichier
  * Le lot de config qui peut faire monter la base (L824), null sinon : sur sa branche, le lot que le plan du départ déclare `config: true` (`ref.lotConfig`) ;
  * sans nom de lot (porte d'un run, porte d'intégration), quand CHAQUE commit depuis le départ, hors ceux qui ne touchent que le plan (`.cadence/`), ne cite
  * que des lots `config: true` et que rien d'autre que la base (`baseline`) n'est hors commit. Un commit de code dans l'intervalle ferme la voie : la mesure du sommet
- * porterait son code, et la base « exacte » le figerait.
+ * porterait son code, et la base « exacte » le figerait. Un commit sans fichier listé (une fusion, que `git log --name-only` ne détaille pas, ou un commit vide)
+ * la ferme aussi : sa résolution peut porter du code que personne ne voit.
  */
 export function lotDeConfigQuiMonte(ref, baseline) {
   if (!ref?.base) return null;
   if (ref.lotConfig) return ref.lotConfig;
-  const commits = (ref.commits?.() ?? []).filter((c) => !c.fichiers.every((f) => f.startsWith('.cadence/')));
+  const tous = ref.commits?.() ?? [];
+  if (tous.some((c) => !c.fichiers.length)) return null;
+  const commits = tous.filter((c) => !c.fichiers.every((f) => f.startsWith('.cadence/')));
   if (!commits.length || !commits.every((c) => estDeConfig(c, ref))) return null;
   if (!ref.nonCommites || ref.nonCommites().some((f) => f !== baseline)) return null;
   return [...new Set(commits.flatMap(lotsCites))].join(', ');

@@ -115,7 +115,8 @@ anything, and the ratchet closes them:
   The lot is the one of the branch (`cadence/<wave>/<project>--<lot>`); without a lot in the branch name (the gate of a
   `cadence run`, the integration gate) every commit since the start must cite only `config: true` lots (commits that touch
   only `.cadence/` are neutral) and nothing but `qualite-baseline.json` may be uncommitted: one commit of a code lot in the
-  range closes the way, since the measure of the tip would carry its code. A lot without `config: true` keeps the refusal of
+  range closes the way, since the measure of the tip would carry its code, and so does a commit that lists no file (a merge,
+  whose resolution `git log --name-only` does not show, or an empty commit). A lot without `config: true` keeps the refusal of
   any rise, and a config lot still touches no code (rule above).
 - **A hidden path**: `.git/info/exclude` is not versioned, so it cannot be compared to the start of the lot. When it holds
   a pattern (a line that is neither blank nor a comment) the command adds a warning to its output, success or refusal,

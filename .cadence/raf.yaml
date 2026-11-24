@@ -4227,6 +4227,7 @@ lots:
     created: 2026-11-24
   - id: L823
     title: "L823 Cliquet qualité étendu à v2/ (cadence 2 : run, banc) et aux plugins : eslint.config ne couvre que src, bin et scripts ; v2/src/run/run.ts fait 559 lignes et v2/src/bench/cli.ts 473 (seuil max-lines 400) sans être mesurés. Attendu : v2/src/** (et plugins/*/hooks) dans la mesure de scripts/qualite.mjs, base figée à l'existant (rien ne peut empirer), même porte et même CI ; ne change aucun code de v2/ (pas de banc requis)"
+    config: true
     status: doing
     estimate: 1
     created: 2026-11-24

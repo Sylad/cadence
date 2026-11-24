@@ -4027,9 +4027,10 @@ lots:
     created: 2026-11-20
   - id: L796
     title: "cadence run tient toute la branche : verrou des fichiers touchés, intégration par rebase quand main a bougé sur des fichiers disjoints, raf start commité par le run (lot rendu refus-integration par son propre raf start non commité, ~50 min) — issue #70 du compte pro, voisine de #66"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-20
+    started: 2026-11-24
   - id: L797
     title: "Suites de L794 (revue r1) : test que bras-sequence-v2d.md ne réintroduit pas l'interdiction des Nouveautés ; « Nouveautés manquante » seulement à la fin définitive du run (pas en attente, échec, quota, run.ts:396) ; pas de consigne « fichier daté du jour » quand une entrée cite déjà le lot (run.ts:338, doublon en correction) ; dossier des Nouveautés en dur (news.dir commun à news, lead et run)"
     status: todo

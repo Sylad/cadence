@@ -3999,6 +3999,7 @@ lots:
     estimate: 1
     created: 2026-11-19
     started: 2026-11-24
+    review: { date: 2026-11-24, verdict: "conforme après 3 corrections : majeur docs/spec.md ne couvre pas language: en ; mineurs : message d'états manquants changé sans la clé, brief spec.md:8 et exemples (etat-vide) qui contredisent les états anglais — tmp/revue-cadence-L791.md", commit: a519593c81e6dd081269be7957b51df18d2415a2 }
   - id: L792
     title: "Issue #68 (compte pro) : le brief de cadence run ne nomme pas cadence spec check — une session chargée d'amener des fiches d'écran à « fiche valide » n'a jamais lancé la commande, a reconstruit les règles depuis git et s'est crue à 0 écart (97 restaient ; run 20261119121911-828448). Cause : découverte, pas permission. Nommer les commandes de vérification du projet (spec check, et celles de cadence.yaml) dans le brief quand le lot ou la demande touche des fiches, et le tester sur le texte du brief rendu"
     status: done

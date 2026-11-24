@@ -221,11 +221,18 @@ jobs:
 Without any earlier commit (the first commit of a repository) it measures against the baseline alone. **Never put
 `.cadence/analyse/**` (nor `cadence.yaml` or a file of `configs`) in `paths-ignore`** of the workflow: a push that
 changes only a baseline would then run no analysis at all, and a baseline raised alone would wait for the next push,
-whose `before` already holds it. The command refuses the wrong reference itself: when the start of `--contre <ref>`
-is HEAD and HEAD raises a baseline against its parent (a key higher, or absent from the parent), it exits 1 with
+whose `before` already holds it.
+
+**The recipe is the protection; the command only guards the last commit.** When the start of `--contre <ref>` is HEAD
+and HEAD raises a baseline against its parent (a key higher, or absent from the parent), the command exits 1 with
 « --contre … désigne le commit jugé lui-même » and the keys; a baseline born in HEAD is only said (it is not judged as
-new there), and an unchanged or lowered baseline is judged as before.
-`test/analyse-contre-head-l811.test.ts` plays the case of the issue and this recipe as written.
+new there), and an unchanged or lowered baseline is judged as before. It compares HEAD to its first parent and to
+nothing older: the command cannot know where a push begins, only the event says it (`github.event.before`). A push of
+two commits, the first raising a baseline over a new violation and the second clean, passes with
+`--contre origin/main` (code 0) and fails against the commit before the push (code 1). Keep the recipe above, never
+`--contre origin/main` on a push. The fallback to `HEAD~1` (manual run, or a `before` the runner does not have) has the
+same limit: it judges the last commit alone. `test/analyse-contre-head-l811.test.ts` plays the case of the issue, the
+push of two commits, and this recipe as written.
 
 ## Recipe per technology
 

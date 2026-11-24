@@ -1,6 +1,6 @@
 // L811 (issue #72) : `cadence analyse --contre origin/main` sur la CI d'un push à main comparait chaque base à elle-même (origin/main = le commit poussé) ;
 // une violation nouvelle commitée avec sa base relevée à la main passait. La recette CI de docs/analyse.md compare au commit d'avant le push, et la commande
-// refuse un départ égal à HEAD quand HEAD relève une base.
+// refuse un départ égal à HEAD quand HEAD relève une base — garde du dernier commit seulement : la recette reste la protection d'un push de plusieurs commits.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -132,6 +132,23 @@ describe('L811 — la recette CI de docs/analyse.md, jouée telle qu\'écrite', 
     expect((await cadence(r2, '--ecrire')).code).toBe(0);
     commit(r2, 'propre');
     expect(jouer(r2, { AVANT: avant2 }).code).toBe(0);
+  });
+
+  it('push de 2 commits (base relevée puis commit propre) : la garde ne voit que le dernier, vert contre origin/main ; rouge avec la recette contre before', async () => {
+    const r = await depot();
+    const avant = git(r, 'rev-parse', 'HEAD');
+    violationEtBaseRelevee(r);
+    writeFileSync(join(r, 'src/b.js'), 'propre\n');
+    commit(r, 'commit propre');
+    git(r, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
+    expect((await cadence(r, '--contre', 'origin/main')).code).toBe(0); // la limite dite par docs/analyse.md
+    const rouge = jouer(r, { AVANT: avant });
+    expect(rouge.code).toBe(1);
+    expect(rouge.sortie).toContain('src/a.js|no-todo');
+    expect(rouge.sortie).toContain('remonte par rapport à');
+    const doc = readFileSync('docs/analyse.md', 'utf8');
+    expect(doc).toMatch(/the command only guards the last commit/);
+    expect(doc).not.toMatch(/refuses the wrong reference itself/);
   });
 
   it('replis : before à 0000… ou absent du dépôt, et lancement manuel (vide) sur main → le parent ; sur une autre branche → la branche par défaut', async () => {

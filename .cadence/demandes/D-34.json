@@ -1,0 +1,16 @@
+{
+  "id": "D-34",
+  "texte": "ok on regarde",
+  "date": "2026-11-24",
+  "etat": "ouverte",
+  "preuve": "",
+  "lots": [
+    "L839"
+  ],
+  "precisions": [
+    {
+      "date": "2026-11-24",
+      "texte": "Contexte (lead) : réponse à « je viens de revoir une nouvelle video sur code mode, les influenceur ia semble fan de se truc ». Proposition acceptée : un lot cadence mesuré qui essaie le code mode (script Playwright au lieu d'appels d'outils un par un) sur le ux-reviewer, le poste où il peut compter, et ne le garde que s'il trouve autant de défauts pour moins cher."
+    }
+  ]
+}

@@ -5,7 +5,8 @@ import { parse } from 'yaml';
 import { describe, expect, it } from 'vitest';
 import { run } from '../src/cli.js';
 import { readOrchestrateConfig } from '../src/config.js';
-import { languageText, readLanguage, requiredStates, templateName } from '../src/language.js';
+import { languageText, mockupSections, readLanguage, requiredStates, templateName } from '../src/language.js';
+import { renderBrief } from '../src/orchestrate/briefs.js';
 import { acceptText } from '../src/orchestrate/accept.js';
 import { specText } from '../src/orchestrate/spec.js';
 import { checkFiche, deriveQa } from '../src/spec.js';
@@ -159,5 +160,46 @@ describe('L791 — cadence spec check suit la langue du projet', () => {
     cadenceYaml(dir, 'language: en\n');
     expect(await run(['spec', 'qa', 'docs/specs/my-screen/fiche.yaml'], { cwd: dir, env: {}, out: (l) => out.push(l), err: (l) => out.push(l), now: () => new Date() })).toBe(0);
     expect(out.join('\n')).toContain('## /my-screen');
+  });
+});
+
+describe('L791 — corrections de la revue (message d’avant, brief spec anglais, docs/spec.md)', () => {
+  it('sans la clé, le message d’états manquants est celui d’avant L791, mot pour mot', () => {
+    const doc = parse(read('templates/fiche.yaml'));
+    doc.etats = doc.etats.filter((e: string) => e !== 'chargement' && e !== 'erreur');
+    doc.regles = doc.regles.filter((r: { etat?: string }) => r.etat !== 'chargement' && r.etat !== 'erreur');
+    expect(checkFiche(doc)).toContain('états : « chargement », « erreur » manquant(s) (vide, chargement et erreur sont requis)');
+    expect(checkFiche(parse(read('templates/fiche.en.yaml')), 'fr').join('\n')).toContain('(vide, chargement et erreur sont requis)');
+    expect(checkFiche(parse(read('templates/fiche.yaml')), 'en').join('\n')).toContain('(empty, loading et error sont requis)');
+  });
+
+  const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', news: '', captures: '' };
+
+  it('le brief spec rendu en anglais ne nomme que les états anglais (sections, captures, actuel-*)', () => {
+    for (const light of [false, true]) {
+      const brief = renderBrief('spec', { ...vars, sections: mockupSections('en'), spec: specText({ dir: 'docs/specs', screen: 'page', light, language: 'en' }) });
+      expect(brief).toContain('`<section id="etat-empty">`, `etat-loading`, `etat-error`, and `etat-loaded`');
+      expect(brief).toContain('#etat-empty');
+      expect(brief).toContain(light ? '`actuel-empty-1440.png`, `maquette-empty-1440.png`' : '`maquette-empty-1440.png`');
+      for (const fr of ['etat-vide', 'etat-chargement', 'etat-erreur', 'etat-charge`', '-vide-1440']) expect(brief, `${light} ${fr}`).not.toContain(fr);
+    }
+  });
+
+  it('sans la clé, le brief spec rendu garde les sections et les exemples d’avant', () => {
+    expect(mockupSections()).toBe(mockupSections('fr'));
+    for (const light of [false, true]) {
+      const spec = specText({ dir: 'docs/specs', screen: 'page', light });
+      const sans = renderBrief('spec', { ...vars, spec });
+      expect(renderBrief('spec', { ...vars, spec, sections: mockupSections() })).toBe(sans);
+      expect(sans).toContain('`<section id="etat-vide">`, `etat-chargement`, `etat-erreur`, and `etat-charge` when the screen has data');
+      expect(sans).toContain(light ? '`actuel-vide-1440.png`, `maquette-vide-1440.png`' : '(e.g. `maquette-vide-1440.png`)');
+    }
+  });
+
+  it('docs/spec.md, renvoyée par le gabarit anglais, décrit les états anglais', () => {
+    expect(read('templates/fiche.en.yaml')).toContain('docs/spec.md');
+    const doc = read('docs/spec.md');
+    expect(doc).toContain('language: en');
+    for (const e of ['`empty`', '`loading`', '`error`', '`loaded`', '#etat-empty', 'templates/fiche.en.yaml']) expect(doc, e).toContain(e);
   });
 });

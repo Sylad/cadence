@@ -23,7 +23,7 @@ import { ficheReviewText, reviewedSheetText } from '../fiche.js';
 import { maquetteText, reviewedText } from '../maquette.js';
 import { worstUxText } from '../pires-cas.js';
 import { answeredText, ficheHasBack, findFiche, lightLot, ruleIdsSourcedByLead, sessionAnswerText, specText, visibleFix, type FicheParts } from '../spec.js';
-import { templateName, type Language } from '../../language.js';
+import { mockupSections, templateName, type Language } from '../../language.js';
 import { decisionsText, humanDecisions } from '../decisions.js';
 import { type Constat, type LotState } from '../state.js';
 import { git } from '../worktree.js';
@@ -265,7 +265,7 @@ export function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
     const written = ficheOf(c);
     const back = partsOf(c, written).back;
     const session = { run: (l.specRuns ?? 0) + 1, max: specMax(c) };
-    vars.spec = specText({
+    Object.assign(vars, { sections: mockupSections(c.config.language) }).spec = specText({
       dir: c.config.spec.dir,
       render: c.config.spec.render,
       screen: l.screen, light: lightLot(l, lot, c.config.maquette, wd(c), c.config.spec.dir),

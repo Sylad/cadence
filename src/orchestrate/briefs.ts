@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { RafError, type Lot } from '../plan.js';
 import type { SessionKind } from './launch.js';
 import { wipBranch } from './tiers.js';
+import { mockupSections } from '../language.js';
 
 /** Gabarits livrés avec le paquet (à la racine, à côté de dist/ et src/). */
 export const TEMPLATES_DIR = fileURLToPath(new URL('../../templates/orchestrate', import.meta.url));
@@ -40,6 +41,8 @@ export interface BriefVars {
   ack?: string;
   /** Précheck (L322) : comment la session prend connaissance du lot ; absent, elle lit le plan elle-même (`PLAN_READING`). Le modèle local reçoit le lot dans le brief (`localReading`). */
   lecture?: string;
+  /** Brief de la spec (L791) : les sections d'état de la maquette dans la langue du projet (`mockupSections`) ; absent, les noms français d'avant. */
+  sections?: string;
   /** Consigne de l'étape spec (L171) : dossier, largeurs, commande de rendu, écarts de la passe précédente ; vide ailleurs. */
   spec?: string;
   /** Décisions de l'humain des notes du lot et de son parent (L344) : `decisionsText(humanDecisions(lot, parent))` pour implement et fix ; vide ailleurs et sans décision. */
@@ -250,7 +253,7 @@ export function loadTemplates(dir = TEMPLATES_DIR): Templates {
 export function renderBrief(kind: BriefName, vars: BriefVars, source: Templates | string = TEMPLATES_DIR): string {
   const text = typeof source === 'string' ? loadTemplates(source)[kind] : source[kind];
   const out = text.replace(/\{\{(\w+)\}\}/g, (_m, name: string) => {
-    const v = ({ ...vars, ...Object.fromEntries(BLANK_WHEN_ABSENT.map((k) => [k, vars[k] ?? ''])), lecture: vars.lecture ?? PLAN_READING } as unknown as Record<string, string | undefined>)[name];
+    const v = ({ ...vars, ...Object.fromEntries(BLANK_WHEN_ABSENT.map((k) => [k, vars[k] ?? ''])), lecture: vars.lecture ?? PLAN_READING, sections: vars.sections ?? mockupSections() } as unknown as Record<string, string | undefined>)[name];
     if (v === undefined) throw new RafError(`gabarit ${FILES[kind]} : valeur manquante pour {{${name}}}`);
     return v;
   });

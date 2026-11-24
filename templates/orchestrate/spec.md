@@ -5,7 +5,7 @@ Read the lot, its notes and sub-tasks in the plan (`.cadence/raf.yaml`, the lega
 {{spec}}
 
 What you produce, in `<dir>/<écran>/`:
-1. `maquette.html`: static HTML + CSS, to the project's charter (reuse its variables, fonts and components; invent no style when an equivalent exists), no business JavaScript. Every state the sheet covers is an addressable section: `<section id="etat-vide">`, `etat-chargement`, `etat-erreur`, and `etat-charge` when the screen has data (a light mockup covers only the states the lot touches, as said above). Every field of the sheet carries `data-testid="<id of the field>"`.
+1. `maquette.html`: static HTML + CSS, to the project's charter (reuse its variables, fonts and components; invent no style when an equivalent exists), no business JavaScript. Every state the sheet covers is an addressable section: {{sections}} when the screen has data (a light mockup covers only the states the lot touches, as said above). Every field of the sheet carries `data-testid="<id of the field>"`.
 2. The captures described above, one per state and per width, copied from the Playwright output directory of this wave into the folder (give a capture the absolute path of that directory, as the Playwright paragraph says, then copy it).
 3. `fiche.yaml`, in the format of the template below. Check it with `cadence spec check <fiche>` until it is valid, and derive the QA expectations with `cadence spec qa <fiche>` only if the lot asks for it.
 

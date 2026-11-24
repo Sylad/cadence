@@ -6,7 +6,7 @@ import { isMap, isNode, isScalar, isSeq, parse, parseDocument, stringify, type N
 import type { Screen } from '../plan.js';
 import { acceptationFile } from './accept.js';
 import { checkFiche, fichesDuDossier, LARGEURS } from '../spec.js';
-import { languageText, type Language } from '../language.js';
+import { languageText, statesOf, type Language } from '../language.js';
 import { EXPRESS_MAX_ESTIMATE } from './express.js';
 import { worstSpecLines } from './pires-cas.js';
 import { indexProblems } from './maquette-ecran.js';
@@ -360,19 +360,19 @@ const indexLines = (dir: string): string[] => [
 ];
 
 /** Consigne de la maquette d'un lot `screen: page` (ou déjà entré dans la chaîne complète). */
-const pageLines = (o: { dir: string; render?: string; screen?: string }): string[] => [
+const pageLines = (o: { dir: string; render?: string; screen?: string; language?: Language }): string[] => [
     `The lot declares \`screen: ${o.screen}\`. The specs of this project live in \`${o.dir}/<écran>/\` (one folder per screen, \`<écran>\` = the kebab-case \`ecran.id\` of the sheet).`,
-    `Render each state of the mockup at ${LARGEURS.map((w) => `${w}`).join(' and ')} px width: one capture per state and per width, named \`maquette-<état>-<largeur>.png\` (e.g. \`maquette-vide-1440.png\`). Each capture is rendered from its own state: the program compares the files and sends back two states of one width with the same fingerprint, and a dark capture (\`maquette-<état>-sombre-<largeur>.png\`) identical to its light one.`,
+    `Render each state of the mockup at ${LARGEURS.map((w) => `${w}`).join(' and ')} px width: one capture per state and per width, named \`maquette-<état>-<largeur>.png\` (e.g. \`maquette-${statesOf(o.language).vide}-1440.png\`). Each capture is rendered from its own state: the program compares the files and sends back two states of one width with the same fingerprint, and a dark capture (\`maquette-<état>-sombre-<largeur>.png\`) identical to its light one.`,
 
   ...indexLines(o.dir),
   renderLine(o.render, 'Use it'),
 ];
 
 /** Consigne de la maquette légère (L459) : l'écran actuel et la version visée des seuls états touchés. */
-const lightLines = (o: { dir: string; render?: string }): string[] => [
+const lightLines = (o: { dir: string; render?: string; language?: Language }): string[] => [
     `This lot is a visible lot that is not a whole page: write a light mockup, before any code. The specs of this project live in \`${o.dir}/<écran>/\` (one folder per screen, \`<écran>\` = the kebab-case \`ecran.id\` of the sheet).`,
     'Cover only the states the lot touches (not the whole screen). For each touched state, capture the CURRENT screen of the application at each width, then the target version: the sheet and the mockup are limited to the states, fields and rules the lot changes.',
-    `Name the captures of the current screen \`actuel-<état>-<largeur>.png\` and those of the target \`maquette-<état>-<largeur>.png\`, one per touched state and per width (${LARGEURS.join(' and ')} px; e.g. \`actuel-vide-1440.png\`, \`maquette-vide-1440.png\`), in the folder of the sheet. The program checks the captures of the target, not the \`actuel-*\` ones.`,
+    `Name the captures of the current screen \`actuel-<état>-<largeur>.png\` and those of the target \`maquette-<état>-<largeur>.png\`, one per touched state and per width (${LARGEURS.join(' and ')} px; e.g. \`actuel-${statesOf(o.language).vide}-1440.png\`, \`maquette-${statesOf(o.language).vide}-1440.png\`), in the folder of the sheet. The program checks the captures of the target, not the \`actuel-*\` ones.`,
     'If the current screen cannot be captured (the application does not start, the page is protected), say so under "nonVerifie" and base the mockup on the code: never invent a capture of the current screen.',
     'Each touched state is a section `id="etat-<état>"` of `maquette.html`, and each touched field carries a `data-testid`.',
 

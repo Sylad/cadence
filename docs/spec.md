@@ -5,14 +5,25 @@
 `cadence spec check <fiche.yaml>` checks a **sheet** (`fiche.yaml`, the machine-readable output of the spec step): a **screen sheet** (a lot with `screen:`), a **back-end sheet** (a lot that changes a behaviour without a screen) or a **mixed sheet** with both parts. The screen part is designed in
 [docs/superpowers/specs/2026-10-10-etape-spec-design.md](superpowers/specs/2026-10-10-etape-spec-design.md)). Start from the template
 [`templates/fiche.yaml`](../templates/fiche.yaml) (it passes the check as is), a worked example sits next to the design. It prints one
-`✗ …` line per violation and exits **0** when the sheet is valid, **1** with violations, **2** when the file is missing, is not YAML or the usage is wrong. The invariants:
+`✗ …` line per violation and exits **0** when the sheet is valid, **1** with violations, **2** when the file is missing, is not YAML or the usage is wrong. 
+**Language of the sheet** (`language:` of `cadence.yaml`, L791, [docs/config.md](config.md#language-of-the-project-files-language)). Without the key, or with
+`fr`, the states are the French names below (`vide`, `chargement`, `erreur`, `charge`). With `language: en`, start from
+[`templates/fiche.en.yaml`](../templates/fiche.en.yaml) and [`templates/fiche-back.en.yaml`](../templates/fiche-back.en.yaml): the required
+states are `empty`, `loading`, `error` (and `loaded` when the screen has data), so wherever this page says `vide`, `chargement`, `erreur`
+or `charge`, read `empty`, `loading`, `error` or `loaded` — the required `etats`, the state of a rule that carries `masque`, the mockup
+sections `#etat-empty`… and captures `maquette-empty-1440.png`, and the states `spec qa` derives from. A sheet with the French states
+is then refused (« empty », « loading », « error » manquant(s)), and an English one is refused without the key. The texts of the rules,
+labels and planned test names are in English; the keys (`ecran`, `etats`, `regles`, `enonce`…) do not change, nor do the messages of the
+command.
 
-- `ecran` has `id`, `titre`, `route` (starts with `/`), `lot`, `maquette`, and `largeurs: [1440, 390]`; `etats` holds at least `vide`, `chargement`, `erreur`, none twice;
+The invariants:
+
+- `ecran` has `id`, `titre`, `route` (starts with `/`), `lot`, `maquette`, and `largeurs: [1440, 390]`; `etats` holds at least `vide`, `chargement`, `erreur` (`empty`, `loading`, `error` with `language: en`), none twice;
 - `ecran.maquette_ecran` (optional, L573) is the path of the page that draws the states when it is not the index `ecran.maquette`. The spec step checks the index: each field of the sheet is an entry `<p data-testid="<id>">…</p>` of `maquette.html` and each state a `<section id="etat-<état>">…</section>`, with the captures `maquette-<état>-<largeur>.png` beside it. With `maquette_ecran`, the program first adds to the index what that page draws and the index lacks (an entry per field, a section per state, never twice) and copies into the folder of the sheet the captures held beside the page (never over an existing one), then commits them with the `plan.commit` template (default `docs(<lot>): index de la maquette complété depuis maquette_ecran (orchestrate <wave>)`, which `--dry-run` also runs through the `commit-msg` hook). A refused commit puts the index and the captures back as they were (neither modified nor staged), so the session sees no dirty tree and the finding stays. What the page does not draw is not invented: the finding stays, and reads « présent dans maquette_ecran, absent de l'index » when only the index misses it. A path outside the repository, a missing page or the index itself is ignored;
 - `champs[]`: a unique kebab-case `id` (it is also the mockup's `data-testid`), `libelle`, `type`, `source`, and a boolean `obligatoire`;
 - `regles[]` are numbered `R1`, `R2`… in order with no gap; each has an `etat` that is one of `etats`, an `enonce`, a `message` (the exact text on screen, or `null`),
   a `statut` — `sourcee` with the `source` it comes from, or `hypothese` with the `si_faux` that says what would change — and at least one planned test, named `Rn — …`;
-- `masque` (optional, only on a rule of state `vide`) lists the fields the rule makes disappear: every id must be a field of the sheet and none may be one the rule shows in `champs`;
+- `masque` (optional, only on a rule of state `vide`, `empty` with `language: en`) lists the fields the rule makes disappear: every id must be a field of the sheet and none may be one the rule shows in `champs`;
 - `actions[]` are numbered `A1`… in order, their `declencheur` is a field id (or `null` for the page load), their `appel` reads `VERB /path`, and the `regles` they carry exist.
 
 **Back-end sheet** (L187; design: [docs/superpowers/specs/2026-10-11-etape-spec-back-design.md](superpowers/specs/2026-10-11-etape-spec-back-design.md)). Start from [`templates/fiche-back.yaml`](../templates/fiche-back.yaml) (it passes the check as is); a worked example, a real lot of ol-companion, sits next to the design. The sheet has `sujet` instead of `ecran` (no `etats`, `champs`, mockup), and the same `regles`. The back-end invariants, one `✗ …` line each:
@@ -35,7 +46,7 @@ The worst-case data set that the screen steps capture next to the demo data (`qa
 
 `cadence spec qa <fiche.yaml>` derives from a valid sheet the section of `docs/qa/expectations.md` for its screen and prints it on the standard output
 (it never writes the file: you paste the section, and the lead commits it like the rest of the plan files). A sheet with violations prints them on the
-error output, nothing on the standard one, and exits 1. The derivation is built so that the planned empty and error states are never reported as defects:
+error output, nothing on the standard one, and exits 1. The derivation is built so that the planned empty and error states (`vide`/`erreur`, or `empty`/`error` with `language: en`) are never reported as defects:
 
 - `## <route>` is the screen's route;
 - `shows:` — one line per mandatory field (its `libelle`), **except** the fields that belong to a state (listed in `champs` of a rule of state `vide` or `erreur`, like the empty-state message);

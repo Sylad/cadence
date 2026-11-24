@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import { RafError } from './plan.js';
 import { maquetteEcranProblems } from './orchestrate/maquette-ecran.js';
-import { requiredStates, statesOf, type Language } from './language.js';
+import { requiredStates, requiredStatesText, statesOf, type Language } from './language.js';
 
 /** Les largeurs de rendu d'une fiche (L170, spec etape-spec S2). */
 export const LARGEURS = [1440, 390];
@@ -81,7 +81,7 @@ export function checkFiche(doc: unknown, lang?: Language): string[] {
     else {
       for (const [i, e] of doc.etats.entries()) if (!texte(e)) p.push(`état n° ${i + 1} : texte attendu`);
       const manquants = requiredStates(lang).filter((e) => !etats.includes(e));
-      if (manquants.length) p.push(`états : ${manquants.map((e) => `« ${e} »`).join(', ')} manquant(s) (${requiredStates(lang).join(', ')} sont requis)`);
+      if (manquants.length) p.push(`états : ${manquants.map((e) => `« ${e} »`).join(', ')} manquant(s) (${requiredStatesText(lang)} sont requis)`);
       for (const e of new Set(etats.filter((x, i) => etats.indexOf(x) !== i))) p.push(`états : « ${e} » en double`);
     }
 

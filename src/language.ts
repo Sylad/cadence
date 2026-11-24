@@ -38,6 +38,21 @@ export const requiredStates = (lang?: Language): string[] => {
   return [s.vide, s.chargement, s.erreur];
 };
 
+/** Les états requis dans le texte d'un message : « vide, chargement et erreur » (le texte d'avant L791, sans la clé), « empty, loading et error » en anglais. */
+export const requiredStatesText = (lang?: Language): string => {
+  const [a, b, c] = requiredStates(lang);
+  return `${a}, ${b} et ${c}`;
+};
+
+/**
+ * Les sections de la maquette, citées par le brief de la spec (`{{sections}}` de templates/orchestrate/spec.md) : `etat-vide`…
+ * sans la clé (le texte d'avant, mot pour mot), `etat-empty`… avec `language: en`, pour que le brief ne contredise pas `languageText`.
+ */
+export const mockupSections = (lang?: Language): string => {
+  const s = statesOf(lang);
+  return `\`<section id="etat-${s.vide}">\`, \`etat-${s.chargement}\`, \`etat-${s.erreur}\`, and \`etat-${s.charge}\``;
+};
+
 /** Le nom de fichier d'un gabarit du paquet dans la langue du projet : `fiche.yaml` → `fiche.en.yaml` en anglais, inchangé sinon. */
 export const templateName = (name: string, lang?: Language): string => (lang === 'en' ? name.replace(/(\.[^.]+)$/, '.en$1') : name);
 

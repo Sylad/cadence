@@ -29,6 +29,7 @@ import type { Args } from './command-args.js';
 import { draw, priorityOf } from './draw.js';
 import { agentsOf } from './preflight.js';
 import { lotBudgetBasis, type MeasuredBudgets } from './lot-budget.js';
+import { mockupSections } from '../language.js';
 
 /**
  * Ce avec quoi le dry-run mesure les messages de la fiche d'un lot à étape spec (L343) : la fiche du lot quand elle est déjà écrite (son sujet pour les hypothèses
@@ -206,7 +207,7 @@ export function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDep
     // brief écrit par --dry-run = base d'une délégation à la main : aucun dossier de vague (il n'existe pas)
     const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: headline(lot, l.goal), objectif: objective(lot, l.goal), commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', news: l.visible ? newsText(l.lot) : '', captures: '', diff: 'git diff <sha de départ>..HEAD' };
     vars.decisions = decisionsText(humanDecisions(lot, lot.parent ? env.loadPlan().lots().find((x) => x.id === lot.parent) : undefined));
-    if (specStage) vars.spec = specText({ dir: env.config.spec.dir, render: env.config.spec.render, screen: l.screen, light: lightLot(l, lot, env.config.maquette, l.repo, env.config.spec.dir), back: !!l.specLot, worst: env.loadPlan().qaWorstData, language: env.config.language });
+    if (specStage) Object.assign(vars, { sections: mockupSections(env.config.language) }).spec = specText({ dir: env.config.spec.dir, render: env.config.spec.render, screen: l.screen, light: lightLot(l, lot, env.config.maquette, l.repo, env.config.spec.dir), back: !!l.specLot, worst: env.loadPlan().qaWorstData, language: env.config.language });
     if (l.screen && env.config.maquette) vars.maquette = maquetteText({ fiche: `${env.config.spec.dir}/<écran>/fiche.yaml`, passes: 0, max: env.config.maquetteReviews, light: lightLot(l, lot, env.config.maquette, l.repo, env.config.spec.dir), worst: env.loadPlan().qaWorstData });
     if (l.specLot && env.config.fiche) vars.fiche = ficheReviewText({ fiche: `${env.config.spec.dir}/<sujet>/fiche.yaml`, passes: 0 });
     if (specStage && env.config.accept && !lightLot(l, lot, env.config.maquette, l.repo, env.config.spec.dir)) {

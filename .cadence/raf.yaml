@@ -3922,9 +3922,10 @@ lots:
     finished: 2026-11-24
   - id: L780
     title: "Parité porte ↔ CI : un préfixe d'environnement dont la valeur est une substitution $(…) avec guillemets imbriqués et pipes est sauté en entier, plus de faux écart (issue #65 du compte pro, D-28 ; voisin de #32)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-18
+    started: 2026-11-24
   - id: L781
     title: "cadence run : les commandes de projet qui appellent cadence (npm run news → cadence news build, puis npm run plan) ne peuvent pas tourner dans la session du run ; 3 lots le 18-11 (finance L172, L173 ; warhammer L71 fait à la main) rendus avec nouveautes-data non régénéré, le lead rejoue à chaque fois — les jouer à l'intégration du run (ou autoriser cadence news build dans la session), avec un test"
     status: done

@@ -4299,10 +4299,11 @@ lots:
     created: 2026-11-24
   - id: L834
     title: "D-33 : CI de cadence mutualisée — un seul run par rafale de pushes sur main, la suite jouée une fois par version de Node et non deux"
-    status: todo
+    status: doing
     estimate: 0.5
     quickwin: true
     created: 2026-11-24
+    started: 2026-11-24
   - id: L835
     title: "D-33 étude : où part le temps entre la fin d'un lot et la prod, tous projets (porte locale, CI, banc, déploiement, attentes) et ce qui se mutualise"
     status: todo

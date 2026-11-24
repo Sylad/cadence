@@ -21,16 +21,55 @@ const TEST_RUNNER = /^((npm|pnpm|yarn) (run )?test(?![\w-])|(vitest|jest|mocha|p
 const TEST_SCRIPT = /^(npm|pnpm|yarn) run (test|e2e)\S*/;
 /** Les enveloppes d'un lanceur (écran virtuel, délai…), retirées avant la reconnaissance. */
 const WRAPPER = /^(xvfb-run|timeout|time|env|nice)(\s+-\S+)*(\s+\d+[smhd]?)?\s+/;
-/** Les variables d'environnement en tête de commande, valeur entre guillemets comprise. */
-const ENV_PREFIX = /^(\w+=("[^"]*"|'[^']*'|\S*)\s+)+/;
 /** Une redirection : vers un descripteur (`2>&1`, `>&2`, sans groupe) ou vers un fichier (`>out.log`, `&>`, `<in`), dont le groupe est vide quand la cible est le mot suivant (`> out.log`). */
 const REDIRECTION = /^(?:\d*>>?&\d+|(?:&>>?|\d*>>?|\d*<)(\S*))$/;
+
+/**
+ * L'indice juste après la construction shell qui commence en `i` (L780) : `'…'`, `"…"`, `` `…` `` ou `$(…)` (et `$((…))`), guillemets, backticks et
+ * substitutions imbriqués compris, `\` échappant le caractère suivant hors des apostrophes ; `i + 1` si rien n'y commence, la fin de `s` si elle n'est pas fermée.
+ */
+function skipConstruct(s: string, i: number): number {
+  const c = s[i];
+  if (c === '\\') return Math.min(i + 2, s.length);
+  if (c === "'") {
+    const end = s.indexOf("'", i + 1);
+    return end < 0 ? s.length : end + 1;
+  }
+  if (c === '"' || c === '`') return scanUntil(s, i + 1, c, c === '"' ? ['\\', '`', '$('] : ['\\']);
+  if (c === '$' && s[i + 1] === '(') return scanUntil(s, i + 2, ')', ['\\', "'", '"', '`', '$(', '(']);
+  if (c === '(') return scanUntil(s, i + 1, ')', ['\\', "'", '"', '`', '$(', '(']);
+  return i + 1;
+}
+
+/** L'indice juste après le `close` qui ferme ce qui s'ouvre avant `i`, en sautant les constructions `nested` (voir `skipConstruct`) ; la fin de `s` sans fermeture. */
+function scanUntil(s: string, i: number, close: string, nested: string[]): number {
+  while (i < s.length) {
+    if (s[i] === close) return i + 1;
+    i = nested.some((n) => s.startsWith(n, i)) ? skipConstruct(s, i) : i + 1;
+  }
+  return s.length;
+}
+
+/** Les constructions qu'un mot shell avale en entier, séparateurs et parenthèses qu'elles contiennent compris. */
+const WORD_CONSTRUCTS = ['\\', "'", '"', '`', '$('];
+
+/** `command` sans ses affectations de tête (`CI=1`, `FOO="a b"`, `PATH="$(ls -d "$HOME"/… | tail -1):$PATH"`, L780) : chaque valeur est lue comme un mot shell, substitutions et guillemets imbriqués compris, et doit être suivie d'un blanc. */
+function withoutEnvPrefix(command: string): string {
+  let rest = command;
+  for (let name = /^\w+=/.exec(rest); name; name = /^\w+=/.exec(rest)) {
+    let i = name[0].length;
+    while (i < rest.length && !/\s/.test(rest[i]!)) i = WORD_CONSTRUCTS.some((n) => rest.startsWith(n, i)) ? skipConstruct(rest, i) : i + 1;
+    if (!/^\s+/.test(rest.slice(i))) break; // affectation seule, sans commande après
+    rest = rest.slice(i).trimStart();
+  }
+  return rest;
+}
 
 /** `command` sans ses variables d'environnement de tête, ses enveloppes (`xvfb-run`, `timeout`…) ni `npx`, répétés jusqu'à épuisement (`timeout 60 CI=1 npx vitest`). */
 function unwrap(command: string): string {
   let rest = command;
   for (let again = true; again; ) {
-    const next = rest.replace(ENV_PREFIX, '').replace(WRAPPER, '').replace(/^npx(\s+(--no-install|-y|--yes))?\s+/, '');
+    const next = withoutEnvPrefix(rest).replace(WRAPPER, '').replace(/^npx(\s+(--no-install|-y|--yes))?\s+/, '');
     again = next !== rest;
     rest = next;
   }
@@ -54,17 +93,17 @@ function isSeparator(line: string, i: number): boolean {
   return c === '&' && line[i - 1] !== '>' && line[i + 1] !== '>';
 }
 
-/** Découpe une ligne sur `&&`, `||`, `|` et `;` hors des guillemets (les redirections `2>&1` restent dans leur commande) ; chaque parenthèse (sous-shell, `$(…)`) devient un segment `(` ou `)`. */
+/**
+ * Découpe une ligne sur `&&`, `||`, `|` et `;` hors des guillemets, backticks et substitutions `$(…)` (L780 : un `|` ou une parenthèse dans
+ * `PATH="$(ls … | tail -1)"` ne coupe pas la commande ; les redirections `2>&1` restent dans leur commande) ; chaque parenthèse de sous-shell devient un segment `(` ou `)`.
+ */
 function splitLine(line: string): string[] {
   const parts: string[] = [];
-  let quote = '';
   let from = 0;
   for (let i = 0; i < line.length; i++) {
     const c = line[i]!;
-    if (quote) {
-      if (c === quote) quote = '';
-    } else if (c === '"' || c === "'") {
-      quote = c;
+    if (WORD_CONSTRUCTS.some((n) => line.startsWith(n, i))) {
+      i = skipConstruct(line, i) - 1;
     } else if (c === '(' || c === ')') {
       parts.push(line.slice(from, i), c);
       from = i + 1;

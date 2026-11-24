@@ -47,7 +47,14 @@ const estDeConfig = (c, ref) => lotsCites(c).length > 0 && lotsCites(c).every((i
 
 // Les fichiers qui diffèrent réellement du départ (L826) : `ref.touches()` (git diff du départ à l'arbre, et fichiers neufs non ignorés). Un fichier qu'un
 // commit a changé puis qu'un autre a ramené à son état de départ n'y est pas : un lot se juge à ce qu'il laisse, pas à son chemin.
-const diffNet = (ref) => new Set(ref.touches?.() ?? []);
+// Lu à la demande, une seule fois : rien n'est lancé (git diff, ls-files) quand aucun commit n'a besoin d'être pesé.
+function diffNet(ref) {
+  let net = null;
+  return (f) => {
+    if (!net) net = new Set(ref.touches?.() ?? []);
+    return net.has(f);
+  };
+}
 
 // Vrai si le libellé « fichier (état) » d'une config changée n'est dû qu'à des commits de lots de config (au moins un) : un commit de code qui y touche, ou un arbre sale, la laisse refusée
 function deLotsDeConfig(libelle, commits, ref) {
@@ -72,7 +79,7 @@ export function configChangee(racine, ref, jeu) {
   const changees = jeu.changees().filter((libelle) => !deLotsDeConfig(libelle, commits, ref));
   // jugé sur le diff NET depuis le départ (L826) : un fichier hors config qu'un commit de correction a ramené à son état de départ ne compte plus
   const net = diffNet(ref);
-  const hors = commits.filter((c) => estDeConfig(c, ref)).flatMap((c) => c.fichiers.filter(horsConfig(lotsCites(c), jeu.estConfig)).filter((f) => net.has(f)));
+  const hors = commits.filter((c) => estDeConfig(c, ref)).flatMap((c) => c.fichiers.filter(horsConfig(lotsCites(c), jeu.estConfig)).filter(net));
   if (hors.length) return { code: 1, texte: `${[...new Set(hors)].join(', ')} : un lot déclaré « config: true » au plan ne touche que les fichiers de config et leurs tests (le reste est du code : un autre lot).` };
   if (!changees.length) return null;
   return { code: 1, texte: `${changees.join(', ')} diffère(nt) de ${ref.nom} : ${jeu.raison}.` };
@@ -96,7 +103,7 @@ export function lotDeConfigQuiMonte(ref, baseline) {
   // un commit qui ne cite pas un lot de config ne ferme la voie que s'il laisse une trace dans le diff NET (L826) : un commit de code entièrement défait
   // par un retour arrière ne porte plus rien au sommet mesuré
   const net = diffNet(ref);
-  const pese = (c) => estDeConfig(c, ref) || c.fichiers.some((f) => net.has(f));
+  const pese = (c) => estDeConfig(c, ref) || c.fichiers.some(net);
   const commits = tous.filter((c) => !c.fichiers.every((f) => f.startsWith('.cadence/'))).filter(pese);
   if (!commits.length || !commits.every((c) => estDeConfig(c, ref))) return null;
   if (!ref.nonCommites || ref.nonCommites().some((f) => f !== baseline)) return null;

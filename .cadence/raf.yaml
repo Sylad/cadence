@@ -3914,9 +3914,10 @@ lots:
     finished: 2026-11-18
   - id: L779
     title: "raf start mis en attente pendant un cadence run, comme raf note (issue #66 du compte pro, D-28) : la séquence documentée « raf start <lot> && cadence run » ne salit plus le plan quand un autre run tient le dépôt — ou cadence run --lot démarre lui-même un lot todo"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-18
+    started: 2026-11-24
   - id: L780
     title: "Parité porte ↔ CI : un préfixe d'environnement dont la valeur est une substitution $(…) avec guillemets imbriqués et pipes est sauté en entier, plus de faux écart (issue #65 du compte pro, D-28 ; voisin de #32)"
     status: todo

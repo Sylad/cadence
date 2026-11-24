@@ -23,6 +23,7 @@ import { ficheReviewText, reviewedSheetText } from '../fiche.js';
 import { maquetteText, reviewedText } from '../maquette.js';
 import { worstUxText } from '../pires-cas.js';
 import { answeredText, ficheHasBack, findFiche, lightLot, ruleIdsSourcedByLead, sessionAnswerText, specText, visibleFix, type FicheParts } from '../spec.js';
+import { templateName, type Language } from '../../language.js';
 import { decisionsText, humanDecisions } from '../decisions.js';
 import { type Constat, type LotState } from '../state.js';
 import { git } from '../worktree.js';
@@ -130,11 +131,11 @@ function packageFile(name: string): string | undefined {
   }
 }
 
-/** Gabarit de fiche livré avec le paquet, joint au brief de la spec. */
-const ficheTemplate = (): string | undefined => packageFile('fiche.yaml');
+/** Gabarit de fiche livré avec le paquet, joint au brief de la spec ; dans la langue du projet (`language:`, L791). */
+const ficheTemplate = (lang?: Language): string | undefined => packageFile(templateName('fiche.yaml', lang));
 
-/** Gabarit de la partie back de la fiche (L187), joint au brief de la spec d'un lot `spec: true`. */
-const ficheBackTemplate = (): string | undefined => packageFile('fiche-back.yaml');
+/** Gabarit de la partie back de la fiche (L187), joint au brief de la spec d'un lot `spec: true` ; dans la langue du projet. */
+const ficheBackTemplate = (lang?: Language): string | undefined => packageFile(templateName('fiche-back.yaml', lang));
 
 /**
  * Les parties que la fiche du lot doit avoir : l'écran d'un lot à `screen:`, le sujet d'un lot à `spec: true` (sans écran). Un lot mixte est un lot
@@ -142,8 +143,8 @@ const ficheBackTemplate = (): string | undefined => packageFile('fiche-back.yaml
  */
 export const partsOf = (c: LotCtx, fiche?: string | null): FicheParts => ({ screen: !!c.lot.screen, back: !!c.lot.specLot || (!!c.lot.screen && !!fiche && ficheHasBack(wd(c), fiche)) });
 
-/** Gabarit du lanceur de tests livré avec le paquet, joint au brief de l'étape accept. */
-const acceptRunner = (): string | undefined => packageFile('acceptation-runner.mjs');
+/** Gabarit du lanceur de tests livré avec le paquet, joint au brief de l'étape accept et copié tel quel dans le projet : dans la langue du projet (L791). */
+const acceptRunner = (lang?: Language): string | undefined => packageFile(templateName('acceptation-runner.mjs', lang));
 
 /** Fiche du lot : celle de l'étape spec, ou la fiche retrouvée dans le dépôt (reprise). */
 export function ficheOf(c: LotCtx): string | null {
@@ -271,8 +272,8 @@ export function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
       back, worst: plan.qaWorstData,
       problems: l.specProblems,
       review: !reviewed.length ? undefined : back ? reviewedSheetText(reviewed, !!l.screen, session) : reviewedText(reviewed, session),
-      template: l.screen ? ficheTemplate() : undefined,
-      templateBack: back || l.screen ? ficheBackTemplate() : undefined,
+      template: l.screen ? ficheTemplate(c.config.language) : undefined,
+      templateBack: back || l.screen ? ficheBackTemplate(c.config.language) : undefined, language: c.config.language,
     });
     vars.spec = [vars.spec, referenceIdsText('spec', lotIds({ ...lot, goal: l.goal ?? lot.goal }))].filter(Boolean).join('\n\n');
     const mine = lotCommitLines(c);
@@ -291,7 +292,7 @@ export function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
   if (kind === 'accept') {
     const fiche = ficheOf(c) ?? '';
     const folder = posix.dirname(fiche);
-    vars.accept = acceptText({ fiche, maquette: `${folder}/maquette.html`, screen: !!l.screen, back: !!l.screen && partsOf(c, fiche).back, acceptation: acceptationFile(fiche, l.lot), command: c.config.accept ?? '', test: c.config.test, runner: acceptRunner(), problems: l.acceptProblems });
+    vars.accept = acceptText({ fiche, maquette: `${folder}/maquette.html`, screen: !!l.screen, back: !!l.screen && partsOf(c, fiche).back, acceptation: acceptationFile(fiche, l.lot), command: c.config.accept ?? '', test: c.config.test, runner: acceptRunner(c.config.language), problems: l.acceptProblems, language: c.config.language });
     vars.objectif = ''; // l'oracle est écrit depuis la fiche et la maquette seules, pas depuis le texte du lot
     vars.commits = '';
     if (l.pendingAnswer) vars.reponse = `Answer from the human to your earlier question: ${l.pendingAnswer}`;

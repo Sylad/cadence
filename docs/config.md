@@ -132,3 +132,21 @@ Output written to files that git ignores is seen by the gate but never committed
 `ecriture:` sets the thresholds of `cadence ecriture` (L803): words per sentence (`phrase`, 25), per instruction (`consigne`, 20),
 and whether the passive voice (`passif`) and the semicolon (`pointVirgule`) are flagged. Declared, it also makes `raf news check` warn
 about the entries dated `depuis` or later; a warning blocks nothing. Details: [ecriture.md](ecriture.md).
+
+## Language of the project files: `language:`
+
+Some projects require every comment, test name and documentation line in English. `language:` (at the root of `cadence.yaml`,
+`fr` or `en`; L791, issue #67) sets the language of the files cadence writes **into the project**. Without the key, or with `fr`,
+nothing changes. With `language: en`:
+
+- the step `accept` hands the session `templates/acceptation-runner.en.mjs`, the English runner template it copies into the project
+  (e.g. `tests/acceptation-runner.mjs`), with the same code and no French comment;
+- the step `spec` hands `templates/fiche.en.yaml` and `templates/fiche-back.en.yaml`, and the briefs of the spec writer and of the
+  acceptance writer ask for English rules, labels, planned test names (`R1 — empty state: …`) and test comments;
+- the states of a screen sheet are `empty`, `loading`, `error` (all three required by `cadence spec check`) and `loaded`, so the sections
+  of the mockup are `#etat-empty`… and `masque` belongs to a rule of the `empty` state; `cadence spec qa` reads the same names.
+
+The keys of the sheets (`ecran`, `regles`, `enonce`…) stay as they are: they are the format cadence reads. The texts the product shows on
+screen (`message`, the mockup) keep the language of the product, since a test asserts them exactly. The plan, the reports to the lead and
+the messages cadence prints keep their language. Any other value is refused by `cadence spec check`, `cadence run` and the gate that
+validates `cadence.yaml`.

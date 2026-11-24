@@ -206,12 +206,12 @@ export function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDep
     // brief écrit par --dry-run = base d'une délégation à la main : aucun dossier de vague (il n'existe pas)
     const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: headline(lot, l.goal), objectif: objective(lot, l.goal), commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', news: l.visible ? newsText(l.lot) : '', captures: '', diff: 'git diff <sha de départ>..HEAD' };
     vars.decisions = decisionsText(humanDecisions(lot, lot.parent ? env.loadPlan().lots().find((x) => x.id === lot.parent) : undefined));
-    if (specStage) vars.spec = specText({ dir: env.config.spec.dir, render: env.config.spec.render, screen: l.screen, light: lightLot(l, lot, env.config.maquette, l.repo, env.config.spec.dir), back: !!l.specLot, worst: env.loadPlan().qaWorstData });
+    if (specStage) vars.spec = specText({ dir: env.config.spec.dir, render: env.config.spec.render, screen: l.screen, light: lightLot(l, lot, env.config.maquette, l.repo, env.config.spec.dir), back: !!l.specLot, worst: env.loadPlan().qaWorstData, language: env.config.language });
     if (l.screen && env.config.maquette) vars.maquette = maquetteText({ fiche: `${env.config.spec.dir}/<écran>/fiche.yaml`, passes: 0, max: env.config.maquetteReviews, light: lightLot(l, lot, env.config.maquette, l.repo, env.config.spec.dir), worst: env.loadPlan().qaWorstData });
     if (l.specLot && env.config.fiche) vars.fiche = ficheReviewText({ fiche: `${env.config.spec.dir}/<sujet>/fiche.yaml`, passes: 0 });
     if (specStage && env.config.accept && !lightLot(l, lot, env.config.maquette, l.repo, env.config.spec.dir)) {
       const folder = `${env.config.spec.dir}/${l.screen ? '<écran>' : '<sujet>'}`;
-      vars.accept = acceptText({ fiche: `${folder}/fiche.yaml`, maquette: `${folder}/maquette.html`, screen: !!l.screen, back: false, acceptation: acceptationFile(`${folder}/fiche.yaml`, l.lot), command: env.config.accept ?? '', test: env.config.test });
+      vars.accept = acceptText({ fiche: `${folder}/fiche.yaml`, maquette: `${folder}/maquette.html`, screen: !!l.screen, back: false, acceptation: acceptationFile(`${folder}/fiche.yaml`, l.lot), command: env.config.accept ?? '', test: env.config.test, language: env.config.language });
     }
     for (const s of steps) {
       const file = join(tmp, `${lotSlug(l.project, l.lot)}--${s.kind}.md`);

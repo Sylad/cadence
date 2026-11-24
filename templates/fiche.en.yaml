@@ -1,0 +1,44 @@
+# Template of a screen sheet, English version (`language: en` in cadence.yaml; spec step of orchestrate, L170, L791).
+# Copy it into docs/specs/<screen>/fiche.yaml, replace the values, then run `cadence spec check docs/specs/<screen>/fiche.yaml`.
+# The keys are the format read by cadence and stay as they are; the values are written in English, except the texts shown on screen
+# (`message`), which keep the language of the product. Every key and checked invariant is described in the "spec" section of docs/spec.md
+# of the @sylad/cadence package (linked from its README).
+ecran:
+  id: my-screen                # kebab-case; name of the folder docs/specs/<id>/
+  titre: My screen
+  route: /my-screen            # starts with /
+  lot: L0                      # the implementation lot
+  largeurs: [1440, 390]        # render widths: always these two
+  maquette: docs/specs/my-screen/maquette.html
+  # maquette_ecran: docs/specs/my-screen/ecran/page.html   # (optional) the page that draws the states, if it is not the index above
+etats: [empty, loading, error, loaded]   # at least empty, loading, error
+
+champs:                        # unique kebab-case id: it is also the data-testid of the mockup
+  - { id: page-title, libelle: Page title, type: text, source: static, obligatoire: true }
+  - { id: item-list, libelle: List of items, type: list, source: "GET /api/items → items", obligatoire: true }
+  - { id: empty-message, libelle: Empty state message, type: text, source: static, obligatoire: true }
+  - { id: error-message, libelle: Loading error message, type: text, source: static, obligatoire: false }
+  - { id: retry-button, libelle: Retry, type: button, source: "action A2", obligatoire: false }
+
+regles:                        # R1, R2… in order, without gaps
+  - id: R1
+    etat: empty                # one of the etats: the state where the rule applies and where its message is visible
+    enonce: With no item, the screen shows the empty state message instead of the list.
+    message: "No item yet."    # exact text on screen (in the product's language), or ~ (null) if there is none
+    champs: [empty-message]    # the fields the rule makes appear
+    masque: [item-list]        # (empty only) the fields the rule hides; ids of the sheet
+    statut: sourcee            # sourcee: says where it comes from (source); hypothese: says what would change (si_faux)
+    source: "request of the lot: \"an empty state that says what to do\""
+    tests: ["R1 — empty state: the message is shown, no list"]   # every test named "Rn — …"
+  - id: R2
+    etat: error
+    enonce: If the call fails, the screen shows the error and a "Retry" button that calls the API again.
+    message: "The items could not be loaded."
+    champs: [error-message, retry-button]
+    statut: hypothese
+    si_faux: If the message must change, only this block changes (no data at stake).
+    tests: ["R2 — error: message and Retry button", "R2 — Retry calls the API again"]
+
+actions:                       # A1, A2… in order
+  - { id: A1, declencheur: ~, appel: "GET /api/items", regles: [R1, R2] }   # ~: the loading of the screen
+  - { id: A2, declencheur: retry-button, appel: "GET /api/items", regles: [R2] }

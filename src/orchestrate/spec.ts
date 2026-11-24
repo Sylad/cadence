@@ -6,6 +6,7 @@ import { isMap, isNode, isScalar, isSeq, parse, parseDocument, stringify, type N
 import type { Screen } from '../plan.js';
 import { acceptationFile } from './accept.js';
 import { checkFiche, fichesDuDossier, LARGEURS } from '../spec.js';
+import { languageText, type Language } from '../language.js';
 import { EXPRESS_MAX_ESTIMATE } from './express.js';
 import { worstSpecLines } from './pires-cas.js';
 import { indexProblems } from './maquette-ecran.js';
@@ -119,8 +120,8 @@ export function ficheHasBack(repo: string, fiche: string): boolean {
 }
 
 /** Une fiche déjà écrite ne dispense de la spec que si elle passe les contrôles du programme et ne porte aucune hypothèse coûteuse. */
-export function ficheReady(repo: string, fiche: string, lot: string, parts: FicheParts = { screen: true, back: false }): boolean {
-  if (checkSpec(repo, fiche, lot, parts).length) return false;
+export function ficheReady(repo: string, fiche: string, lot: string, parts: FicheParts = { screen: true, back: false }, lang?: Language): boolean {
+  if (checkSpec(repo, fiche, lot, parts, lang).length) return false;
   try {
     return costlyHypotheses(parse(readFileSync(join(repo, fiche), 'utf8'))).length === 0;
   } catch {
@@ -248,7 +249,7 @@ export interface FicheParts {
  * elle est celle du lot et de son dossier, la maquette existe avec une section `#etat-<état>` par état et un
  * `data-testid` par champ, et chaque état a sa capture à chaque largeur — le tout commité.
  */
-export function checkSpec(repo: string, fiche: string, lot: string, parts: FicheParts = { screen: true, back: false }): string[] {
+export function checkSpec(repo: string, fiche: string, lot: string, parts: FicheParts = { screen: true, back: false }, lang?: Language): string[] {
   const file = join(repo, fiche);
   if (!existsSync(file)) return [`${fiche} : fiche absente (écrire ${fiche.replace(/[^/]+\/fiche\.yaml$/, parts.screen ? '<écran>' : '<sujet>')}/fiche.yaml et la commiter)`];
   let doc: unknown;
@@ -257,7 +258,7 @@ export function checkSpec(repo: string, fiche: string, lot: string, parts: Fiche
   } catch (e) {
     return [`${fiche} : YAML illisible (${(e as Error).message.split('\n')[0]})`];
   }
-  const problems = checkFiche(doc).map((p) => `fiche : ${p}`);
+  const problems = checkFiche(doc, lang).map((p) => `fiche : ${p}`);
   if (!isObj(doc)) return problems;
   const folder = fiche.replace(/\/fiche\.yaml$/, '');
   // un lot back (`spec: true`, avec ou sans écran) écrit la partie sujet : sans elle, ni lot ni dossier ne seraient contrôlés
@@ -380,8 +381,10 @@ const lightLines = (o: { dir: string; render?: string }): string[] => [
 ];
 
 /** Consigne propre à l'étape spec dans le brief : dossier, largeurs, commande de rendu, et les écarts de la passe précédente. */
-export function specText(o: { dir: string; render?: string; screen?: string; light?: boolean; back?: boolean; problems?: string[]; review?: string; template?: string; templateBack?: string; worst?: string }): string {
+export function specText(o: { dir: string; render?: string; screen?: string; light?: boolean; back?: boolean; problems?: string[]; review?: string; template?: string; templateBack?: string; worst?: string; language?: Language }): string {
   const lines: string[] = [];
+  const lang = languageText(o.language, 'spec');
+  if (lang) lines.push(lang);
   if (o.screen) lines.push(...(o.light ? lightLines(o) : pageLines(o)), ...worstSpecLines(o.worst, !!o.light));
   if (o.back) {
     lines.push(

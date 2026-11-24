@@ -3,11 +3,10 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import { RafError } from './plan.js';
 import { maquetteEcranProblems } from './orchestrate/maquette-ecran.js';
+import { requiredStates, statesOf, type Language } from './language.js';
 
 /** Les largeurs de rendu d'une fiche (L170, spec etape-spec S2). */
 export const LARGEURS = [1440, 390];
-/** Les états qu'une fiche porte au moins. */
-export const ETATS_REQUIS = ['vide', 'chargement', 'erreur'];
 
 const KEBAB = /^[a-z][a-z0-9-]*$/;
 const APPEL = /^(GET|POST|PUT|PATCH|DELETE) \/\S*$/;
@@ -36,8 +35,9 @@ export function appelDe(action: Obj, contrats: unknown): string {
  * `regles` est commun. Écran : ids de champs uniques, états connus, citations d'ids existants (actions, règles, masque).
  * Back : cas C1… et contrats A1… sans trou, règles rattachées à un cas, alternatives qui citent des règles, erreurs de contrat,
  * décision du lead sur une donnée existante modifiée. Les deux : règles R1… sans trou, statut et justification, tests « Rn — … ».
+ * `lang` (clé `language:` de cadence.yaml, L791) : les noms des états requis (`empty`, `loading`, `error` en anglais) ; absent, les noms français.
  */
-export function checkFiche(doc: unknown): string[] {
+export function checkFiche(doc: unknown, lang?: Language): string[] {
   if (!isObj(doc)) return ["ce n'est pas une fiche : un document YAML à clés est attendu (ecran, etats, champs, regles, actions pour un écran ; sujet, cas, regles, contrats, donnees pour un lot sans écran)"];
   const p: string[] = [];
   const back = 'sujet' in doc;
@@ -80,8 +80,8 @@ export function checkFiche(doc: unknown): string[] {
     if (!Array.isArray(doc.etats)) p.push('etats : liste attendue');
     else {
       for (const [i, e] of doc.etats.entries()) if (!texte(e)) p.push(`état n° ${i + 1} : texte attendu`);
-      const manquants = ETATS_REQUIS.filter((e) => !etats.includes(e));
-      if (manquants.length) p.push(`états : ${manquants.map((e) => `« ${e} »`).join(', ')} manquant(s) (vide, chargement et erreur sont requis)`);
+      const manquants = requiredStates(lang).filter((e) => !etats.includes(e));
+      if (manquants.length) p.push(`états : ${manquants.map((e) => `« ${e} »`).join(', ')} manquant(s) (${requiredStates(lang).join(', ')} sont requis)`);
       for (const e of new Set(etats.filter((x, i) => etats.indexOf(x) !== i))) p.push(`états : « ${e} » en double`);
     }
 
@@ -178,7 +178,7 @@ export function checkFiche(doc: unknown): string[] {
       if ('masque' in r && r.masque !== undefined && r.masque !== null) {
         if (!Array.isArray(r.masque)) p.push(`${id} : masque doit être une liste d'ids de champs`);
         else {
-          if (r.etat !== 'vide') p.push(`${id} : masque n'a de sens que pour une règle d'état « vide » (état « ${String(r.etat)} »)`);
+          if (r.etat !== statesOf(lang).vide) p.push(`${id} : masque n'a de sens que pour une règle d'état « ${statesOf(lang).vide} » (état « ${String(r.etat)} »)`);
           for (const m of r.masque) {
             if (!ids.has(String(m))) p.push(`${id} : masque cite le champ « ${String(m)} » absent de la fiche`);
             else if (cites.includes(m)) p.push(`${id} : masque cite « ${String(m)} » que la règle fait apparaître dans champs`);
@@ -304,19 +304,20 @@ const condition = (enonce: string) => enonce.trim().replace(/[.\s]+$/, '');
  * - `never:` les messages des règles d'état erreur (jamais celui d'une règle vide : c'est un affichage prévu).
  * - `api:` les actions de chargement (sans déclencheur) en GET ; `— may be empty when <énoncé>` si une règle sourcée d'état vide la porte.
  */
-export function deriveQa(doc: unknown): string {
-  const problems = checkFiche(doc);
+export function deriveQa(doc: unknown, lang?: Language): string {
+  const problems = checkFiche(doc, lang);
+  const { vide, erreur } = statesOf(lang);
   if (problems.length > 0) throw new RafError(`fiche invalide :\n${problems.map((m) => `✗ ${m}`).join('\n')}`);
   if (!isObj((doc as Obj).ecran)) throw new RafError("spec qa : la fiche n'a pas de partie écran (ecran) : rien à dériver pour docs/qa/expectations.md");
   const f = doc as { ecran: Obj; champs: Obj[]; regles: Obj[]; actions: Obj[]; contrats?: Obj[] };
-  const vides = f.regles.filter((r) => r.etat === 'vide' && r.statut === 'sourcee');
-  const propres = new Set(f.regles.filter((r) => r.etat === 'vide' || r.etat === 'erreur').flatMap((r) => (r.champs as string[] | undefined) ?? []));
+  const vides = f.regles.filter((r) => r.etat === vide && r.statut === 'sourcee');
+  const propres = new Set(f.regles.filter((r) => r.etat === vide || r.etat === erreur).flatMap((r) => (r.champs as string[] | undefined) ?? []));
   const out = [`## ${f.ecran.route as string}`];
   for (const c of f.champs.filter((x) => x.obligatoire === true && !propres.has(x.id as string))) {
     const unless = vides.filter((r) => ((r.masque as string[] | undefined) ?? []).includes(c.id as string)).map((r) => condition(r.enonce as string));
     out.push(`- shows: ${c.libelle as string}${unless.length ? ` — unless ${unless.join(' ; ')}` : ''}`);
   }
-  const messages = f.regles.filter((r) => r.etat === 'erreur' && typeof r.message === 'string' && r.message !== '').map((r) => `"${r.message as string}"`);
+  const messages = f.regles.filter((r) => r.etat === erreur && typeof r.message === 'string' && r.message !== '').map((r) => `"${r.message as string}"`);
   if (messages.length) out.push(`- never: ${messages.join(', ')}`);
   for (const a of f.actions.filter((x) => (x.declencheur === null || x.declencheur === undefined) && appelDe(x, f.contrats).startsWith('GET '))) {
     const peut = vides.filter((r) => ((a.regles as string[] | undefined) ?? []).includes(r.id as string)).map((r) => condition(r.enonce as string));

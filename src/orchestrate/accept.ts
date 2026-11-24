@@ -7,6 +7,7 @@ import { admettreFiche, type Acquittement, type Amendement } from './fiche-amend
 import { PLAN_ACTIONS } from '../plan-commit.js';
 import { testsAbsents, type Partage } from './accept-regles.js';
 import { isParts, type GateTest } from './gate-parts.js';
+import { languageText, type Language } from '../language.js';
 
 // Étape accept d'orchestrate (L173, spec etape-spec S5) : le fichier acceptation.json d'un lot et le verrou de ses tests rouges.
 //
@@ -477,7 +478,7 @@ export function planAcceptRuns(commands: string[], fichiers: string[], single = 
 /** La commande ordinaire du projet dans le prompt de la session accept : une chaîne telle quelle, une porte en parties (L512) partie par partie avec son dossier. */
 const ordinaryText = (t?: GateTest): string => (!t ? '' : isParts(t) ? ` The project's ordinary test commands, one per folder, are ${t.map((p) => `\`${p.run}\` (in \`${p.dir}/\`)`).join(', ')}: they must stay green with your red tests committed.` : ` The project's ordinary test command is \`${t}\`: it must stay green with your red tests committed.`);
 
-export function acceptText(o: { fiche: string; maquette: string; screen?: boolean; back?: boolean; acceptation: string; command: string | string[]; test?: GateTest; runner?: string; problems?: string[] }): string {
+export function acceptText(o: { fiche: string; maquette: string; screen?: boolean; back?: boolean; acceptation: string; command: string | string[]; test?: GateTest; runner?: string; problems?: string[]; language?: Language }): string {
   const commands = acceptCommands(o.command);
   const screen = o.screen !== false;
   const lines = [
@@ -491,6 +492,8 @@ export function acceptText(o: { fiche: string; maquette: string; screen?: boolea
     `Write \`${o.acceptation}\` (one file per lot, next to the sheet: another lot on the same ${screen ? 'screen' : 'subject'} has its own, which you never touch, nor its tests — give your test files names of your own): \`{ "lot": "<lot>", "fiche": "${o.fiche}", "fichiers": ["<test file>", …], "vert": false }\` (paths relative to the repository). If the tests need a build or a browser (Playwright, Chromium, \`dist\`), add \`"e2e": true\` to it: those files then stay out of the ordinary runner and the unit CI even once green (they would turn it red without \`dist\` or Chromium) and belong to the project's e2e suite, run after the build (\`acceptationE2e()\` of the runner template lists them). The ordinary test config of the project (shared with its CI) must exclude those files while \`vert\` is false; the dedicated config includes only them. Both read the file with this runner template (copy it into the project, e.g. \`tests/acceptation-runner.mjs\`):`,
   ];
   if (o.runner) lines.push('```js', o.runner.trimEnd(), '```');
+  const lang = languageText(o.language, 'accept');
+  if (lang) lines.unshift(lang);
   if (o.problems?.length) lines.push('', 'The program checked your previous pass and it did not pass; fix exactly these points (one more pass only, then the lot goes back to the lead):', ...o.problems.map((p) => `- ${p}`));
   return lines.join('\n');
 }

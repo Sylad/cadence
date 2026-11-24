@@ -1,0 +1,76 @@
+# Template of a back sheet, English version (`language: en` in cadence.yaml; lot without a screen, back spec step of orchestrate, L187, L791).
+# Copy it into docs/specs/<subject>/fiche.yaml, replace the values, then run `cadence spec check docs/specs/<subject>/fiche.yaml`.
+# The keys are the format read by cadence and stay as they are; the values are written in English. Every key and checked invariant
+# is described in the "spec" section of docs/spec.md of the @sylad/cadence package (linked from its README).
+# A lot that also has a screen (screen:) adds to this file the screen part of the template templates/fiche.en.yaml
+# (ecran, etats, champs, actions): sujet.id and ecran.id are then the name of the folder.
+sujet:
+  id: my-subject               # kebab-case; name of the folder docs/specs/<id>/
+  titre: My subject
+  lot: L0                      # the implementation lot
+  perimetre:                   # what the lot touches: at least one module, endpoint or job
+    modules: [backend/src/modules/my-module]
+    endpoints: ["GET /api/items"]
+    jobs: []
+    hors_perimetre: ["the display in the frontend (a separate screen lot)"]   # optional: what the lot does not do
+
+cas:                           # C1, C2… in order, without gaps
+  - id: C1
+    titre: The client reads the list while the source is down
+    acteur: an API client
+    declencheur: GET /api/items        # a contract call, a job or a command
+    preconditions:
+      - the external source does not answer
+    nominal:                   # the steps of the passing case
+      - The service queries the source.
+      - The call fails.
+      - The service returns the last known list and logs a warning.
+    alternatives:              # { si, alors, regles }: every alternative cites at least one rule
+      - { si: the source answers, alors: the answer is fresh, regles: [R2] }
+    resultat: The last known list instead of an error.
+  - id: C2
+    titre: The scheduler refreshes the list
+    acteur: the scheduler
+    declencheur: job items-refresh
+    preconditions:
+      - a list is cached
+    nominal:
+      - The job calls the source.
+      - The cache is rewritten.
+    alternatives: []
+    sans_alternative: the only failure of the job is the one of C1 (R1); it has no other branch   # required when alternatives is empty
+    resultat: The cache carries the timestamp of the last success.
+
+regles:                        # R1, R2… in order, without gaps
+  - id: R1
+    cas: [C1, C2]              # a back rule is attached to at least one case (a screen rule to a state: etat)
+    enonce: When the source fails, the API serves the last known list instead of an error.
+    statut: sourcee            # sourcee: says where it comes from (source); hypothese: says what would change (si_faux)
+    source: "request of the lot: \"serve the last known cache instead of an error\""   # a line of the lot, a file:line, an existing contract…
+    tests: ["R1 — source down: the last list is served"]   # every test named "Rn — …"
+  - id: R2
+    cas: [C1]
+    enonce: A fresh answer does not carry the ageSeconds field.
+    statut: hypothese
+    si_faux: If the field must always be present, only its content changes (no data at stake).
+    tests: ["R2 — fresh answer: ageSeconds absent"]
+
+contrats:                      # A1, A2… in order (in a mixed sheet, shared with the actions of the screen)
+  - id: A1
+    appel: GET /api/items      # VERB /path, job <name> or commande <name>
+    entree: none
+    sortie: "the list, or an empty list (HTTP 200)"
+    erreurs:                   # { code, message }: code "HTTP <n>" or "log <level>", message = the exact text
+      - { code: log warn, message: "Serving cached list: source unavailable" }
+    regles: [R1, R2]
+  - id: A2
+    appel: job items-refresh
+    entree: "cron 0 */15 * * * *"
+    sortie: "cache rewritten after a success, unchanged after a failure"
+    erreurs: []
+    sans_erreur: the job answers no caller; its failure is a warning already covered by A1   # required when erreurs is empty
+    regles: [R1]
+
+donnees:                       # D1…: the data touched ([] if none)
+  - { id: D1, objet: "data/items-cache.json ({ ts, data })", existant: true, modification: aucune, note: "read back as a fallback, format and writing unchanged" }
+  # existant: true with modification: ajout|changement requires  decision: <the lead's answer to the targeted question>

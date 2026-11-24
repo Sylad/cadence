@@ -22,7 +22,7 @@ export function firstWrite(c: LotCtx): SessionKind {
   const l = c.lot;
   if (!hasSpecStage(l) || l.spec) return 'implement';
   const fiche = findFiche(wd(c), c.config.spec.dir, l.lot);
-  return fiche && ficheReady(wd(c), fiche, l.lot, partsOf(c, fiche)) ? afterSpec(c, fiche) : 'spec';
+  return fiche && ficheReady(wd(c), fiche, l.lot, partsOf(c, fiche), c.config.language) ? afterSpec(c, fiche) : 'spec';
 }
 
 /**
@@ -180,7 +180,7 @@ export async function specStep(c: LotCtx): Promise<void> {
   const fiche = outside ? '' : asked || findFiche(wd(c), c.config.spec.dir, l.lot) || '';
   const what = l.screen ? '<écran>' : '<sujet>';
   const inDir = fiche === '' || fiche.startsWith(`${c.config.spec.dir.replace(/\/+$/, '')}/`);
-  const problems = !outside && fiche && !inDir ? [`${fiche} : fiche hors de ${c.config.spec.dir} (la spec vit dans ${c.config.spec.dir}/${what}/fiche.yaml, où l'étape la retrouve)`] : outside ? [`${reported} : fiche hors du dépôt (le chemin de « fiche » est relatif au dépôt : ${c.config.spec.dir}/${what}/fiche.yaml)`] : fiche ? [...completeAndCommit(c, fiche), ...checkSpec(wd(c), fiche, l.lot, partsOf(c, fiche))] : [`aucune fiche écrite : ${c.config.spec.dir}/${what}/fiche.yaml est attendue (ou une raison dans « sousSeuil » si le lot ne change ${l.screen ? 'aucun écran' : 'aucun comportement'})`];
+  const problems = !outside && fiche && !inDir ? [`${fiche} : fiche hors de ${c.config.spec.dir} (la spec vit dans ${c.config.spec.dir}/${what}/fiche.yaml, où l'étape la retrouve)`] : outside ? [`${reported} : fiche hors du dépôt (le chemin de « fiche » est relatif au dépôt : ${c.config.spec.dir}/${what}/fiche.yaml)`] : fiche ? [...completeAndCommit(c, fiche), ...checkSpec(wd(c), fiche, l.lot, partsOf(c, fiche), c.config.language)] : [`aucune fiche écrite : ${c.config.spec.dir}/${what}/fiche.yaml est attendue (ou une raison dans « sousSeuil » si le lot ne change ${l.screen ? 'aucun écran' : 'aucun comportement'})`];
   if (problems.length) {
     if ((l.specRuns ?? 0) >= specMax(c)) {
       stop(c, 'handed-back', `spec non conforme après ${l.specRuns} passes : ${problems.join(' ; ')}`);

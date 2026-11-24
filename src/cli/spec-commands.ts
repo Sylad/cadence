@@ -13,6 +13,7 @@ import { cadenceHome, liveWaves, openLotsIn, type OpenWave, openWavesIn } from '
 import { resumeCommand } from '../orchestrate/table.js';
 import { findAcceptation, modeSpecGreen, parseAcceptation, resealAcceptation, resealForGreen, runAcceptation, setVert } from '../orchestrate/accept.js';
 import { checkFiche, deriveQa, readFiche, summary } from '../spec.js';
+import { readLanguage } from '../language.js';
 import { type Ctx, type EarlyCtx, type Io } from './context.js';
 
 const git = (cwd: string, args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
@@ -233,17 +234,21 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
   return 0;
 }
 
-/** `cadence spec check|qa <fiche>` (L170) : code 0 valide, 1 écarts, 2 usage ou fichier illisible. `qa` imprime la section expectations.md de l'écran. */
-function spec(rest: string[], io: Io): number {
+/**
+ * `cadence spec check|qa <fiche>` (L170) : code 0 valide, 1 écarts, 2 usage ou fichier illisible. `qa` imprime la section expectations.md de l'écran.
+ * `configPath` : le cadence.yaml du dépôt, dont la clé `language:` (L791) donne les noms des états requis.
+ */
+function spec(rest: string[], io: Io, configPath: string): number {
   const sub = rest[0];
   if ((sub !== 'check' && sub !== 'qa') || rest.length !== 2) throw new RafError('usage : cadence spec check|qa <fiche.yaml>');
+  const lang = readLanguage(configPath);
   const doc = readFiche(resolve(io.cwd, rest[1]!));
-  const problems = checkFiche(doc);
+  const problems = checkFiche(doc, lang);
   if (sub === 'qa') {
     // les écarts vont sur la sortie d'erreur : la sortie standard est la section, qu'on redirige vers le fichier
     for (const m of problems) io.err(`✗ ${m}`);
     if (problems.length > 0) return 1;
-    io.out(deriveQa(doc).trimEnd());
+    io.out(deriveQa(doc, lang).trimEnd());
     return 0;
   }
   for (const m of problems) io.out(`✗ ${m}`);
@@ -272,5 +277,5 @@ export function cmdSpec(c: Ctx): number | Promise<number> {
 
 /** `spec` est aussi un verbe de raf (raf spec <id> on|off, L186) : seuls check et qa vont à la fiche, sans lire le plan ; null pour les autres. */
 export function cmdSpecChecks(c: EarlyCtx): number | null {
-  return c.rest[0] === 'check' || c.rest[0] === 'qa' ? spec(c.rest, c.io) : null;
+  return c.rest[0] === 'check' || c.rest[0] === 'qa' ? spec(c.rest, c.io, resolve(c.io.cwd, c.values.config ?? join(c.root, 'cadence.yaml'))) : null;
 }

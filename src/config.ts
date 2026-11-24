@@ -12,6 +12,7 @@ import { planCommitProblem } from './plan-commit.js';
 import { readOnWrite } from './config-onwrite.js';
 import { parseStates } from './plan-states.js';
 import { checkTestRelated, checkTestReplay, readGateTest, type GateTest } from './orchestrate/gate-parts.js';
+import { readLanguage, type Language } from './language.js';
 import { booleanKey, isObject, list, readYamlFile, readYamlKey } from './yaml-keys.js';
 import { lireReferences, type References } from '../scripts/references.mjs';
 import { FIELDS, Plan, RafError, readIdPattern, STATUSES, type Field, type PlanFormat, type PlanSettings, type Status } from './plan.js';
@@ -311,6 +312,7 @@ export interface OrchestrateConfig {
   addDirs: string[];
   /** Millisecondes. */
   timeouts: { work: number; review: number };
+  language?: Language; // clé `language:` à la racine de cadence.yaml (L791) : langue des fichiers écrits dans le projet ; absente, le comportement d'avant
 }
 
 const EFFORTS = ['default', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
@@ -351,6 +353,7 @@ const integerAtLeast = (v: unknown, min: number, error: RafError): number => {
 /** Clé `orchestrate:` de cadence.yaml. Absente : les défauts (auto, 45 min d'implémentation, 25 min de revue). */
 export function readOrchestrateConfig(file: string): OrchestrateConfig {
   const config: OrchestrateConfig = { precheck: true, maquette: true, maquetteReviews: 3, budgetTopUp: 300_000, fiche: true, precheckLocal: false, prodAccess: false, worktrees: false, spec: { dir: 'docs/specs' }, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', spec: 'medium', maquette: 'high', fiche: 'medium', accept: 'medium', implement: 'medium', probe: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
+  if (readLanguage(file)) config.language = readLanguage(file);
   const o = readYamlKey(file, 'orchestrate');
   if (o == null) return config;
   const bad = (what: string) => new RafError(`${file} : orchestrate.${what}`);
@@ -382,21 +385,13 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
     config.worktreeDeps = deps.map((x: string) => x.trim().replace(/\/$/, ''));
   }
   if (o.gate != null) config.gate = readGate(o.gate, bad);
-  if (o.maquette != null) {
-    if (typeof o.maquette !== 'boolean') throw bad('maquette : true ou false attendu');
-    config.maquette = o.maquette;
-  }
   if (o.maquetteReviews != null) config.maquetteReviews = integerAtLeast(o.maquetteReviews, 1, bad('maquetteReviews : entier supérieur ou égal à 1 attendu'));
   if (o.budgetTopUp != null) config.budgetTopUp = integerAtLeast(o.budgetTopUp, 0, bad('budgetTopUp : entier de tokens supérieur ou égal à 0 attendu (0 désactive le prélèvement)'));
-  for (const k of ['fiche', 'probe'] as const) if (o[k] != null) config[k] = booleanKey(o[k], bad(`${k} : true ou false attendu`));
+  for (const k of ['maquette', 'fiche', 'probe', 'prodAccess'] as const) if (o[k] != null) config[k] = booleanKey(o[k], bad(`${k} : true ou false attendu`));
   if (o.precheck != null) {
     if (typeof o.precheck !== 'boolean' && o.precheck !== 'local') throw bad('precheck : true, false ou local attendu');
     config.precheck = o.precheck !== false;
     config.precheckLocal = o.precheck === 'local';
-  }
-  if (o.prodAccess != null) {
-    if (typeof o.prodAccess !== 'boolean') throw bad('prodAccess : true ou false attendu');
-    config.prodAccess = o.prodAccess;
   }
   if (o.worktrees != null) {
     if (typeof o.worktrees !== 'boolean') throw bad('worktrees doit être true ou false');

@@ -1,0 +1,17 @@
+{
+  "id": "D-33",
+  "texte": "ce que j'aimerais qu'on regarde aussi c'est qu'est-ce qui ralenti, est ce que l'on peu mutualiser des traitements CI, banc de tests, etc... (comme l'histoire des CI lancé sur plusieurs lots par exemple)",
+  "date": "2026-11-24",
+  "etat": "ouverte",
+  "preuve": "",
+  "precisions": [
+    {
+      "date": "2026-11-24",
+      "texte": "Sylvain : « l'idée est de ne pas ralentirs les dev »"
+    },
+    {
+      "date": "2026-11-24",
+      "texte": "Premiers relevés (lead) : CI « tests » de cadence ~55 min par push sur main (23 runs en 3 jours, 6 rouges), sans annulation des runs dépassés (pushes à 2 min d'écart joués en entier), suite jouée 4 fois par push (npm test et publish --dry-run, sous Node 22 et 24) ; warhammer « Contrôles frontend » 14 min par lot (20 runs). Lots mis en attente du plan : CI mutualisée (0,5 j) et étude tous projets (1 j)."
+    }
+  ]
+}

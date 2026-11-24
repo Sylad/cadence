@@ -4290,6 +4290,22 @@ lots:
     estimate: 1
     after: [ L823 ]
     created: 2026-11-24
+  - id: L833
+    title: "L833 cadence deliver (et lead tour) : signaler une étape de CI qui frôle son timeout-minutes (≥ 85 % sur les derniers runs verts) AVANT qu'elle échoue — vécu 24-11 warhammer : e2e à 11 min pour un délai de 12 pendant des jours, puis L253 a ajouté des tests et la livraison est tombée en CI après une porte locale verte (machine plus rapide). Mesure : plus aucune livraison perdue sur un timeout de CI annoncé"
+    status: todo
+    estimate: 1
+    created: 2026-11-24
+  - id: L834
+    title: "D-33 : CI de cadence mutualisée — un seul run par rafale de pushes sur main, la suite jouée une fois par version de Node et non deux"
+    status: todo
+    estimate: 0.5
+    quickwin: true
+    created: 2026-11-24
+  - id: L835
+    title: "D-33 étude : où part le temps entre la fin d'un lot et la prod, tous projets (porte locale, CI, banc, déploiement, attentes) et ce qui se mutualise"
+    status: todo
+    estimate: 1
+    created: 2026-11-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

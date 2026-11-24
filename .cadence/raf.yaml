@@ -4240,6 +4240,7 @@ lots:
     estimate: 1
     created: 2026-11-24
     started: 2026-11-24
+    review: { date: 2026-11-24, verdict: "conforme après 1 correction — aucun chemin ordinaire ne laisse un lot de code monter la base ; à corriger : commit de fusion compté neutre (constat 1), tests multi-lots et sans scope (constat 3) ; note pour L823 : tests figés (constat 2) (tmp/revue-cadence-L824.md)", commit: 5e58e5f5872f466d31a5783f72657508f45b674d }
   - id: L825
     title: "L825 raf start (et raf status) écrit .cadence/raf.yaml directement pendant une porte cadence verify --gate jouée dans l'arbre principal, au lieu de passer par plan-en-attente comme add/note/done : la porte de L791 (59472b6) est sortie non probante le 24-11 à cause d'un raf start L823 du lead. Attendu : toute écriture de raf passe en attente tant que main est tenue, avec un test"
     status: todo

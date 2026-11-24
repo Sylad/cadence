@@ -75,8 +75,14 @@ describe('L796 (1) : le run ne verrouille que les fichiers qu il touche', () => 
     expect(commitRefusal(dir)).toMatch(/commit refusé : la branche main est tenue par porte/);
   });
 
-  it('e2e (points 1 et 2) : pendant un vrai cadence run, le commit disjoint du lead passe, celui sur le fichier du run est refusé ; le run rebase et intègre', () => {
+  it('e2e (points 1 et 2) : pendant un vrai cadence run, le commit du lead sur le fichier du run est refusé ; le commit disjoint fait pendant la porte passe, le run rebase, rejoue la porte et intègre', () => {
     const { dir, env } = project();
+    // Revue r1 (m3) : le commit disjoint arrive PENDANT la porte (pas pendant la session, que le rebase de tête de boucle de L723 absorbe) : chemin rebaserDisjoint.
+    const t = tempDir(), script = join(t, 'porte.sh');
+    writeFileSync(script, `echo x >> ${t}/passages\nif [ ! -f ${t}/fait ]; then touch ${t}/fait; echo v2 > ${dir}/docs/guide.md; `
+      + `PATH="${env.PATH}" git -C ${dir} commit -qam 'docs: guide du lead' > ${t}/disjoint.log 2>&1; echo $? > ${t}/disjoint; fi\n`);
+    writeFileSync(join(dir, 'cadence.yaml'), `orchestrate:\n  test: sh ${script}\n`);
+    expect(sh(dir, env, 'git', 'commit', '-qam', 'chore: porte').status).toBe(0);
     const vu: Record<string, ReturnType<typeof sh>> = {};
     const exec: Executeur = (_args, o) => {
       writeFileSync(join(o.cwd, 'fait.txt'), 'ok'); // la session écrit, pas encore commité
@@ -84,8 +90,6 @@ describe('L796 (1) : le run ne verrouille que les fichiers qu il touche', () => 
       sh(dir, env, 'git', 'add', 'fait.txt');
       vu.chevauche = sh(dir, env, 'git', 'commit', '-qm', 'chore: fait du lead');
       sh(dir, env, 'git', 'rm', '-q', '--cached', 'fait.txt'); sh(dir, env, 'rm', 'fait.txt');
-      writeFileSync(join(dir, 'docs', 'guide.md'), 'v2\n');
-      vu.disjoint = sh(dir, env, 'git', 'commit', '-qam', 'docs: guide du lead');
       sh(o.cwd, env, 'git', 'add', 'fait.txt');
       vu.session = sh(o.cwd, env, 'git', 'commit', '-qm', 'feat: travail du run');
       return { stdout: sortie('s1'), code: 0 };
@@ -94,10 +98,13 @@ describe('L796 (1) : le run ne verrouille que les fichiers qu il touche', () => 
     const e = executerRun({ repo: dir, demande: 'Crée fait.txt', exec, out: (l) => lignes.push(l), raf: RAF_JS() });
     expect(vu.chevauche.status).not.toBe(0);
     expect(vu.chevauche.stderr).toMatch(/commit refusé : la branche main est tenue par cadence run .*: fait\.txt/);
-    expect(vu.disjoint.status).toBe(0);
+    expect(readFileSync(join(t, 'disjoint'), 'utf8').trim(), readFileSync(join(t, 'disjoint.log'), 'utf8')).toBe('0'); // le pre-commit l'a laissé passer
     expect(vu.session.status).toBe(0);
     expect(e.etat).toBe('integre');
-    expect(sh(dir, env, 'git', 'log', '--format=%s', '-3').stdout.trim()).toBe('feat: travail du run\ndocs: guide du lead\nchore: plan');
+    expect(readFileSync(join(t, 'passages'), 'utf8').split('\n').filter(Boolean).length).toBe(2); // porte rejouée sur le sha rebasé
+    expect(e.cible_avancee?.map((a) => [a.fichiers, a.plan_seul])).toEqual([[['docs/guide.md'], false]]);
+    expect(lignes.join('\n')).toMatch(/main a avancé pendant la porte sur des fichiers que le run ne touche pas \(1 commit : docs\/guide\.md\) : rebasé, porte rejouée sur le sha rebasé/);
+    expect(sh(dir, env, 'git', 'log', '--format=%s', '-3').stdout.trim()).toBe('feat: travail du run\ndocs: guide du lead\nchore: porte');
     expect(repoHolders(dir)).toEqual([]);
   });
 });

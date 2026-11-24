@@ -56,8 +56,9 @@ export interface Etat extends EtatRapport { id: string; repo: string; branche: s
   spec_check?: boolean;
   /** L794 : le lot du plan est visible (scripts/nouveautes-du-run.mjs) ; `nouveautes` : à la fin, les entrées du commit du run qui le citent (null : git illisible). */
   lot_visible?: boolean; nouveautes?: { entrees: string[] | null; manquante: boolean };
-  /** L796 : la cible a avancé pendant la porte par des commits sur des fichiers que le run ne touche pas : rebasé sur `sur` sans rejouer la porte, qui a jugé `porte`. */
-  cible_avancee?: { sur: string; commits: number; fichiers: string[]; porte: string }[];
+  /** L796 : la cible a avancé pendant la porte par des commits sur des fichiers que le run ne touche pas : rebasé sur `sur` ; `porte` a jugé le run avant ;
+   * `plan_seul` : les commits arrivés ne touchent que le plan ou le registre, la porte n'est pas rejouée ; sinon elle l'est sur le sha rebasé (revue r1, M1). */
+  cible_avancee?: { sur: string; commits: number; fichiers: string[]; porte: string; plan_seul?: boolean }[];
   clos?: { date: string; cible: string; tete: string; integre?: boolean; archives?: string[]; restes?: string[]; force?: true } }
 /** `maintenant` et `attendre` : l'horloge et l'attente du quota (D-15), simulées par les tests ; `attendre: null` rend la main sans attendre la remise à zéro. */
 interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null }
@@ -330,8 +331,11 @@ function avancer(e: Etat, br: string, cible: string): { avance: boolean; raison:
   return m.status === 0 ? null : { avance: git(e.repo, 'rev-parse', e.cible) !== cible, raison: `${m.stderr}`.trim() || 'avance rapide impossible' };
 }
 
+/** Revue r1 (M1) : « disjoint » ne compare que des chemins ; un test, un module importé, package.json ou v2/budget.json arrivés changent ce que la porte juge.
+ * Seuls le plan et le registre des demandes, que la porte ne lit jamais, laissent intégrer sans la rejouer. */
+const dePlan = (f: string) => f === '.cadence/raf.yaml' || f.startsWith('docs/plan/') || f.startsWith('.cadence/demandes/');
 /** L796 (issue #70) : la cible est passée de `cible` (vue par la porte) à `nouvelle` par des commits disjoints des fichiers du run, sans cadence.yaml (la porte) :
- * rebase sans conflit possible, porte non rejouée. Un run à commits de régénération (L781) garde le chemin de L723 (ses fichiers générés peuvent en dépendre). */
+ * rebase sans conflit possible. Un run à commits de régénération (L781) garde le chemin de L723 (ses fichiers générés peuvent en dépendre). */
 function rebaserDisjoint(e: Etat, cible: string, nouvelle: string): NonNullable<Etat['cible_avancee']>[number] | null {
   if (regenerations(e).length) return null;
   const run = new Set(fichiersGit(e.worktree, 'diff', '--name-only', '--no-renames', cible, 'HEAD'));
@@ -339,11 +343,12 @@ function rebaserDisjoint(e: Etat, cible: string, nouvelle: string): NonNullable<
   if (leurs.includes('cadence.yaml') || leurs.some((f) => run.has(f))) return null;
   const porte = git(e.worktree, 'rev-parse', '--short', 'HEAD');
   if (essaiGit(e.worktree, 'rebase', '-q', nouvelle).status !== 0) { if (rebaseEnCours(e.worktree)) essaiGit(e.worktree, 'rebase', '--abort'); return null; }
-  return { sur: nouvelle, commits: Number(git(e.repo, 'rev-list', '--count', `${cible}..${nouvelle}`)), fichiers: leurs, porte };
+  return { sur: nouvelle, commits: Number(git(e.repo, 'rev-list', '--count', `${cible}..${nouvelle}`)), fichiers: leurs, porte, plan_seul: leurs.every(dePlan) };
 }
 const cibleAvancee = (e: Etat, a: NonNullable<Etat['cible_avancee']>[number]) => `${e.cible} a avancé pendant la porte sur des fichiers que le run ne touche pas `
-  + `(${a.commits} commit${a.commits > 1 ? 's' : ''}${a.fichiers.length ? ` : ${nommerFichiers(a.fichiers)}` : ''}) : rebasé et intégré sans rejouer la porte, qui a jugé ${a.porte} `
-  + `(L796) ; le sha intégré n'a pas de verdict de porte : le hook pre-push exigera une porte de verify à ce sha`;
+  + `(${a.commits} commit${a.commits > 1 ? 's' : ''}${a.fichiers.length ? ` : ${nommerFichiers(a.fichiers)}` : ''}) : rebasé, `
+  + (a.plan_seul ? `intégré sans rejouer la porte, qui a jugé ${a.porte} : ils ne touchent que le plan ou le registre des demandes, que la porte ne lit pas (L796)`
+    : `porte rejouée sur le sha rebasé (L796)`);
 const DISJOINTS_MAX = 10; // une cible qui avance sans fin finit par le chemin de L723 (refus après 3 rebases)
 
 /** Après chaque passage de session : question, commits, puis rebase, porte et avance rapide, rejoués tant que la cible avance (L723). */
@@ -359,7 +364,8 @@ function suite(e: Etat, o: Opts): Etat {
   };
   if (!commandesDeCadenceYaml(e.worktree).length && !o.sansPorte) return arretSansCommande();
   const br = git(e.worktree, 'rev-parse', '--abbrev-ref', 'HEAD');
-  for (let rebase = 1; ; rebase++) {
+  let disjoints = 0;
+  for (let rebase = 1; ;) {
     let cible = git(e.repo, 'rev-parse', e.cible);
     const arret = rebaser(e, o, cible);
     if (arret) return arret;
@@ -383,17 +389,24 @@ function suite(e: Etat, o: Opts): Etat {
       ouvrirCorrection(e, p.sortie, o.out);
       if (!session(e, `La porte complète est rouge après ton travail :\n${p.sortie}\nCorrige la cause (sans affaiblir aucun test), commite, ${CONSIGNE_FINI}.`, o, false, SUJET_CORRECTION)) return fin(e, o);
     }
-    let refus = avancer(e, br, cible);
-    // L796 : la cible a avancé sur des fichiers disjoints (le lead commite son plan pendant la porte) : rebase et avance rapide, porte non rejouée
-    for (let n = 0, a; refus?.avance && n < DISJOINTS_MAX && (a = rebaserDisjoint(e, cible, git(e.repo, 'rev-parse', e.cible))); n++) {
+    let refus = avancer(e, br, cible), rejouer = false;
+    // L796 : la cible a avancé sur des fichiers disjoints : rebase ; plan ou registre seuls, avance rapide sans porte ; sinon porte rejouée sur le sha rebasé,
+    // sans compter parmi les rebases de L723 (un commit disjoint ne rend plus le lot, il coûte une porte)
+    while (refus?.avance && disjoints < DISJOINTS_MAX) {
+      const a = rebaserDisjoint(e, cible, git(e.repo, 'rev-parse', e.cible));
+      if (!a) break;
+      disjoints++;
       e.cible_avancee = [...(e.cible_avancee ?? []), a]; sauver(e); o.out(cibleAvancee(e, a));
+      if (!a.plan_seul) { rejouer = true; break; }
       cible = a.sur; refus = avancer(e, br, cible);
     }
+    if (rejouer) continue;
     if (!refus) break;
     if (!refus.avance || rebase === REBASES_MAX) {
       e.etat = 'refus-integration'; e.detail = refus.avance ? `${e.cible} a encore avancé après ${REBASES_MAX} rebases : ${refus.raison}` : refus.raison; return fin(e, o);
     }
-    o.out(`${e.cible} a avancé pendant la porte : rebase et porte rejouée (${rebase + 1}/${REBASES_MAX})`);
+    rebase++;
+    o.out(`${e.cible} a avancé pendant la porte : rebase et porte rejouée (${rebase}/${REBASES_MAX})`);
   }
   e.integre = git(e.repo, 'rev-parse', '--short', e.cible); e.etat = 'integre';
   const regenere = regenerations(e);

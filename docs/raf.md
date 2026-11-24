@@ -150,7 +150,7 @@ pid now belongs to another process (`start` differs: a run killed before a reboo
   `--no-verify` bypasses it) and says what to do instead. A `cadence run` writes its `worktree` in the file (L796): it
   holds only the files it touches (changed in its worktree since its common ancestor with the branch, committed or not,
   and its untracked files). A commit of the lead on other files goes through, and the run rebases on it when it
-  integrates; a commit that touches one of them is refused and the message names them. A commit on another branch (the worktree of a run or of a
+  integrates, replaying its gate unless the commit touches only the plan or the request register; a commit that touches one of them is refused and the message names them. A commit on another branch (the worktree of a run or of a
   lot) goes through, and so do the commits cadence's own programs make on the branch (the plan commit of a v1 wave,
   `cadence deliver`, `cadence config set`): they mark their `git commit` with `CADENCE_COMMIT_PROGRAMME=1`.
 - `raf add`, `raf note`, `raf start` (L779), `raf done`, `raf review`, `raf ux` and the writes of `raf demande` (L722) on a held branch write

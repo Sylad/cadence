@@ -4196,6 +4196,17 @@ lots:
     started: 2026-11-23
     review: { date: 2026-11-23, verdict: "conforme (lead) : 3f55e112 relu — banc.md dit que grep -r x .., find .., rg x .., du -sh .., cd .. && cat c2/x sont refusés et comptés, ls .. et les globs à vérifier, conforme à la revue r2 de L817 ; doc seule, v2/ intact", commit: 3f55e112e6cb8e83716e7f6f4008f05296d08e70 }
     finished: 2026-11-23
+  - id: L819
+    title: "L726 ne bascule pas sur Fable : codex L88, 4e run du lot le 24-11 (3e passe de correction, 3 verdicts UX non conformes de suite), lancé sur « Opus (par défaut) » ; le plan ne garde que le dernier verdict (review conforme, ux non conforme) et le compte des passes ne voit pas les runs précédents du lot — compter les runs du lot dans ../.cadence-run/ et l'historique des verdicts ux comme review, avec un test"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-24
+  - id: L820
+    title: cadence run enregistre ses jetons (modelUsage par passe) dans son état, pour que cadence perf remplisse « jetons par lot » et « part des tokens de revue » d'un lot fait par run (suite de L795 ; touche v2/, banc requis)
+    status: todo
+    estimate: 0.5
+    after: [ L795 ]
+    created: 2026-11-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -4253,10 +4253,12 @@ lots:
     created: 2026-11-24
   - id: L826
     title: "L826 Issue #73 (compte pro) : un lot config: true reste refusé par la porte même après qu'un commit de correction a retiré ses changements hors config — la règle 4 lit chaque commit de la branche, pas le diff net ; juger le diff net depuis le départ (L824 lit aussi les commits : même question)"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-24
     started: 2026-11-24
+    review: { date: 2026-11-24, verdict: "conforme (1 note mineure : le diff net lit l'arbre, un revert non commité masque le code commité → L836 ; rapport tmp/revue-cadence-L826.md)", commit: cc3ad3dcc072239a4d9d6498a10eb7a2109d5bc7 }
+    finished: 2026-11-24
   - id: L827
     title: "L827 raf config <lot> : déclarer un lot config: true par une commande qui écrit la clé dans le plan puis la relit (refus si le lot n'existe pas, s'il est done, ou si le plan est en lecture seule) ; --off pour la retirer. Vécu 24-11 : le lead l'a posée par un script Python qui n'a rien écrit, commit 3dd3af0 annonçant la clé sans la contenir, run L823 refusé par la porte, ~1 h perdue. Mesure : plus aucune édition de .cadence/raf.yaml à la main pour déclarer un lot de config (D-32)"
     status: todo
@@ -4305,6 +4307,11 @@ lots:
     title: "D-33 étude : où part le temps entre la fin d'un lot et la prod, tous projets (porte locale, CI, banc, déploiement, attentes) et ce qui se mutualise"
     status: todo
     estimate: 1
+    created: 2026-11-24
+  - id: L836
+    title: "Diff net de la règle config: true (L826) : juger aussi contre HEAD — l'union de git diff <départ> HEAD et de l'arbre —, pour qu'un retour arrière non commité ne masque plus le code commité (vécu 24-11, revue de L826 : porte rc 0 sur un commit config + code). Mesure : le cas du dépôt jetable rend rc 1"
+    status: todo
+    estimate: 0.25
     created: 2026-11-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

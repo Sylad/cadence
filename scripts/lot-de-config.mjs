@@ -74,3 +74,22 @@ export function configChangee(racine, ref, jeu) {
 
 /** Les libellés « fichier (nouveau|supprimé|modifié) » des fichiers qui diffèrent du départ (`ref.config`), pour un `jeu` de configChangee. */
 export const fichiersDifferents = (racine, ref, fichiers) => differences(fichiers.map((f) => [f, ref.config(f), lireSiPresent(racine, f)]));
+
+/**
+ * Le lot de config qui peut faire monter la base (L824), null sinon : sur sa branche, le lot que le plan du départ déclare `config: true` (`ref.lotConfig`) ;
+ * sans nom de lot (porte d'un run, porte d'intégration), quand CHAQUE commit depuis le départ, hors ceux qui ne touchent que le plan (`.cadence/`), ne cite
+ * que des lots `config: true` et que rien d'autre que la base (`baseline`) n'est hors commit. Un commit de code dans l'intervalle ferme la voie : la mesure du sommet
+ * porterait son code, et la base « exacte » le figerait.
+ */
+export function lotDeConfigQuiMonte(ref, baseline) {
+  if (!ref?.base) return null;
+  if (ref.lotConfig) return ref.lotConfig;
+  const commits = (ref.commits?.() ?? []).filter((c) => !c.fichiers.every((f) => f.startsWith('.cadence/')));
+  if (!commits.length || !commits.every((c) => estDeConfig(c, ref))) return null;
+  if (!ref.nonCommites || ref.nonCommites().some((f) => f !== baseline)) return null;
+  return [...new Set(commits.flatMap(lotsCites))].join(', ');
+}
+
+/** Les clés où la base diffère de la mesure (présente d'un seul côté, ou d'une autre valeur) : vide quand la base EST la mesure, clé par clé. */
+export const ecartsALaMesure = (base, mesure) => [...new Set([...Object.keys(base), ...Object.keys(mesure)])].sort()
+  .filter((cle) => base[cle] !== mesure[cle]).map((cle) => ({ cle, avant: base[cle] ?? 'absente', apres: mesure[cle] ?? 'absente' }));

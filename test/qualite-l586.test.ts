@@ -120,7 +120,7 @@ describe('L586 — un lot de config déclaré (config: true) échappe au refus d
     expect(verifier().texte).toContain('src/code.ts');
   });
 
-  it('R4 — un lot de config reste jugé par les autres mesures : la base ne peut pas remonter', () => {
+  it('R4 — un lot de config reste jugé par les autres mesures : la base ne peut pas remonter au-dessus de la mesure (L824 : seule la mesure exacte passe)', () => {
     const { dir, ecrire, verifier } = depot('    config: true\n', 'cadence/v/p--L1', PLAN('    config: true\n'), '{"eslint|vitest.workspace.ts|max-lines":1}');
     ecrire('vitest.workspace.ts', 'b');
     writeFileSync(join(dir, BASELINE), '{"eslint|vitest.workspace.ts|max-lines":2}');

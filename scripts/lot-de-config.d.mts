@@ -7,3 +7,7 @@ export function lotsDeConfig(config: (chemin: string) => string | null): Set<str
 export function lireSiPresent(racine: string, fichier: string): string | null;
 export function differences(couples: [string, string | null, string | null][]): string[];
 export function planNatif(config: (chemin: string) => string | null): boolean;
+/** Le lot de config qui peut faire monter la base `baseline` (L824) : celui de la branche, ou les lots `config: true` que citent tous les commits ; null sinon. */
+export function lotDeConfigQuiMonte(ref: Ref | null, baseline: string): string | null;
+/** Les clés où la base diffère de la mesure (L824) : vide quand la base est la mesure, clé par clé. */
+export function ecartsALaMesure(base: Record<string, number>, mesure: Record<string, number>): { cle: string; avant: number | 'absente'; apres: number | 'absente' }[];

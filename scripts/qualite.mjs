@@ -6,7 +6,7 @@ import { existsSync, globSync, lstatSync, mkdtempSync, readdirSync, readFileSync
 import { tmpdir } from 'node:os';
 import { basename, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { configChangee, differences, fichiersDifferents, lireSiPresent, lotsDeConfig } from './lot-de-config.mjs';
+import { configChangee, differences, ecartsALaMesure, fichiersDifferents, lireSiPresent, lotDeConfigQuiMonte, lotsDeConfig } from './lot-de-config.mjs';
 
 export const BASELINE = 'qualite-baseline.json';
 
@@ -319,9 +319,14 @@ export function lireRef(racine, ref) {
     const [sujet, ...fichiers] = b.split(/\n|\0/);
     return { sujet, fichiers: fichiers.filter(Boolean) };
   });
+  // ce qui n'est pas commité (modifié depuis HEAD, ou neuf et non ignoré, hors liens symboliques) : un lot de config ne monte la base que sur un sommet commité (L824)
+  const nonCommites = () => [...new Set([
+    ...git('diff', '--name-only', '--no-renames', '-z', 'HEAD').stdout.split('\0').filter(Boolean),
+    ...git('ls-files', '-z', '--others', '--exclude-standard').stdout.split('\0').filter(Boolean).filter(nonSymbolique),
+  ])];
   const lots = lotsDeConfig(config);
   const slug = /--([^/]+)$/.exec(git('branch', '--show-current').stdout.trim())?.[1];
-  return { nom: `${ref} (${sha.slice(0, 7)})`, base: show.status === 0 ? JSON.parse(show.stdout) : null, existe, contenu, config, fichiers, touches, commits, lotsConfig: lots, lotConfig: (slug && [...lots].find((id) => id.split('/').join('__') === slug)) || undefined };
+  return { nom: `${ref} (${sha.slice(0, 7)})`, base: show.status === 0 ? JSON.parse(show.stdout) : null, existe, contenu, config, fichiers, touches, commits, nonCommites, lotsConfig: lots, lotConfig: (slug && [...lots].find((id) => id.split('/').join('__') === slug)) || undefined };
 }
 
 // Les seuils et les exclusions des trois outils : les relever ferait baisser la mesure sans corriger le code. Tout ce que les
@@ -429,6 +434,24 @@ function baseRemonte(racine, base, mesure, ref) {
   return !remonte.length ? null : { code: 1, texte: `${BASELINE} remonte par rapport à ${ref.nom} (elle ne peut que baisser : corriger le code, pas la base) :\n${remonte.map(ligne).join('\n')}` };
 }
 
+/** La hausse de la base d'un lot de config (L824) : acceptée (null) si la base est exactement la mesure du sommet, refusée (code 1) sinon, écarts nommés. */
+function hausseDeConfig(base, mesure, lot, ref) {
+  const ecarts = ecartsALaMesure(base, mesure);
+  if (!ecarts.length) return null;
+  return { code: 1, texte: `${BASELINE} remonte par rapport à ${ref.nom} : le lot de config ${lot} le peut, mais seulement à la mesure EXACTE du sommet (aucune marge) ; ${ecarts.length} clé(s) en diffèrent (base → mesure). Écrire la mesure : « npm run qualite:cliquet -- --contre ${ref.nom.split(' ')[0]} ».\n${ecarts.map(ligne).join('\n')}` };
+}
+
+/**
+ * La base qui monte : refusée (baseRemonte), sauf pour un lot de config (L824) dont la base est exactement la mesure ; null si rien ne monte. Dans un lot de
+ * config, `--ecrire` pose la mesure telle quelle (et rend son résultat) ; pour un autre lot il ne fait que baisser.
+ */
+function jugerHausse(racine, mode, base, mesure, ref) {
+  const lot = lotDeConfigQuiMonte(ref, BASELINE);
+  if (lot && mode === 'ecrire') return (ecrireBase(racine, mesure), { code: 0, texte: `${BASELINE} écrite à la mesure du sommet (lot de config ${lot}) : ${Object.keys(mesure).length} mesures.` });
+  const refus = baseRemonte(racine, base, mesure, ref);
+  return refus && lot ? hausseDeConfig(base, mesure, lot, ref) : refus;
+}
+
 /**
  * Ce qui remonte dans la base d'un lot (`base`) par rapport à celle de son départ (`depart`) : `existe(chemin)` dit un fichier du départ, `lien` relie un
  * fichier neuf à sa source. Une clé d'un fichier neuf qui ne mesure plus rien sort du jugement, les autres sont jugées à leur valeur (`baseJugee`).
@@ -493,7 +516,7 @@ function decider(racine, mode, mesure, ref) {
   }
   if (!existe) return { code: 2, texte: `${BASELINE} absente : lancer « node scripts/qualite.mjs --init » une fois, puis la versionner.` };
   const base = lireBase(racine);
-  const refus = baseRemonte(racine, base, mesure, ref);
+  const refus = jugerHausse(racine, mode, base, mesure, ref);
   if (refus) return refus;
   if (mode === 'migrer') return migrer(racine, base, mesure, ref);
   const { pires, mieux } = comparer(base, mesure);

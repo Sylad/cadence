@@ -70,7 +70,7 @@ export const fichierRun = (repo: string, id: string) => { const racine = git(rep
 export const sauver = (e: Etat) => { const t = `${e.fichier}.${process.pid}.tmp`; writeFileSync(t, JSON.stringify(e, null, 1)); renameSync(t, e.fichier); return e; }; const lireEtat = (f: string) => JSON.parse(readFileSync(f, 'utf8')) as Etat;
 
 // L695 (D-9) : le run tient la branche cible du début à la fin ; le pre-commit de raf (raf hook install) y refuse un commit du lead, qui le ferait
-// échouer en avance rapide, et raf add|note|done|review|ux|demande écrivent dans le plan en attente (L722). Même format que src/repo-held.ts, qui le lit.
+// échouer en avance rapide, et raf add|note|start|done|review|ux|demande écrivent dans le plan en attente (L722, L779). Même format que src/repo-held.ts, qui le lit.
 const RAF = fileURLToPath(new URL('../../../bin/raf.js', import.meta.url));
 const fichierTenu = (repo: string) => join(resolve(repo, git(repo, 'rev-parse', '--git-common-dir')), 'cadence', 'tenu', `run-${process.pid}.json`);
 // Revue L695 r1 (D-10) : `start` écrit, un fichier laissé par un run tué (Ctrl-C, SIGKILL, PC éteint) ne tient plus la branche quand son pid est repris.

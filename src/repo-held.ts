@@ -1,6 +1,6 @@
 // Dépôt tenu (L695, D-9) : pendant qu'un programme (cadence run, porte jouée dans l'arbre principal) va intégrer ou lire une branche, le lead n'y commite pas.
-// Le programme pose un fichier dans <git-common-dir>/cadence/tenu/ ; le pre-commit refuse un commit sur cette branche, et `raf add|note|done|review|ux|demande`
-// (L722 : review, ux et le registre des demandes aussi) mettent leur écriture dans .cadence/plan-en-attente.yaml, que le programme fait appliquer
+// Le programme pose un fichier dans <git-common-dir>/cadence/tenu/ ; le pre-commit refuse un commit sur cette branche, et `raf add|note|start|done|review|ux|demande`
+// (L722 : review, ux et le registre des demandes aussi ; L779 : start) mettent leur écriture dans .cadence/plan-en-attente.yaml, que le programme fait appliquer
 // (`raf attente appliquer`) une fois le dépôt rendu.
 // Le format du fichier est partagé avec v2/src/run/run.ts, qui l'écrit lui-même (v2 ne lit pas src/) : { pid, start?, kind, label, branch, since }.
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -18,7 +18,7 @@ export const HELD_DIR = 'tenu';
 export const PENDING_PLAN = PLAN_EN_ATTENTE;
 const PENDING_LOCK = 'plan-en-attente.lock';
 /** Les écritures mises en attente sur une branche tenue, telles que les messages les nomment. */
-const DEFERRED_WRITES = 'raf add|note|done|review|ux|demande';
+const DEFERRED_WRITES = 'raf add|note|start|done|review|ux|demande';
 
 interface Holder { pid: number; start?: string; kind: string; label: string; branch: string; since: string }
 interface PendingWrite { date: string; tenu: string; argv: string[] }
@@ -63,7 +63,7 @@ export function holderHere(cwd: string): Holder | null {
 
 const since = (h: Holder) => h.since.slice(11, 16);
 
-/** Qui applique l'attente : cadence run en rendant le dépôt ; après une porte, le prochain add|note|done|review|ux|demande ou `raf attente appliquer`. */
+/** Qui applique l'attente : cadence run en rendant le dépôt ; après une porte, le prochain add|note|start|done|review|ux|demande ou `raf attente appliquer`. */
 const applier = (h: Holder) => (h.kind === 'run' ? 'appliqué par le run quand il rend le dépôt' : `appliqué au premier ${DEFERRED_WRITES} après sa fin, ou par raf attente appliquer`);
 
 /** Le refus du pre-commit quand la branche du commit est tenue, avec le geste à faire ; null si elle est libre ou si le commit est celui d'un programme (`commitAsProgram`). */

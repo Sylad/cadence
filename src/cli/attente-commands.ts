@@ -1,4 +1,4 @@
-// Le plan en attente (L695, D-9) : `raf add|note|done|review|ux|demande` (L722) sur une branche tenue par un programme, puis `raf attente [appliquer]`.
+// Le plan en attente (L695, D-9) : `raf add|note|start|done|review|ux|demande` (L722, L779 pour start) sur une branche tenue par un programme, puis `raf attente [appliquer]`.
 import { checkRegistryWrite, isRegistryWrite } from './demande-commands.js';
 import { checkGateUsage, reviewedAt, seenArgs } from './gates.js';
 import { applyPending, deferPlanWrite, holderHere, PENDING_PLAN, readPending } from '../repo-held.js';
@@ -8,10 +8,11 @@ import { buildCtx, type EarlyCtx, type Io } from './context.js';
 type Run = (argv: string[], io: Io) => number | Promise<number>;
 
 // L722 : review et ux écrivaient le plan de l'arbre principal pendant qu'un run le tenait ; demande écrit le registre, commité avec le code.
-const DEFERRABLE = new Set(['add', 'note', 'done', 'review', 'ux', 'demande']);
+// L779 (issue #66) : `raf start <lot> && cadence run … --fond` écrivait le plan de l'arbre principal pendant qu'un autre run le tenait.
+const DEFERRABLE = new Set(['add', 'note', 'start', 'done', 'review', 'ux', 'demande']);
 let applying = false;
 
-/** Joue les écritures en attente avec `run` (des commandes synchrones : add, note, done, review, ux, demande). */
+/** Joue les écritures en attente avec `run` (des commandes synchrones : add, note, start, done, review, ux, demande). */
 function apply(root: string, io: Io, run: Run): number {
   applying = true;
   try {
@@ -31,6 +32,15 @@ function apply(root: string, io: Io, run: Run): number {
 function checked(command: string, c: EarlyCtx): string[] {
   if (command === 'demande') {
     checkRegistryWrite(c);
+    return [];
+  }
+  if (command === 'start') {
+    // Lot inconnu, déjà démarré ou clos, transition refusée par les états du plan : refusé en mémoire, rien n'est sauvé.
+    const ctx = buildCtx({ ...c, command });
+    ctx.need(1, 'start <id>');
+    ctx.loadPlan().setStatus(c.rest[0]!, 'doing', c.today, { force: !!c.values.force });
+    // Joué plus tard, un second start du même lot échouerait (« déjà doing ») et retiendrait toutes les écritures qui le suivent.
+    if (readPending(c.root).some((w) => w.argv[0] === 'start' && w.argv[1] === c.rest[0])) throw new RafError(`${c.rest[0]} : raf start déjà en attente (raf attente le montre)`);
     return [];
   }
   if (command !== 'review' && command !== 'ux') return [];

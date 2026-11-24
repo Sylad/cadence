@@ -1,0 +1,40 @@
+{
+ "id": "20261120140054-1782282",
+ "repo": "@PARENT@/alpha",
+ "branche": "cadence/run-20261120140054-1782282",
+ "cible": "main",
+ "base": "7f84096ce42b43ee54cedf7bd0e9dd1c8d4a8826",
+ "worktree": "@PARENT@/.cadence-run/alpha-20261120140054-1782282",
+ "fichier": "@PARENT@/.cadence-run/alpha-20261120140054-1782282.json",
+ "demande": "(texte retiré à l'anonymisation)",
+ "pieces": [],
+ "taille": "fonction",
+ "mode": "leger",
+ "modele": "opus",
+ "acces_cluster": false,
+ "lot": "L798",
+ "modele_raison": "par défaut",
+ "correction_revue": true,
+ "corrections_avant": 1,
+ "revue": {
+  "date": "2026-11-20",
+  "verdict": "non conforme",
+  "commit": "2d352787bf8cbfadebb96bab00d4d4f3a282ec53"
+ },
+ "session": "00000000-0000-4000-8000-000000000002",
+ "cout_usd": 1.9325524000000003,
+ "etat": "integre",
+ "detail": "",
+ "debut": "2026-11-20T14:00:55.250Z",
+ "passes": [
+  {
+   "quoi": "correction 2 (après revue)",
+   "modele": "opus",
+   "raison": "par défaut",
+   "id_modele": "claude-opus-5-5"
+  }
+ ],
+ "rapport": "(texte retiré à l'anonymisation)",
+ "rapport_tour": 1,
+ "integre": "dda26797"
+}

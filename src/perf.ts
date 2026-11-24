@@ -10,9 +10,10 @@ import { findProjects } from './lead.js';
 import type { Lot } from './plan.js';
 import { FAIL_CLASSES, readDeliveries, readFailedEntries, type FailClass, type FailedDelivery } from './state.js';
 import { ecarteCounts, ecarteLines, instableCounts, type EcarteCounts, type InstableCounts } from './perf-constats.js';
+import { costedWithoutGrid, isRunPass, sourceCounts, sourceLines, type SourceCounts } from './perf-runs.js';
 
 /** Le lot d'un plan tel que `cadence perf` le lit. */
-type PlanLot = Pick<Lot, 'id' | 'status' | 'created' | 'finished' | 'estimate' | 'notes'>;
+type PlanLot = Pick<Lot, 'id' | 'status' | 'created' | 'finished' | 'estimate' | 'notes'> & Partial<Pick<Lot, 'visible' | 'ux'>>;
 /** Les plans lisibles du dossier : nom du projet (chemin relatif au dossier, séparateurs « / ») → ses lots. */
 type Plans = Map<string, PlanLot[]>;
 
@@ -197,6 +198,8 @@ export interface PerfResult {
   quality: { redDeliveries: Indicator; qaBlocking: Indicator; reds: { current: RedBreakdown; previous: RedBreakdown } };
   /** Lots de journal rendus dans les deux fenêtres qui n'ont pas de lot dans les plans du dossier (R15). */
   orphans: number;
+  /** D'où viennent les lots rendus de chaque fenêtre (L795) : journal de vague seul, états de `cadence run` seuls, ou les deux fondus en un lot. */
+  sources: { current: SourceCounts; previous: SourceCounts };
   warnings: string[];
 }
 
@@ -410,7 +413,8 @@ export function computePerf(input: PerfInput): PerfResult {
     return set.length === 0 ? null : set.filter((d) => pred(d.j.passes.length)).length / set.length;
   };
   const lotCounts = both(windows, (w) => lotsIn(w).length);
-  const passDays = withPasses.flatMap((d) => d.j.passes.map((pass) => ({ pass, day: pass.fixEnded && !Number.isNaN(Date.parse(pass.fixEnded)) ? toDay(new Date(pass.fixEnded)) : d.day })));
+  // Les passes d'un run (L795) n'ont pas de constat à classer : le run ne garde que la sortie de la porte, la revue est hors du run.
+  const passDays = withPasses.flatMap((d) => d.j.passes.filter((pass) => !isRunPass(pass)).map((pass) => ({ pass, day: pass.fixEnded && !Number.isNaN(Date.parse(pass.fixEnded)) ? toDay(new Date(pass.fixEnded)) : d.day })));
   const causes = { current: causeWindow(passDays, windows.current, cache, input.sousCache), previous: causeWindow(passDays, windows.previous, cache) };
 
   // Interventions du lead (R10, R15)
@@ -448,8 +452,6 @@ export function computePerf(input: PerfInput): PerfResult {
     const set = prechecked(w);
     return set.length === 0 ? null : set.filter((d) => d.j.precheck === 'oui').length / set.length;
   });
-  const visibleCounts = both(windows, (w) => visibleRendered(w).length);
-  const budgetCounts = both(windows, (w) => withBudget(w).length);
 
   const mk = (vals: { current: number | null; previous: number | null }, lots: { current: number; previous: number }, dir: Direction | null, twin: string | null, nullNote: string | null = null, minSample = MIN_SAMPLE) => indicator(vals.current, vals.previous, lots, windows, dir, twin, nullNote, minSample);
   const planNote = hasPlans ? null : 'plan illisible ou absent';
@@ -493,7 +495,8 @@ export function computePerf(input: PerfInput): PerfResult {
   };
   const minutesClasses = both(windows, minutesByClass);
   const lotMinutes: Record<string, Indicator> = {};
-  for (const key of classKeys) {
+  // Un lot fait par cadence run n'a pas de jetons mais a une durée (L795) : ses classes s'ajoutent à celles des tokens.
+  for (const key of [...new Set([...classKeys, ...minutesClasses.current.keys(), ...minutesClasses.previous.keys()])].sort(byEstimateKey)) {
     const v = both(windows, (w) => (w === windows.current ? minutesClasses.current : minutesClasses.previous).get(key) ?? []);
     lotMinutes[key] = mk({ current: median(v.current), previous: median(v.previous) }, { current: v.current.length, previous: v.previous.length }, null, null);
   }
@@ -549,11 +552,12 @@ export function computePerf(input: PerfInput): PerfResult {
         withoutJournal++;
         continue;
       }
-      if (!prices) continue;
+      // Sans grille, seul un lot dont chaque étape porte son montant (les runs, L795) ou ne compte rien se chiffre.
+      if (!costedWithoutGrid(prices, journals.flatMap((d) => d.j.steps))) continue;
       let sum = 0;
       const lacking = new Set<string>();
       for (const step of journals.flatMap((d) => d.j.steps)) {
-        const e = stepEuros(step, prices);
+        const e = stepEuros(step, prices ?? {});
         if (typeof e === 'number') sum += e;
         else lacking.add(e.missing);
       }
@@ -572,7 +576,7 @@ export function computePerf(input: PerfInput): PerfResult {
     ready: mk(ready, lotsOf, null, twinEscaped),
     rendered: mk(both(windows, perDay), lotsOf, 'down', twinEscaped),
     delivered: mk(delivered, both(windows, deliveredCount), 'down', twinEscaped, planNote),
-    onBudget: mk(onBudget, budgetCounts, 'down', twinEscaped),
+    onBudget: mk(onBudget, both(windows, (w) => withBudget(w).length), 'down', twinEscaped),
     escaped: mk(both(windows, escapedOf), lotsOf, 'up', null, escapedNote),
   };
   const firstTime = both(windows, (w) => share(w, (n) => n === 0));
@@ -582,8 +586,8 @@ export function computePerf(input: PerfInput): PerfResult {
     firstTime: mk(firstTime, lotCounts, 'down', null),
     causes,
   };
-  const handed = mk(handedOut, lotsOf, 'up', twinEscaped, planNote);
-  const interventions = { handedOut: { ...handed, count: handedCount }, ux: mk(ux, visibleCounts, 'up', twinEscaped), dedicatedUx: mk(dedicatedUx, visibleCounts, null, null) };
+  const visibleCounts = both(windows, (w) => visibleRendered(w).length);
+  const interventions = { handedOut: { ...mk(handedOut, lotsOf, 'up', twinEscaped, planNote), count: handedCount }, ux: mk(ux, visibleCounts, 'up', twinEscaped), dedicatedUx: mk(dedicatedUx, visibleCounts, null, null) };
 
   const precheck = { yes: mk(precheckYes, both(windows, (w) => prechecked(w).length), null, null), ...precheckMeasure(windows, rendered) };
   const tokens: TokensBlock = { byEstimate, reviewShare: mk(reviewShare, both(windows, (w) => rendered(w).length), 'up', twinFirstTime) };
@@ -624,7 +628,7 @@ export function computePerf(input: PerfInput): PerfResult {
     redDeliveries: mk(reds, deliveriesOf, 'up', 'throughput.delivered'),
     qaBlocking: mk(both(windows, blockingOf), both(windows, deliveredCount), 'up', twinEscaped, escapedNote),
   };
-  const result: PerfResult = { since: input.since ?? null, today, windows, throughput, corrections: correctionsInd, interventions, precheck, escalations: both(windows, (w) => escalationCounts(rendered(w))), instables: both(windows, (w) => instableCounts(rendered(w))), ecartes: both(windows, (w) => ecarteCounts(rendered(w))), tokens, lotMinutes, delays, durations, cost, quality, orphans, warnings: [] };
+  const result: PerfResult = { since: input.since ?? null, today, windows, throughput, corrections: correctionsInd, interventions, precheck, escalations: both(windows, (w) => escalationCounts(rendered(w))), instables: both(windows, (w) => instableCounts(rendered(w))), ecartes: both(windows, (w) => ecarteCounts(rendered(w))), sources: both(windows, (w) => sourceCounts(rendered(w))), tokens, lotMinutes, delays, durations, cost, quality, orphans, warnings: [] };
   const bottleneck = bottleneckOf(causes.current);
   for (const [key, ind] of indicatorLines(result)) if (ind.warn) result.warnings.push(`⚠ ${key.label} : ${describe(ind, key.kind, result.cost.currency)} → ${decisionOf(key, ind, result)}`);
   if (bottleneck) result.warnings.push(bottleneck);
@@ -853,7 +857,7 @@ export function renderPerf(r: PerfResult): string[] {
     for (const l of lines.filter(([x]) => labels.includes(x.label))) out.push(row(l));
   };
   section('Débit', ['prêts', 'rendus par jour', 'livrés', 'part des rendus sur budget', 'défauts échappés']);
-  out.push(...redBreakdownLines(r.quality.reds.current));
+  out.push(...sourceLines(r.sources), ...redBreakdownLines(r.quality.reds.current));
   section('Passes de correction', ['médiane de passes de correction par lot', 'part des lots à au moins 2 passes', 'part conforme du premier coup']);
   const c = r.corrections.causes.current;
   const top = c.top.map((t, i) => `${i + 1}. ${LABELS[t.cause]} ${t.passes} (${pct(t.share)})`).join(' · ');

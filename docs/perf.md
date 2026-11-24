@@ -4,7 +4,8 @@
 
 `cadence perf [folder] [--since date] [--json]` is the permanent dashboard of the workflow. It calls no model, writes nothing
 (no journal, no plan, no cache) and reads, from the folder (default: the current one), the wave journals
-`<folder>/.cadence/runs/<wave>/<project>--<lot>.json` (with each wave's `wave.json`) and the plan of every project of the folder
+`<folder>/.cadence/runs/<wave>/<project>--<lot>.json` (with each wave's `wave.json`), the state files of `cadence run` (`.cadence-run/<repo>-<id>.json`
+next to each repository, [below](#lots-made-by-cadence-run-l795)) and the plan of every project of the folder
 (one nesting level, like `cadence corrections`: `group/gamma`; a `tmp/` folder is never read: its working copies would count their lots twice, L241). Exit code `0`, even when a `⚠` is printed; `1` on a usage or read error.
 
 It compares two windows of 7 calendar days (local days): the **current** one (the last 7 days, today included) and the **previous**
@@ -43,8 +44,41 @@ current window, with at least 10 classified passes) is flagged by a `⚠` even w
 - **Review findings set aside by L622 and L646** (L638). Under the section « Revues : constats écartés », for the current window: `constats de revue écartés par L622 et L646 : n sur m (p % ; précédente q %)`, then one line per wave `<wave> : n sur m (p %)`. A minor that repeats one the previous review had noted (L646) is kept as `ecarte-deja-note`: it is read in `constatsRevue` and counted in `n` with `ecarte-inchange` (L649: a reworded repeat is recognised by file and line, or file and `classe`). Each review step of a lot now keeps `constatsRevue` in its state: for every finding of the report its `texte`, `gravite`, `rang` (the rank L622 read the mark with: a narrowed lot counts the mark from rank 2) and `decision` (`compte`, `ecarte-inchange` = a major marked `inchange: true` set aside by L622, or `ecarte-hors-regle` = an out-of-rule probe expectation, L625). The rate counts `ecarte-inchange` and `ecarte-deja-note` over all kept findings of the rendered lots; steps written before L638 keep nothing and are not counted, and nothing is printed without a kept finding. In `--json`: `ecartes` (`{ current, previous }`, each `{ constats, ecartes, taux, vagues: [{ wave, constats, ecartes, taux }] }`, `taux` null without finding). A high rate does not say which rule played: read `decision` in the findings of the steps, `ecarte-inchange` for L622 (a mark that sets aside more than a reviewer would), `ecarte-deja-note` for L646 (minors repeated, which is the intended effect of L649).
 - **`--since date`** is an ISO date that ignores everything before that day in both windows (a wave created before that day is not read, even if its lots end after it); a window starting before it is *truncated* (its per-day rates divide by the days covered, no `⚠`).
   It is **not** the instant of `cadence corrections --since` (waves created strictly after).
-- **`--json`** prints one object `{ since, today, windows: { current, previous }, throughput, corrections, interventions, precheck, escalations, instables, ecartes, tokens, lotMinutes, delays, durations, cost, quality, orphans, warnings }`; every indicator carries
+- **`--json`** prints one object `{ since, today, windows: { current, previous }, throughput, corrections, interventions, precheck, escalations, instables, ecartes, sources, tokens, lotMinutes, delays, durations, cost, quality, orphans, warnings }`; every indicator carries
   `{ current, previous, change, warn, twin, lots, note }` (`twin`: the path of its quality twin, e.g. `throughput.escaped`). Same values as the text.
+
+## Lots made by `cadence run` (L795)
+
+Since 2.0.0 most lots are made by `cadence run`, which writes no wave journal: a week of runs only left every line `n/d` but `livrés`.
+`perf` now also reads the **state file of every run** (`.cadence-run/<repo>-<id>.json`, in the folder that holds the repository: the
+folder itself and the parent folder of each project) whose repository is a project of the folder and which names a lot (`--lot`).
+A state that does not parse and a run without a lot are not read; a run still going (`en-cours`, `attente`, `quota`) does not count yet.
+A folder is refused only when it has neither wave journal nor run state.
+
+- **One lot, one journal.** All finished runs of a lot make one lot journal, dated by the end of its last run. Its status is that of
+  the last run: `integre` → ready, `porte-rouge`, `sans-commit`, `conflit`, `sans-porte`, `refus-integration`, `environnement-perime` →
+  handed back, `echec` → failed (a run closed by `--clore` from another state is handed back).
+- **A lot made both ways is counted once.** When the lot also has a wave journal, its runs are added to the latest one (their steps,
+  their passes, the implement session) and that journal keeps its status when it was finished: a lot handed back by the wave and then
+  finished by a run stays a handed-back lot, as `lots terminés hors vague` expects.
+- **Correction passes** (`médiane de passes`, `au moins 2 passes`, `part conforme du premier coup`). The plan keeps only the **last**
+  review and UX verdict of a lot (a non-compliant r1 is overwritten by r2), so the passes are those **the runs know**: one per red gate
+  handed back to the session (`corrections` of the state) and one per run launched as a correction after a non-compliant review
+  (`correction_revue`). A lot right the first time has neither. Reading the git history of the plan was rejected: one `git log` per
+  project per call for a figure the runs already hold. Not counted: a correction made by hand, outside any run. Run passes have no
+  findings to classify: they are left out of the dominant causes (neither « à classer » nor « sans revue »).
+- **Wall time** (`durée de mur run`, `lotMinutes`). Each run is one step `run`, from its `debut` to the last write of its state file
+  (the run saves its final state last); waits for an answer or for the quota are inside. A run closed by `--clore` was rewritten later:
+  it has no end and no duration.
+- **Cost** (`coût par lot livré`). A run step costs its `cout_usd`, the amount Claude Code reports at API price, taken as is and not
+  priced again by `perf.prices`; without a grid, a lot made by run only still gets its cost (a warning says so), a lot with a
+  wave journal does not. With `perf.currency` other than `$`, `US$` or `USD`, a warning says the amounts are mixed.
+- **UX review.** A visible lot made by run counts one UX session when the plan holds a `raf ux` verdict for it.
+- **Not measured.** A run state holds no token counts and no review session: `tokens par lot` and `part des tokens de revue` stay `n/d`
+  for a lot made by run only; the `estimate` class still exists in `lotMinutes`.
+- **Sources.** Under `Débit`, when runs were read: `sources des lots rendus : vague n · cadence run m · les deux k` (current window,
+  then the previous one); in `--json`, `sources: { current, previous }`, each `{ vague, run, both }`. It tells a slower flow from
+  bigger lots made another way.
 
 ## Tokens, delays, wall time and cost (L226)
 

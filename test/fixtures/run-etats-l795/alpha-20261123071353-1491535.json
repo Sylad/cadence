@@ -1,0 +1,33 @@
+{
+ "id": "20261123071353-1491535",
+ "repo": "@PARENT@/alpha",
+ "branche": "cadence/run-20261123071353-1491535",
+ "cible": "main",
+ "base": "d5873997e5c88c57202dab07dba788ee9b9c0d32",
+ "worktree": "@PARENT@/.cadence-run/alpha-20261123071353-1491535",
+ "fichier": "@PARENT@/.cadence-run/alpha-20261123071353-1491535.json",
+ "demande": "(texte retiré à l'anonymisation)",
+ "pieces": [],
+ "taille": "fonction",
+ "mode": "leger",
+ "modele": "opus",
+ "acces_cluster": false,
+ "lot": "L804",
+ "modele_raison": "par défaut",
+ "session": "00000000-0000-4000-8000-000000000004",
+ "cout_usd": 2.6680098,
+ "etat": "integre",
+ "detail": "",
+ "debut": "2026-11-23T07:13:54.271Z",
+ "passes": [
+  {
+   "quoi": "travail",
+   "modele": "opus",
+   "raison": "par défaut",
+   "id_modele": "claude-opus-5-5"
+  }
+ ],
+ "rapport": "(texte retiré à l'anonymisation)",
+ "rapport_tour": 1,
+ "integre": "be8e8550"
+}

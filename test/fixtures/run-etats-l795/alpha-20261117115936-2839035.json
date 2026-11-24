@@ -1,0 +1,58 @@
+{
+ "id": "20261117115936-2839035",
+ "repo": "@PARENT@/alpha",
+ "branche": "cadence/run-20261117115936-2839035",
+ "cible": "main",
+ "base": "a620b4d10e151da623f5582455b4e4a24b901812",
+ "worktree": "@PARENT@/.cadence-run/alpha-20261117115936-2839035",
+ "fichier": "@PARENT@/.cadence-run/alpha-20261117115936-2839035.json",
+ "demande": "(texte retiré à l'anonymisation)",
+ "pieces": [],
+ "taille": "fonction",
+ "mode": "leger",
+ "modele": "opus",
+ "acces_cluster": false,
+ "lot": "L765",
+ "modele_raison": "par défaut",
+ "session": "00000000-0000-4000-8000-000000000003",
+ "cout_usd": 4.514787200000001,
+ "etat": "porte-rouge",
+ "detail": "(texte retiré à l'anonymisation)",
+ "debut": "2026-11-17T11:59:37.134Z",
+ "passes": [
+  {
+   "quoi": "travail",
+   "modele": "opus",
+   "raison": "par défaut",
+   "id_modele": "claude-opus-5-5"
+  },
+  {
+   "quoi": "correction 1 (porte rouge)",
+   "modele": "opus",
+   "raison": "par défaut",
+   "id_modele": "claude-opus-5-5"
+  }
+ ],
+ "rapport": "(texte retiré à l'anonymisation)",
+ "rapport_tour": 1,
+ "corrections": [
+  {
+   "rouge": "(sortie de porte retirée)",
+   "message": "(message retiré)",
+   "verte": false
+  }
+ ],
+ "tete": "78d256d6b457f6212676545de8d3aa2f933c055a",
+ "clos": {
+  "date": "2026-11-18T13:31:35.907Z",
+  "cible": "6e555c2f72566733a80922f229acc39be504c455",
+  "tete": "78d256d6b457f6212676545de8d3aa2f933c055a",
+  "integre": false,
+  "archives": [
+   "refs/cadence/archive/20261117115936-2839035"
+  ],
+  "restes": [
+   "(retiré)"
+  ]
+ }
+}

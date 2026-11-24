@@ -8,11 +8,14 @@ import type { JournalStep } from './corrections.js';
 export const COUNTED_WRITE_SHARE = 0.9;
 
 /** Ce que le coût lit d'une étape : son modèle et ses compteurs (les quatre, ou le seul `counted`). */
-type CostStep = Pick<JournalStep, 'model' | 'usage' | 'counted'>;
+/** `amount` : coût déjà chiffré (`cout_usd` d'un état de `cadence run`, L795), pris tel quel. */
+type CostStep = Pick<JournalStep, 'model' | 'usage' | 'counted'> & { amount?: number };
 
 /** Coût d'une étape (R8 de L226), au prix du modèle que son journal enregistre (L578), l'écriture de cache à son prix (L704, la grille de `cadence cost`) ; le nom du modèle sans prix quand il en faudrait un (`inconnu` sans modèle lisible). */
 export function stepEuros(step: CostStep, prices: PriceGrid): number | { missing: string } {
   if (step.model === 'local') return 0;
+  // L795 : le coût d'un run est celui que Claude Code rapporte (cout_usd), au tarif de l'API ; la grille ne le rechiffre pas.
+  if (typeof step.amount === 'number') return step.amount;
   const usage = step.usage ?? (step.counted === undefined ? null : { input: 0, cacheWrite: COUNTED_WRITE_SHARE * step.counted, cacheRead: 0, output: (1 - COUNTED_WRITE_SHARE) * step.counted });
   if (!usage) return 0;
   const name = typeof step.model === 'string' && step.model !== '' ? step.model : 'inconnu';

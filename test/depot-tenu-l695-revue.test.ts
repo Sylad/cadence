@@ -112,10 +112,12 @@ describe('L695 r1, majeur 1 : le run rend son verrou dans tous les cas', () => {
     );
     try {
       expect(await until(() => existsSync(heldDir(dir)) && readdirSync(heldDir(dir)).length > 0, 20_000)).toBe(true);
-      expect(commitRefusal(dir)).toMatch(/tenue par cadence run/);
+      // L796 : un run ne refuse que les commits sur ses fichiers ; la branche tenue se lit dans ses porteurs (rien n'est indexé ici)
+      expect(repoHolders(dir).map((h) => h.label).join()).toMatch(/cadence run/);
       process.kill(-c.pid, 'SIGINT');
       await c.done;
       expect(await until(() => !isRunning(c.pid), 3_000)).toBe(true);
+      expect(repoHolders(dir)).toEqual([]);
       expect(commitRefusal(dir)).toBeNull();
       expect(readdirSync(heldDir(dir))).toEqual([]);
     } finally {

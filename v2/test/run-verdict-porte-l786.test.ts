@@ -143,7 +143,8 @@ describe('revue r1 de L786 (m5) : la cible avance pendant la porte, seul le sha 
   it('rebase et porte rejouée : le sha intégré a son verdict vert, distinct du sha jugé avant le rebase', () => {
     const repo = depot(), compte = join(repo, '..', 'porte.compte');
     // Pendant la première porte, un autre commit arrive sur main (comme un autre run qui s'intègre) ; la seconde porte ne fait rien de plus.
-    writeFileSync(join(repo, 'cadence.yaml'), `orchestrate:\n  test: test -f fait.txt && echo x >> ${compte} && (test "$(wc -l < ${compte})" -gt 1 || (cd ${repo} && echo y > autre.txt && git add autre.txt && git ${ID.join(' ')} commit -qm autre))\n`);
+    // L796 : il change cadence.yaml (la porte), donc pas disjoint du run : rebase et porte rejouée ; un commit disjoint ne rejoue plus la porte (run-disjoint-l796).
+    writeFileSync(join(repo, 'cadence.yaml'), `orchestrate:\n  test: test -f fait.txt && echo x >> ${compte} && (test "$(wc -l < ${compte})" -gt 1 || (cd ${repo} && echo '# autre' >> cadence.yaml && git add cadence.yaml && git ${ID.join(' ')} commit -qm autre))\n`);
     git(repo, 'add', '.'); git(repo, ...ID, 'commit', '-qm', 'porte');
     const { l, out } = io();
     const e = executerRun({ repo, demande: 'Fais-le', lot: 'L9', exec: fauxClaude([commite('fait.txt')]), out });

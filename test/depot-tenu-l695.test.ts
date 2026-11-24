@@ -45,17 +45,22 @@ const planText = (dir: string) => readFileSync(join(dir, '.cadence/raf.yaml'), '
 const sortie = (s: string) => JSON.stringify({ session_id: s, total_cost_usd: 0, result: 'fini', subtype: 'success' });
 
 describe('L695 : dépôt tenu par un programme', () => {
-  it('e2e : pendant un cadence run, raf note est mis en attente et le commit du lead sur main refusé ; le run s intègre puis applique la note', () => {
+  it('e2e : pendant un cadence run, raf note est mis en attente et le commit du lead sur un fichier du run refusé ; le run s intègre puis applique la note', () => {
     const { dir, env } = project();
     const vu: Record<string, ReturnType<typeof sh> | string> = {};
-    // Faux claude : pendant la session, le lead écrit le plan et tente un commit sur main ; la session, elle, commite dans son worktree.
+    // Faux claude : la session écrit fait.txt ; pendant ce temps, le lead écrit le plan et tente de commiter fait.txt sur main (L796 : seul un commit qui
+    // touche un fichier du run est refusé ; un commit disjoint passe, test/run-verrou-fichiers-l796.test.ts) ; la session, elle, commite dans son worktree.
     const exec: Executeur = (_args, o) => {
+      writeFileSync(join(o.cwd, 'fait.txt'), 'ok');
       vu.note = sh(dir, env, 'raf', 'note', 'L1', 'écrite pendant le run');
       vu.plan = planText(dir);
+      writeFileSync(join(dir, 'fait.txt'), 'du lead');
+      sh(dir, env, 'git', 'add', 'fait.txt');
+      vu.commit = sh(dir, env, 'git', 'commit', '-qm', 'chore: commit du lead');
+      sh(dir, env, 'git', 'rm', '-q', '--cached', 'fait.txt');
+      sh(dir, env, 'rm', 'fait.txt');
       writeFileSync(join(dir, 'lead.txt'), 'du lead');
       sh(dir, env, 'git', 'add', 'lead.txt');
-      vu.commit = sh(dir, env, 'git', 'commit', '-qm', 'chore: commit du lead');
-      writeFileSync(join(o.cwd, 'fait.txt'), 'ok');
       sh(o.cwd, env, 'git', 'add', 'fait.txt');
       vu.session = sh(o.cwd, env, 'git', 'commit', '-qm', 'feat: travail du run');
       return { stdout: sortie('s1'), code: 0 };
@@ -70,6 +75,7 @@ describe('L695 : dépôt tenu par un programme', () => {
     const commit = vu.commit as ReturnType<typeof sh>;
     expect(commit.status).not.toBe(0);
     expect(commit.stderr).toMatch(/commit refusé : la branche main est tenue par cadence run .* `raf add\|note\|start\|done\|review\|ux\|demande` écrivent dans \.cadence\/plan-en-attente\.yaml/);
+    expect(commit.stderr).toMatch(/fichiers que le run touche aussi : fait\.txt/);
     expect((vu.session as ReturnType<typeof sh>).status).toBe(0);
 
     expect(e.etat).toBe('integre');

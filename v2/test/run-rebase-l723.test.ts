@@ -37,11 +37,16 @@ describe('cadence run : la branche cible avance pendant la porte (L723)', () => 
   it('deux runs : le premier s\'intègre pendant la porte du second ; le second se rebase, rejoue la porte et intègre', () => {
     const repo = depot();
     // Le premier run : sa branche, partie de la même base, qu'il intègre en avance rapide (comme suite() de run.ts) pendant la porte du second.
+    // L796 : les deux runs touchent partage.txt (lignes éloignées : rebase sans conflit) ; deux runs sur des fichiers disjoints ne rejouent plus la porte (run-disjoint-l796).
+    const lignes = Array.from({ length: 12 }, (_, i) => `ligne ${i + 1}`);
+    writeFileSync(join(repo, 'partage.txt'), `${lignes.join('\n')}\n`); git(repo, 'add', '.'); git(repo, ...ID, 'commit', '-qm', 'partage');
     const compte = porte(repo, `git -C ${repo} merge -q --ff-only cadence/run-premier`);
-    git(repo, 'checkout', '-qb', 'cadence/run-premier'); writeFileSync(join(repo, 'premier.txt'), 'ok'); git(repo, 'add', '.'); git(repo, ...ID, 'commit', '-qm', 'ajoute premier.txt');
+    git(repo, 'checkout', '-qb', 'cadence/run-premier');
+    writeFileSync(join(repo, 'partage.txt'), `${[...lignes.slice(0, -1), 'premier'].join('\n')}\n`); writeFileSync(join(repo, 'premier.txt'), 'ok'); git(repo, 'add', '.'); git(repo, ...ID, 'commit', '-qm', 'ajoute premier.txt');
     git(repo, 'checkout', '-q', 'main');
     const { l, out } = io();
-    const e = executerRun({ repo, demande: 'Crée fait.txt', exec: fauxClaude([commite('fait.txt')]), out });
+    const second = (cwd: string) => { writeFileSync(join(cwd, 'partage.txt'), `${['second', ...lignes.slice(1)].join('\n')}\n`); commite('fait.txt')(cwd); };
+    const e = executerRun({ repo, demande: 'Crée fait.txt', exec: fauxClaude([second]), out });
     expect(e.etat).toBe('integre');
     expect(git(repo, 'log', '--format=%s', '-3')).toBe('ajoute fait.txt\najoute premier.txt\nporte');
     expect(passages(compte)).toBe(2); // porte rejouée sur le résultat rebasé
@@ -111,7 +116,8 @@ describe('cadence run : la branche cible avance pendant la porte (L723)', () => 
   });
 
   it('la cible avance à chaque porte : rendu au lead après 3 rebases, avec la raison', () => {
-    const repo = depot(), compte = porte(repo, `git -C ${repo} ${ID.join(' ')} commit -q --allow-empty -m avance`);
+    // L796 : chaque avance change cadence.yaml (la porte), jamais disjointe du run ; un commit vide ou disjoint ne fait plus rendre le run (run-disjoint-l796).
+    const repo = depot(), compte = porte(repo, `echo '# avance' >> ${repo}/cadence.yaml && git -C ${repo} ${ID.join(' ')} commit -qam avance`);
     const e = executerRun({ repo, demande: 'x', exec: fauxClaude([commite('fait.txt')]), out: () => {} });
     expect(e.etat).toBe('refus-integration');
     expect(e.detail).toMatch(/main a encore avancé après 3 rebases/);

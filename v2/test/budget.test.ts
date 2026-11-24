@@ -93,6 +93,8 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // neuve, config changée par déclaration : lignesARelire de scripts/analyse.mjs), sans ligne tassée.
   // L807 : run 1212 (+3) : l'état d'un run s'écrit de façon atomique (sauver : temporaire puis rename, partagé avec clore.ts) ; un lecteur concurrent lisait un
   // JSON vide (test L773 de deux runs --fond rouge à la porte), sans ligne tassée.
+  // L796 : run 1256 (+44) : le run ne tient que ses fichiers (worktree dans le fichier tenu), s'intègre par rebase quand la cible a avancé sur des fichiers
+  // disjoints sans rejouer la porte (rebaserDisjoint, cible_avancee), et commite au lancement le raf start de son lot laissé non commité (commiterStart), sans ligne tassée.
   // L775 : bench 1609 (+21), sequence 717 (+2), mesure 2326 : le détecteur de fuites ignore les appels refusés par le hook du bras (refusParHook, partagé
   // avec lectureReferences), sans ligne tassée.
   // L777 : bench 1672 (+63), mesure 2389 : « tests d'origine verts » compte les tests d'origine réussis par bras (testsReussis, cachesReussis, lus dans les

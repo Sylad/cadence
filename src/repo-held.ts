@@ -3,10 +3,11 @@
 // (L722 : review, ux et le registre des demandes aussi ; L779 : start) mettent leur écriture dans .cadence/plan-en-attente.yaml, que le programme fait appliquer
 // (`raf attente appliquer`) une fois le dépôt rendu.
 // Le format du fichier est partagé avec v2/src/run/run.ts, qui l'écrit lui-même (v2 ne lit pas src/) : { pid, start?, kind, label, branch, since }.
+import { spawnSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parse, stringify } from 'yaml';
-import { PLAN_EN_ATTENTE } from '../scripts/arbre-non-commite.mjs';
+import { nommerFichiers, PLAN_EN_ATTENTE } from '../scripts/arbre-non-commite.mjs';
 import { gitCommonDir, PROGRAM_COMMIT_VAR, tryGit } from './git.js';
 import { holderAlive } from './orchestrate/lock.js';
 import { RafError } from './plan.js';
@@ -20,7 +21,8 @@ const PENDING_LOCK = 'plan-en-attente.lock';
 /** Les écritures mises en attente sur une branche tenue, telles que les messages les nomment. */
 const DEFERRED_WRITES = 'raf add|note|start|done|review|ux|demande';
 
-interface Holder { pid: number; start?: string; kind: string; label: string; branch: string; since: string }
+/** `worktree` (L796) : le worktree d'un cadence run ; le run ne tient alors que les fichiers qu'il y touche. Sans lui (porte dans l'arbre principal), toute la branche. */
+interface Holder { pid: number; start?: string; kind: string; label: string; branch: string; since: string; worktree?: string }
 interface PendingWrite { date: string; tenu: string; argv: string[] }
 
 const heldDir = (root: string) => join(sharedStateDir(root), HELD_DIR);
@@ -66,14 +68,43 @@ const since = (h: Holder) => h.since.slice(11, 16);
 /** Qui applique l'attente : cadence run en rendant le dépôt ; après une porte, le prochain add|note|start|done|review|ux|demande ou `raf attente appliquer`. */
 const applier = (h: Holder) => (h.kind === 'run' ? 'appliqué par le run quand il rend le dépôt' : `appliqué au premier ${DEFERRED_WRITES} après sa fin, ou par raf attente appliquer`);
 
-/** Le refus du pre-commit quand la branche du commit est tenue, avec le geste à faire ; null si elle est libre ou si le commit est celui d'un programme (`commitAsProgram`). */
+/**
+ * L796 (issue #70) : les fichiers qu'un cadence run touche, lus dans son worktree au moment du commit du lead : ceux qu'il change depuis la branche tenue
+ * (depuis leur ancêtre commun : après un rebase, pas ceux des commits de la branche), commités ou non, et ses fichiers non suivis ; null si illisible.
+ * Git est appelé sans les variables GIT_* du hook (GIT_INDEX_FILE désigne l'index de l'arbre principal).
+ */
+function runFiles(h: Holder): Set<string> | null {
+  if (!h.worktree || !existsSync(h.worktree)) return null;
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')));
+  const g = (...a: string[]) => { const r = spawnSync('git', a, { cwd: h.worktree, env, encoding: 'utf8' }); return r.status === 0 ? r.stdout : null; };
+  const base = g('merge-base', h.branch, 'HEAD')?.trim();
+  const diff = base ? g('diff', '--name-only', '--no-renames', '-z', base) : null, others = g('ls-files', '--others', '--exclude-standard', '-z');
+  return diff === null || others === null ? null : new Set(`${diff}\0${others}`.split('\0').filter(Boolean));
+}
+
+/** Les fichiers du commit en cours (index du hook : `GIT_INDEX_FILE` d'un `commit -a` compris) ; null si illisible. */
+function stagedFiles(cwd: string, env: NodeJS.ProcessEnv): string[] | null {
+  const r = spawnSync('git', ['diff', '--cached', '--name-only', '--no-renames', '-z'], { cwd, env: { ...process.env, ...env }, encoding: 'utf8' });
+  return r.status === 0 ? r.stdout.split('\0').filter(Boolean) : null;
+}
+
+/**
+ * Le refus du pre-commit quand la branche du commit est tenue, avec le geste à faire ; null si elle est libre ou si le commit est celui d'un programme (`commitAsProgram`).
+ * L796 : tenue par un cadence run qui a dit son worktree, seul un commit qui touche un fichier du run est refusé ; un commit disjoint passe, le run se rebase
+ * dessus à l'intégration. Fichiers du run ou du commit illisibles : toute la branche, comme avant.
+ */
 export function commitRefusal(cwd: string, env: NodeJS.ProcessEnv = {}): string | null {
   if (env[PROGRAM_COMMIT_VAR]) return null;
   const h = holderHere(cwd);
   if (!h) return null;
-  return `commit refusé : la branche ${h.branch} est tenue par ${h.label} (pid ${h.pid}, depuis ${since(h)}) — un commit ici lui ferait échouer son intégration en avance rapide ou rendrait sa porte non probante. `
-    + `À faire : pour le plan et le registre des demandes, \`${DEFERRED_WRITES}\` écrivent dans ${PENDING_PLAN}, ${applier(h)} (\`raf attente\` le montre) ; `
-    + `pour un autre changement, attendre sa fin (cadence run --liste) puis commiter, ou le commiter sur une autre branche ; --no-verify pour passer outre`;
+  const run = h.kind === 'run' ? runFiles(h) : null, staged = run ? stagedFiles(cwd, env) : null;
+  const communs = run && staged ? staged.filter((f) => run.has(f)) : null;
+  if (communs && !communs.length) return null;
+  const tenue = `commit refusé : la branche ${h.branch} est tenue par ${h.label} (pid ${h.pid}, depuis ${since(h)})`;
+  const quoi = communs ? ` sur les fichiers que le run touche aussi : ${nommerFichiers(communs)} — un commit de ces fichiers ici lui ferait échouer son intégration. `
+    : ' — un commit ici lui ferait échouer son intégration en avance rapide ou rendrait sa porte non probante. ';
+  return `${tenue}${quoi}À faire : pour le plan et le registre des demandes, \`${DEFERRED_WRITES}\` écrivent dans ${PENDING_PLAN}, ${applier(h)} (\`raf attente\` le montre) ; `
+    + `${communs ? 'commiter à part les fichiers que le run ne touche pas (ils passent) ; pour ceux-là, ' : 'pour un autre changement, '}attendre sa fin (cadence run --liste) puis commiter, ou le commiter sur une autre branche ; --no-verify pour passer outre`;
 }
 
 /** Le fichier d'attente du dépôt ; jamais suivi par git (ajouté à info/exclude à la première écriture). */

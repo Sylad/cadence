@@ -56,6 +56,8 @@ export interface Etat extends EtatRapport { id: string; repo: string; branche: s
   spec_check?: boolean;
   /** L794 : le lot du plan est visible (scripts/nouveautes-du-run.mjs) ; `nouveautes` : à la fin, les entrées du commit du run qui le citent (null : git illisible). */
   lot_visible?: boolean; nouveautes?: { entrees: string[] | null; manquante: boolean };
+  /** L796 : la cible a avancé pendant la porte par des commits sur des fichiers que le run ne touche pas : rebasé sur `sur` sans rejouer la porte, qui a jugé `porte`. */
+  cible_avancee?: { sur: string; commits: number; fichiers: string[]; porte: string }[];
   clos?: { date: string; cible: string; tete: string; integre?: boolean; archives?: string[]; restes?: string[]; force?: true } }
 /** `maintenant` et `attendre` : l'horloge et l'attente du quota (D-15), simulées par les tests ; `attendre: null` rend la main sans attendre la remise à zéro. */
 interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null }
@@ -69,15 +71,15 @@ export const fichierRun = (repo: string, id: string) => { const racine = git(rep
 // n'est pas lu comme un état (filtre `.json`) et part avec le run à la purge (annexes de purger.ts).
 export const sauver = (e: Etat) => { const t = `${e.fichier}.${process.pid}.tmp`; writeFileSync(t, JSON.stringify(e, null, 1)); renameSync(t, e.fichier); return e; }; const lireEtat = (f: string) => JSON.parse(readFileSync(f, 'utf8')) as Etat;
 
-// L695 (D-9) : le run tient la branche cible du début à la fin ; le pre-commit de raf (raf hook install) y refuse un commit du lead, qui le ferait
-// échouer en avance rapide, et raf add|note|done|review|ux|demande écrivent dans le plan en attente (L722). Même format que src/repo-held.ts, qui le lit.
+// L695 (D-9) : le run tient la branche cible du début à la fin ; le pre-commit de raf (raf hook install) y refuse un commit du lead sur un fichier que le
+// run touche (L796 : `worktree` dit où les lire ; un commit disjoint passe, le run se rebase dessus à l'intégration), et raf add|note|done|review|ux|demande écrivent dans le plan en attente (L722). Même format que src/repo-held.ts, qui le lit.
 const RAF = fileURLToPath(new URL('../../../bin/raf.js', import.meta.url));
 const fichierTenu = (repo: string) => join(resolve(repo, git(repo, 'rev-parse', '--git-common-dir')), 'cadence', 'tenu', `run-${process.pid}.json`);
 // Revue L695 r1 (D-10) : `start` écrit, un fichier laissé par un run tué (Ctrl-C, SIGKILL, PC éteint) ne tient plus la branche quand son pid est repris.
 function tenir(e: Etat): void {
   const f = fichierTenu(e.repo);
   mkdirSync(dirname(f), { recursive: true });
-  writeFileSync(f, JSON.stringify({ pid: process.pid, start: debutProcessus(process.pid), kind: 'run', label: `cadence run ${e.id}`, branch: e.cible, since: new Date().toISOString() }));
+  writeFileSync(f, JSON.stringify({ pid: process.pid, start: debutProcessus(process.pid), kind: 'run', label: `cadence run ${e.id}`, branch: e.cible, since: new Date().toISOString(), worktree: e.worktree }));
 }
 /**
  * Joue le run en tenant la branche : une exception (un git qui échoue, l'exécuteur qui lève) finit le run en échec et rend le dépôt comme les autres fins.
@@ -328,6 +330,22 @@ function avancer(e: Etat, br: string, cible: string): { avance: boolean; raison:
   return m.status === 0 ? null : { avance: git(e.repo, 'rev-parse', e.cible) !== cible, raison: `${m.stderr}`.trim() || 'avance rapide impossible' };
 }
 
+/** L796 (issue #70) : la cible est passée de `cible` (vue par la porte) à `nouvelle` par des commits disjoints des fichiers du run, sans cadence.yaml (la porte) :
+ * rebase sans conflit possible, porte non rejouée. Un run à commits de régénération (L781) garde le chemin de L723 (ses fichiers générés peuvent en dépendre). */
+function rebaserDisjoint(e: Etat, cible: string, nouvelle: string): NonNullable<Etat['cible_avancee']>[number] | null {
+  if (regenerations(e).length) return null;
+  const run = new Set(fichiersGit(e.worktree, 'diff', '--name-only', '--no-renames', cible, 'HEAD'));
+  const leurs = fichiersGit(e.repo, 'diff', '--name-only', '--no-renames', cible, nouvelle);
+  if (leurs.includes('cadence.yaml') || leurs.some((f) => run.has(f))) return null;
+  const porte = git(e.worktree, 'rev-parse', '--short', 'HEAD');
+  if (essaiGit(e.worktree, 'rebase', '-q', nouvelle).status !== 0) { if (rebaseEnCours(e.worktree)) essaiGit(e.worktree, 'rebase', '--abort'); return null; }
+  return { sur: nouvelle, commits: Number(git(e.repo, 'rev-list', '--count', `${cible}..${nouvelle}`)), fichiers: leurs, porte };
+}
+const cibleAvancee = (e: Etat, a: NonNullable<Etat['cible_avancee']>[number]) => `${e.cible} a avancé pendant la porte sur des fichiers que le run ne touche pas `
+  + `(${a.commits} commit${a.commits > 1 ? 's' : ''}${a.fichiers.length ? ` : ${nommerFichiers(a.fichiers)}` : ''}) : rebasé et intégré sans rejouer la porte, qui a jugé ${a.porte} `
+  + `(L796) ; le sha intégré n'a pas de verdict de porte : le hook pre-push exigera une porte de verify à ce sha`;
+const DISJOINTS_MAX = 10; // une cible qui avance sans fin finit par le chemin de L723 (refus après 3 rebases)
+
 /** Après chaque passage de session : question, commits, puis rebase, porte et avance rapide, rejoués tant que la cible avance (L723). */
 function suite(e: Etat, o: Opts): Etat {
   const q = question(e, o);
@@ -342,7 +360,8 @@ function suite(e: Etat, o: Opts): Etat {
   if (!commandesDeCadenceYaml(e.worktree).length && !o.sansPorte) return arretSansCommande();
   const br = git(e.worktree, 'rev-parse', '--abbrev-ref', 'HEAD');
   for (let rebase = 1; ; rebase++) {
-    const cible = git(e.repo, 'rev-parse', e.cible), arret = rebaser(e, o, cible);
+    let cible = git(e.repo, 'rev-parse', e.cible);
+    const arret = rebaser(e, o, cible);
     if (arret) return arret;
     // Porte complète : une fois ; rouge, la même session corrige une fois et la porte est rejouée (C3 : un seul site de porte) ; L781 : un échec de run.regenerate a sa propre correction.
     for (let rouges = 0, rougesRegeneration = 0; ;) {
@@ -364,7 +383,12 @@ function suite(e: Etat, o: Opts): Etat {
       ouvrirCorrection(e, p.sortie, o.out);
       if (!session(e, `La porte complète est rouge après ton travail :\n${p.sortie}\nCorrige la cause (sans affaiblir aucun test), commite, ${CONSIGNE_FINI}.`, o, false, SUJET_CORRECTION)) return fin(e, o);
     }
-    const refus = avancer(e, br, cible);
+    let refus = avancer(e, br, cible);
+    // L796 : la cible a avancé sur des fichiers disjoints (le lead commite son plan pendant la porte) : rebase et avance rapide, porte non rejouée
+    for (let n = 0, a; refus?.avance && n < DISJOINTS_MAX && (a = rebaserDisjoint(e, cible, git(e.repo, 'rev-parse', e.cible))); n++) {
+      e.cible_avancee = [...(e.cible_avancee ?? []), a]; sauver(e); o.out(cibleAvancee(e, a));
+      cible = a.sur; refus = avancer(e, br, cible);
+    }
     if (!refus) break;
     if (!refus.avance || rebase === REBASES_MAX) {
       e.etat = 'refus-integration'; e.detail = refus.avance ? `${e.cible} a encore avancé après ${REBASES_MAX} rebases : ${refus.raison}` : refus.raison; return fin(e, o);
@@ -375,12 +399,31 @@ function suite(e: Etat, o: Opts): Etat {
   const regenere = regenerations(e);
   // L723 : intégré, mais une fusion écrite par la session est à relire ; L724 : de même pour une correction après porte rouge
   e.detail = [...(e.porte_changee ? [`${e.porte_changee} — à relire : la porte qui a jugé le run est la sienne`] : []), ...(e.analyse_dite ?? []).map((l) => `${l} — à relire`),
-    ...(e.conflits ?? []).filter((c) => c.resolu).map((c) => conflitResolu(e, c)), ...(e.corrections ?? []).filter((c) => c.verte).map(correctionFaite),
+    ...(e.cible_avancee ?? []).map((a) => cibleAvancee(e, a)), ...(e.conflits ?? []).filter((c) => c.resolu).map((c) => conflitResolu(e, c)), ...(e.corrections ?? []).filter((c) => c.verte).map(correctionFaite),
     ...(regenere.length ? [`fichiers générés régénérés par le run avant la porte (run.regenerate, L781) : commit ${regenere.join(', ')}`] : [])].join('\n');
   const registre = registreOuvert(e.worktree);
   noterNouveautes(e);
   retirerRun(e);
   return fin(e, o, registre);
+}
+
+/** L796 (3, issue #70) : un `raf start` laissé non commité faisait rendre son lot refus-integration (~50 min). Un plan qui ne diffère de HEAD QUE par le statut
+ * du lot (et `started`) est commité par le run, hooks compris, au modèle `plan.commit` du projet ; sinon rien, l'avertissement des fichiers non commités reste. */
+function commiterStart(repo: string, lot: string, id: string, out: (l: string) => void): void {
+  const conf = cadenceYaml(repo) as { plan?: { path?: string; commit?: string } } | null, plan = conf?.plan?.path ?? '.cadence/raf.yaml';
+  if (!(fichiersNonCommites(repo) ?? []).includes(plan)) return;
+  const tete = essaiGit(repo, 'show', `HEAD:${plan}`);
+  let avant: { lots?: Record<string, unknown>[] }, apres: typeof avant;
+  try { avant = parse(tete.stdout); apres = parse(readFileSync(join(repo, plan), 'utf8')); } catch { return; }
+  const duLot = (p: typeof avant) => (Array.isArray(p?.lots) ? p.lots.find((l) => l?.id === lot) : undefined), l0 = duLot(avant), l1 = duLot(apres);
+  if (tete.status !== 0 || !l0 || !l1 || l0.status === l1.status) return;
+  l1.status = l0.status;
+  if ('started' in l0) l1.started = l0.started; else delete l1.started;
+  if (JSON.stringify(avant) !== JSON.stringify(apres)) return;
+  const titre = (conf?.plan?.commit ?? 'plan: {lot} {action}').replaceAll('{lot}', lot).replaceAll('{action}', 'démarré').replaceAll('{vague}', `run ${id}`);
+  const r = essaiGit(repo, 'commit', '-q', '-m', titre, '-m', `raf start ${lot} laissé non commité au lancement de cadence run ${id} : commité par le run (L796).`, '--', plan);
+  out(r.status === 0 ? `raf start ${lot} laissé non commité : commité par le run (${titre}, ${git(repo, 'rev-parse', '--short', 'HEAD')})`
+    : `raf start ${lot} laissé non commité : commit refusé (${`${r.stderr}${r.stdout}`.trim().split('\n').at(-1) || `code ${r.status}`}), le run part sans lui`);
 }
 
 /** L794 : run.regenerate déclarée (la consigne dit alors de ne pas régénérer) ; une clé mal formée n'est pas lue ici, la régénération la rendra. */
@@ -426,10 +469,11 @@ export function executerRun(a: { id?: string; repo: string; demande: string; pie
   const repo = git(a.repo, 'rev-parse', '--show-toplevel'), cible = git(repo, 'rev-parse', '--abbrev-ref', 'HEAD');
   referencesDuDepot(repo); // L760 : references: mal formée refusée avant le worktree, comme un modèle inconnu
   if (a.registre && a.registre !== 'humaine') entreeCommitee(repo, a.registre);
-  // L722 : D-1.json modifié à la main pendant un run (13-11) a fait refuser l'intégration ; ce qui n'est pas commité au départ est nommé (lu avant le worktree).
-  const sales = fichiersNonCommites(repo) ?? [];
   const id = a.id ?? nouvelIdRun();
   if (!ID_RUN.test(id)) throw new Error(`cadence run : id de run mal formé : ${id}`);
+  if (a.lot) commiterStart(repo, a.lot, id, a.out); // L796 (3) : avant le worktree, qui part du commit
+  // L722 : D-1.json modifié à la main pendant un run (13-11) a fait refuser l'intégration ; ce qui n'est pas commité au départ est nommé (lu avant le worktree).
+  const sales = fichiersNonCommites(repo) ?? [];
   const runs = dossierRuns(repo), worktree = cheminWorktree(repo, runs, `${basename(repo)}-${id}`); // L705 (C1) : hors du dépôt avec run.worktreeOutside ; état, verrou, journal dans runs
   // L726 : Opus par défaut, Fable à la 3e passe de correction du lot ou après deux revues non conformes (runs précédents du lot, revue du plan au lancement)
   const depart = modeleDeDepart({ modele: choisi, raison: a.modele ? a.modeleRaison ?? '--modele' : 'par défaut' }, a.lot,
@@ -450,7 +494,7 @@ export function executerRun(a: { id?: string; repo: string; demande: string; pie
   verrouiller(e);
   a.out(`cadence run ${id} : session ${modeleDit(modele, depart.raison)} en mode ${aig.mode} (${aig.raison}) dans ${worktree}${aig.migration ? ` ; cadence.yaml : ${aig.migration}` : ''}`);
   if (sales.length) a.out(`cadence run ${id} : l'arbre principal a des modifications non commitées (hors plan en attente) : ${nommerFichiers(sales)} — le run part de `
-    + `${e.base.slice(0, 7)} sans elles ; les commiter sur ${cible} est refusé pendant le run, et un fichier que le run change aussi fera échouer l'intégration`);
+    + `${e.base.slice(0, 7)} sans elles ; les commiter sur ${cible} pendant le run est refusé pour un fichier que le run touche (L796), et un fichier que le run change aussi fera échouer l'intégration`);
   // La ligne « Taille » du brief sert au banc (taille déclarée) ; dans un vrai dépôt, elle casserait commitlint : retirée.
   const nouveautes = a.lot && visible ? consigneNouveautes(a.lot, { maintenant: (a.maintenant ?? (() => new Date()))(), regenere: aRegenerer(worktree) }) : '';
   const demande = `${a.demande}\n\n${a.lot ? `Lot du plan : ${a.lot}. Cite-le dans chaque message de commit, selon les conventions de commit du dépôt (par exemple feat(${a.lot}): …).\n\n` : ''}${nommees.texte}${nouveautes}`

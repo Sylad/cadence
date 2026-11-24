@@ -4156,6 +4156,7 @@ lots:
     notes:
       - { date: 2026-11-23, text: "Précision du lead (23-11) : .cadence/analyse/** ne doit PAS figurer dans paths-ignore ; prévoir le repli pour une nouvelle ref (before = 0000…) et pour un lancement manuel (workflow_dispatch)." }
     started: 2026-11-24
+    review: { date: 2026-11-24, verdict: "conforme après 1 correction (majeur) : docs/analyse.md:224 et changelog.d/L811.md:3 promettent que la commande refuse d'elle-même la mauvaise référence, or departEgalHead (scripts/analyse.mjs:509) ne compare HEAD qu'à son parent ; un push de 2 commits passe avec --contre origin/main — tmp/revue-cadence-L811.md", commit: bd330b326525db6684db0ff9fb035e851a803865 }
   - id: L812
     title: "La porte de cadence rougit sous charge sans changement de code : le 23-11, le run L808 a été rendu 2 fois, Big-Blue étant à une charge de 65 à 79 avec 5 runs. Tests en cause : L563 R13 (dépasse 30 s), mise-en-service L330 (dépasse 120 s), L624 R1 (course). Rejoués seuls, ils sont verts (97/97). Attendu : la porte d'un cadence run règle CADENCE_TEST_WORKERS d'après la charge, ou ces tests tiennent sous charge ; mesure : aucun rendu porte-rouge de cadence dû à un délai sur une semaine. Même famille qu'avatar L68."
     status: todo

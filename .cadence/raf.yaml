@@ -4253,9 +4253,10 @@ lots:
     created: 2026-11-24
   - id: L826
     title: "L826 Issue #73 (compte pro) : un lot config: true reste refusé par la porte même après qu'un commit de correction a retiré ses changements hors config — la règle 4 lit chaque commit de la branche, pas le diff net ; juger le diff net depuis le départ (L824 lit aussi les commits : même question)"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-24
+    started: 2026-11-24
   - id: L827
     title: "L827 raf config <lot> : déclarer un lot config: true par une commande qui écrit la clé dans le plan puis la relit (refus si le lot n'existe pas, s'il est done, ou si le plan est en lecture seule) ; --off pour la retirer. Vécu 24-11 : le lead l'a posée par un script Python qui n'a rien écrit, commit 3dd3af0 annonçant la clé sans la contenir, run L823 refusé par la porte, ~1 h perdue. Mesure : plus aucune édition de .cadence/raf.yaml à la main pour déclarer un lot de config (D-32)"
     status: todo

@@ -16,10 +16,15 @@
     {
       "date": "2026-11-24",
       "texte": "Cause trouvée par le run L826 (lead) : le cgroup init.scope de Big-Blue limitait à 4 915 tâches (pids.max) ; avec 4 runs en parallèle, 4 347 prises au repos, la porte de cadence échouait en EAGAIN sans défaut (5 échecs, une passe de correction). Sylvain a levé la limite le 24-11 (max, drop-in init.scope.d/tasks.conf TasksMax=infinity) ; à vérifier après redémarrage de WSL."
+    },
+    {
+      "date": "2026-11-24",
+      "texte": "Sylvain : « il manque la couverture de code par les tests, et verifier ce qu'ils font, ca me parait ennormes comme nombre de tests ». Relevé du lead : 623 fichiers de test dans cadence, dont 298 lisent docs/CHANGELOG/README/yaml ; aucun outil de couverture (@vitest/coverage absent). L835 couvre : couverture par projet, classement des tests (comportement / texte de doc / config / doublon), utilité d'après l'historique des portes et CI ; le mécanisme générique qui en sortira est un lot à part."
     }
   ],
   "lots": [
     "L834",
-    "L835"
+    "L835",
+    "L838"
   ]
 }

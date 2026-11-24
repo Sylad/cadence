@@ -4031,7 +4031,7 @@ lots:
     estimate: 1
     created: 2026-11-20
     started: 2026-11-24
-    review: { date: 2026-11-24, verdict: "r1 non conforme, 1 majeur (tmp/revue-cadence-L796.md) : run.ts:335-346, rebase sur commits disjoints intégré sans porte rejouée — « disjoint » ne compare que les chemins (test, module importé, package.json, tsconfig, budget.json changés par le lead passent) et maritime-atlas n'a pas de hook pre-push ; décision du lead : rejouer la porte après tout rebase", commit: b51ebd32ec3ce24cf628b4ea9e370adfe0b5fe19 }
+    review: { date: 2026-11-24, verdict: "r2 conforme (lead) : porte rejouée après tout rebase disjoint, exception plan/registre seuls, limite 10 avances → L723 ; 7 cas couverts, 3/7 rouges sans le correctif ; doc ne promet plus le pre-push (maritime n'en a pas)", commit: 0f8eee945b1f909e782475a9fd9ade59b0ec7170 }
   - id: L797
     title: "Suites de L794 (revue r1) : test que bras-sequence-v2d.md ne réintroduit pas l'interdiction des Nouveautés ; « Nouveautés manquante » seulement à la fin définitive du run (pas en attente, échec, quota, run.ts:396) ; pas de consigne « fichier daté du jour » quand une entrée cite déjà le lot (run.ts:338, doublon en correction) ; dossier des Nouveautés en dur (news.dir commun à news, lead et run)"
     status: todo

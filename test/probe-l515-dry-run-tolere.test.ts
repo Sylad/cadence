@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tempDir } from './helpers.js';
 
 const tests = readFileSync(join(import.meta.dirname, '..', '.github/workflows/tests.yml'), 'utf8');
-const step = tests.match(/- name: Suite sous npm publish --dry-run\n(?:\s+continue-on-error: false\n)?\s+run: \|\n((?:\s{10}.*\n)+)/)![1];
+const step = tests.match(/- name: Paquet sous npm publish --dry-run\n(?:\s+continue-on-error: false\n)?\s+run: \|\n((?:\s{10}.*\n)+)/)![1];
 
 const run = (code: number, output: string) => {
   const dir = tempDir();

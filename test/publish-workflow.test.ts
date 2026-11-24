@@ -336,9 +336,9 @@ describe('doublon de run pour un même tag (L64)', () => {
   });
 });
 
-describe('étape « Suite sous npm publish --dry-run » de tests.yml (L515)', () => {
+describe('étape « Paquet sous npm publish --dry-run » de tests.yml (L515, L834)', () => {
   const tests = readFileSync(join(root, '.github/workflows/tests.yml'), 'utf8');
-  const step = tests.match(/- name: Suite sous npm publish --dry-run\n(?:\s+continue-on-error: false\n)?\s+run: \|\n((?:\s{10}.*\n)+)/)?.[1];
+  const step = tests.match(/- name: Paquet sous npm publish --dry-run\n(?:\s+continue-on-error: false\n)?\s+run: \|\n((?:\s{10}.*\n)+)/)?.[1];
 
   // Exécute le script de l'étape tel quel, avec un faux npm qui écrit `output` et sort avec `code`.
   const run = (code: number, output: string) => {

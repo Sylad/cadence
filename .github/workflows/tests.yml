@@ -11,6 +11,14 @@ on:
 permissions:
   contents: read
 
+# Un seul run par rafale de pushes (L834, D-33) : un push sur la même branche annule le run encore en cours, que le suivant remplace.
+# Chaque run joue tout l'arbre de son commit, celui de la pointe contient les commits des runs annulés : rien n'est livré sans
+# avoir été joué (publish.yml, déclenché par les tags, n'est pas dans ce groupe et n'est jamais annulé par lui).
+# Mesure du 24-11 : 23 runs en 3 jours, des pushes à 2 min d'écart joués chacun en entier (~55 min par run).
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   tests:
     runs-on: ubuntu-latest
@@ -74,21 +82,21 @@ jobs:
         run: npm run qualite -- --contre origin/main
       - run: npm test
 
-      # Le run rouge de publish.yml faisait tourner la suite DANS `npm publish` (prepublishOnly), pas à côté : ici de même,
-      # sans --provenance ni jeton, le dry-run ne publie rien. `npm run env` est un script interne de npm : l'environnement donné aux scripts.
-      - name: Environnement que npm donne à ses scripts
-        run: grep -E '^(npm_config_(tmp|cache|prefix|git|ignore_scripts)|TMPDIR|INIT_CWD|HOME|GIT_)' <<< "$(npm run env)" || true
-
-      # Un commit hors release porte une version déjà publiée : npm refuse alors le dry-run APRÈS prepublishOnly (la suite a donc été jouée et passée)
-      # par « You cannot publish over the previously published versions ». Ce seul refus, lu sur une ligne d'erreur de npm comme dans publish.yml
-      # (la sortie de la suite peut citer ces mots sans être un conflit), est toléré ; tout autre échec, dont un rouge de la suite, reste rouge.
-      - name: Suite sous npm publish --dry-run
+      # La suite est jouée une fois par version de Node, par `npm test` ci-dessus (L834). L'étape suivante contrôle le paquet que
+      # publish.yml enverrait (liste des fichiers de `files`, archive, métadonnées) sans rejouer prepublishOnly (typecheck, cliquet
+      # et suite, déjà joués ci-dessus) : --ignore-scripts. dist/ et v2/dist/ sont ceux que `npm ci` a construits (prepare).
+      # Jusqu'à L834 la suite était rejouée ici, dans le cycle de `npm publish` (L224, diagnostic d'un run rouge de publish.yml) :
+      # ce rejeu reste fait avant chaque version par `cadence release` (prepublishOnly en clone neuf, puis npm pack et fumée du
+      # paquet installé), et par publish.yml lui-même (docs/releasing.md).
+      # Un commit hors release porte une version déjà publiée : npm refuse alors le dry-run par « You cannot publish over the previously
+      # published versions ». Ce seul refus, lu sur une ligne d'erreur de npm comme dans publish.yml, est toléré ; tout autre échec reste rouge.
+      - name: Paquet sous npm publish --dry-run
         continue-on-error: false
         run: |
-          if out="$(npm publish --dry-run --access public 2>&1)"; then
+          if out="$(npm publish --dry-run --ignore-scripts --access public 2>&1)"; then
             echo "$out"
           else
             echo "$out"
             grep -qE '^npm (error|ERR!) (code EPUBLISHCONFLICT|.*previously published)' <<< "$out" || exit 1
-            echo "La version de package.json est déjà publiée : npm refuse le dry-run après la suite, c'est attendu hors release."
+            echo "La version de package.json est déjà publiée : npm refuse le dry-run, c'est attendu hors release."
           fi

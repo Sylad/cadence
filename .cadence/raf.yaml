@@ -4237,11 +4237,12 @@ lots:
     started: 2026-11-24
   - id: L824
     title: "L824 Cliquet qualité : un lot déclaré config: true peut faire monter la base, mais seulement à la mesure EXACTE de son sommet (base == mesure, clé par clé, sans marge) — prérequis de L823 (D-31) ; tests + docs/qualite.md"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-24
     started: 2026-11-24
-    review: { date: 2026-11-24, verdict: "conforme après 1 correction — aucun chemin ordinaire ne laisse un lot de code monter la base ; à corriger : commit de fusion compté neutre (constat 1), tests multi-lots et sans scope (constat 3) ; note pour L823 : tests figés (constat 2) (tmp/revue-cadence-L824.md)", commit: 5e58e5f5872f466d31a5783f72657508f45b674d }
+    review: { date: 2026-11-24, verdict: "conforme r2 — relu par le lead (291803f6) : fusion et commit sans fichier ferment la voie, 4 tests ajoutés (S6 refusé, échoue sans le correctif), 309 tests ciblés verts", commit: 291803f6439a67b1d3fd8a10955ba96e75808927 }
+    finished: 2026-11-24
   - id: L825
     title: "L825 raf start (et raf status) écrit .cadence/raf.yaml directement pendant une porte cadence verify --gate jouée dans l'arbre principal, au lieu de passer par plan-en-attente comme add/note/done : la porte de L791 (59472b6) est sortie non probante le 24-11 à cause d'un raf start L823 du lead. Attendu : toute écriture de raf passe en attente tant que main est tenue, avec un test"
     status: todo

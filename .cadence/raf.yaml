@@ -3926,6 +3926,7 @@ lots:
     estimate: 0.25
     created: 2026-11-18
     started: 2026-11-24
+    review: { date: 2026-11-24, verdict: "conforme (lead) : valeur d'affectation lue comme un mot shell (guillemets, $(…), $((…)), backticks imbriqués), splitLine ne coupe plus dans une substitution ; 7 cas dont la ligne exacte de #65 et un vrai écart toujours signalé, 3/7 rouges avant ; 68 tests ci-parity verts (#32 couvert)", commit: 2a26e3cc0dd5bdff3e6c5482a64027e363b9b3ed }
   - id: L781
     title: "cadence run : les commandes de projet qui appellent cadence (npm run news → cadence news build, puis npm run plan) ne peuvent pas tourner dans la session du run ; 3 lots le 18-11 (finance L172, L173 ; warhammer L71 fait à la main) rendus avec nouveautes-data non régénéré, le lead rejoue à chaque fois — les jouer à l'intégration du run (ou autoriser cadence news build dans la session), avec un test"
     status: done

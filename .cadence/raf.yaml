@@ -4507,6 +4507,8 @@ lots:
     status: todo
     estimate: 0.5
     created: 2026-11-25
+    notes:
+      - { date: 2026-11-25, text: "2e occurrence le 25-11 : ol-companion L121, deux passes de porte rouge (ff5dbef puis 7bf5ea5) pour node_modules du backend périmé dans le dossier de run — la 3e passe est partie en Fable pour un npm ci" }
   - id: L868
     title: "cadence run : un fichier dérivé du plan (ex. frontend/public/plan-data/plan.json d'ol-companion, régénéré par raf start dans l'arbre principal) bloque l'intégration (refus-integration « modifications non commitées … que le run modifie aussi ») — vécu ol-companion L121 le 25-11, 1 relance à la main ; mesure : aucun refus d'intégration dû à un fichier dérivé du plan"
     status: todo

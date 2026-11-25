@@ -9,3 +9,4 @@ export function selectionner(racine: string, depart: string, cfg: PorteRapide, y
 export function choisir(racine: string, touches: string[], retires: string[], cfg: PorteRapide, yaml?: unknown): ReturnType<typeof selectionner>;
 export function etapeTests(racine: string, depart: string, cfg: PorteRapide | null, yaml: unknown, complete: string[]): { commandes: string[]; ciblee: boolean; ligne?: string };
 export function jouer(liee: string, complete: string, io?: { out: (t: string) => void; err: (t: string) => void }): number;
+export function lirePorteJouee(commande: string): { liee: string; complete: string } | null;

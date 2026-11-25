@@ -5,6 +5,7 @@ export interface CibleRejeu { fichier: string | null; commande: string; filtre?:
 export type Rejeu = { forme: string; cible: (nom: string, sortie: string) => CibleRejeu | null; raison?: undefined } | { raison: string; forme?: undefined; cible?: undefined };
 export function rejeuDeLaCommande(run: string, declare: string | undefined, dossier: string, partie?: PartiePorte): Rejeu;
 export function rejeuxDesTests(orchestrate: unknown, racine: string): Map<string, Rejeu>;
+export function rejeuDeCommandeJouee(rejeux: Map<string, Rejeu>, commande: string): Rejeu | undefined;
 export function testsReussis(sortie: string): number;
 export function rougesDotnet(sortie: string): string[];
 export function envRejeu(env: NodeJS.ProcessEnv, coeurs?: number): NodeJS.ProcessEnv;

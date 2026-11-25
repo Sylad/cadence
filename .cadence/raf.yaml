@@ -4501,6 +4501,11 @@ lots:
     status: todo
     estimate: 0.5
     created: 2026-11-25
+  - id: L867
+    title: "node_modules d'un dossier de travail de cadence run périmés : le run codex L20 du 25-11 a trouvé un frontend/node_modules du 20-11, d'avant les dépendances eslint/typescript ajoutées par L94 — tsc et eslint ne se lançaient pas, porte rouge, une passe de correction perdue (npm ci à la main). Attendu : au départ du run, si le fichier de verrou des dépendances a changé depuis l'installation liée, réinstaller (ou lier celles de l'arbre principal à jour) ; mesure : aucune porte rouge due à des dépendances périmées"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-25
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

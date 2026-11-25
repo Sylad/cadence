@@ -2,12 +2,12 @@
 // Attendu : à la fin de chaque run (intégré, rendu, échec, interruption), tout ce qu'il a lancé (session, porte, serveurs en arrière-plan) est arrêté, la fin le
 // dit, et rien hors du run n'est touché (un autre run en parallèle survit).
 import { execFileSync, spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { executerRun } from '../src/run/run.js';
+import { executerRun, repondreRun, type Etat } from '../src/run/run.js';
 import { clore } from '../src/run/clore.js';
-import { MARQUE, processusDuRun } from '../src/processus.js';
+import { argsPs, arreterGroupe, arreterProcessusDuRun, dansGroupe, MARQUE, processusDuRun, type AvecGroupe } from '../src/processus.js';
 import { attendre, commite, depot, etats, fauxClaude, vivant } from './run-outils.js';
 import { dossierTemp } from './temp.js';
 
@@ -108,5 +108,91 @@ for i in $(seq 600); do sleep 0.1; done
     await attendre(() => (lu().includes(`processus du run ${e.id} arrêtés`) ? true : undefined), PLAFOND, `le veilleur n'a rien arrêté :\n${lu()}`);
     expect([serveurPid, claudePid].filter(vivant), lu()).toEqual([]);
     expect(processusDuRun(e.id)).toEqual([]);
+  });
+});
+
+// Revue L837 du 25-11 : M1 (système sans /proc, macOS), M2 (démons partagés), M3 (--reponse sur un run interrompu).
+const SANS_PROC = '/proc-absent-l837';
+/** Un id de run neuf pour chaque test (horodatage du test + pid) : ses processus ne se mêlent à rien d'autre. */
+const idNeuf = (n: number) => `20991231${String(n).padStart(6, '0')}-${process.pid}`;
+const avecMarque = (id: string): NodeJS.ProcessEnv => ({ ...process.env, [MARQUE]: id });
+
+describe('sans /proc : les processus du run sont lus par ps (revue L837, M1)', { timeout: PLAFOND }, () => {
+  it('ps (avec l\'environnement) trouve le processus marqué et pas celui d\'un autre run ; la commande affichée ne porte pas l\'environnement ; il est arrêté', () => {
+    const id = idNeuf(1), mien = serveur(avecMarque(id), 'sleep 312'), autre = serveur(avecMarque(`${id}0`), 'sleep 313');
+    tues.push(mien, autre);
+    const vus = processusDuRun(id, { proc: SANS_PROC });
+    expect(vus).toEqual([{ pid: mien, commande: 'sleep 312' }]);
+    expect(arreterProcessusDuRun(id, { proc: SANS_PROC, graceMs: 2000 })).toEqual({ arretes: [{ pid: mien, commande: 'sleep 312' }], restants: [] });
+    expect(vivant(mien)).toBe(false);
+    expect(vivant(autre)).toBe(true);
+  });
+
+  it('arguments de ps : -axEww sur macOS (son -e n\'affiche pas l\'environnement), axeww sous Linux ; sans l\'environnement pour la commande affichée', () => {
+    expect(argsPs('darwin', true)).toEqual(['-axEww', '-o', 'pid=,ppid=,stat=,command=']);
+    expect(argsPs('darwin', false)[0]).toBe('-axww');
+    expect(argsPs('linux', true)[0]).toBe('axeww');
+    expect(argsPs('linux', false)[0]).toBe('axww');
+  });
+
+  it('ni /proc ni ps : rien n\'est dit au départ du run, la fin le dit une fois et l\'état le garde', () => {
+    const src = { proc: SANS_PROC, ps: () => { throw new Error('ps absent'); } }, l: string[] = [], e: AvecGroupe = { id: idNeuf(2) };
+    expect(dansGroupe(e, (x) => l.push(x), () => process.env[MARQUE], src)).toBe(e.id); // le corps joue sous la marque
+    expect(l).toEqual([]);
+    expect(e.processus).toBeUndefined();
+    arreterGroupe(e, (x) => l.push(x), src);
+    expect(l).toEqual([`processus du run ${e.id} non contrôlés : ni /proc ni ps lisibles sur ce système (un serveur lancé par la session peut vivre encore)`]);
+    expect(e.processus).toEqual({ arretes: [], restants: [], controle: false });
+  });
+
+  it('au départ, un run dont rien ne reste ne dit rien (/proc comme ps)', () => {
+    for (const src of [{}, { proc: SANS_PROC }]) {
+      const l: string[] = [];
+      dansGroupe({ id: idNeuf(3) }, (x) => l.push(x), () => 0, src);
+      expect(l).toEqual([]);
+    }
+  });
+});
+
+describe('un démon partagé démarré par le run est épargné, avec ce qui en descend (revue L837, M2)', { timeout: PLAFOND }, () => {
+  it.each([['/proc', {}], ['ps', { proc: SANS_PROC }]])('lu par %s : le serveur tmux marqué et son panneau survivent, le serveur ordinaire est arrêté ; '
+    + 'un panneau marqué sous un tmux sans marque (celui du lead) est arrêté', (_nom, src) => {
+    const dir = dossierTemp('l837-demon-'), tmux = join(dir, 'tmux'), panneau = join(dir, 'panneau.pid'), lead = join(dir, 'lead.pid');
+    symlinkSync(execFileSync('bash', ['-c', 'command -v bash'], { encoding: 'utf8' }).trim(), tmux); // un « tmux » : bash sous ce nom (comm et commande)
+    const id = idNeuf(4);
+    const demon = serveur(avecMarque(id), `${tmux} -c 'sleep 314 & echo $! > ${panneau}; wait'`);
+    const ordinaire = serveur(avecMarque(id), 'sleep 315');
+    // le tmux du lead vit après son panneau (boucle) ; l'id passe par une variable : ps ne distingue pas les arguments de l'environnement
+    const tmuxLead = serveur({ ...process.env, [MARQUE]: '', ID_L837: id }, `${tmux} -c 'env ${MARQUE}="$ID_L837" sleep 316 & echo $! > ${lead}; while :; do sleep 1; done'`);
+    tues.push(demon, ordinaire, tmuxLead);
+    const pidPanneau = execFileSync('bash', ['-c', `for i in $(seq 50); do [ -s ${panneau} ] && [ -s ${lead} ] && break; sleep 0.1; done; cat ${panneau}`], { encoding: 'utf8' });
+    const panneauPid = Number(pidPanneau.trim()), leadPid = lirePid(lead);
+    tues.push(panneauPid, leadPid);
+    const a = arreterProcessusDuRun(id, { ...src, graceMs: 2000 });
+    expect(a?.arretes.map((p) => p.pid).sort()).toEqual([ordinaire, leadPid].sort());
+    expect([demon, panneauPid, tmuxLead].filter(vivant)).toEqual([demon, panneauPid, tmuxLead]);
+    expect([ordinaire, leadPid].filter(vivant)).toEqual([]);
+  });
+});
+
+describe('--reponse sur un run interrompu arrête ce qu\'il a laissé avant de reprendre la session (revue L837, M3)', { timeout: PLAFOND }, () => {
+  it('la session laissée et son serveur sont arrêtés avant la reprise, et le départ le dit ; la reprise finit le run', () => {
+    const repo = depot(), l: string[] = [];
+    const e = executerRun({ repo, demande: 'Crée fait.txt', exec: fauxClaude([commite('autre.txt')]), out: () => {}, attendre: null });
+    expect(e.etat).toBe('porte-rouge');
+    // le run est tué pendant sa session : en-cours sur disque, sans processus qui le tienne (interrompu, L709) ; sa session et un serveur vivent encore
+    writeFileSync(e.fichier, JSON.stringify({ ...JSON.parse(readFileSync(e.fichier, 'utf8')), etat: 'en-cours' } satisfies Partial<Etat>));
+    const laisses = [serveur(avecMarque(e.id), 'sleep 317'), serveur(avecMarque(e.id), 'sleep 318', false)];
+    tues.push(...laisses);
+    const vusALaReprise: number[] = [];
+    const r = repondreRun(e.id, repo, 'reprends', { out: (x) => l.push(x), attendre: null, exec: fauxClaude([(cwd) => {
+      vusALaReprise.push(...laisses.filter(vivant));
+      commite('fait.txt')(cwd);
+    }]) });
+    expect(vusALaReprise, l.join('\n')).toEqual([]);
+    const depart = l.findIndex((x) => x.startsWith(`processus du run ${e.id} arrêtés (2) : `));
+    expect(depart, l.join('\n')).toBeGreaterThanOrEqual(0);
+    for (const p of laisses) expect(l[depart]).toContain(String(p));
+    expect(r.etat, l.join('\n')).toBe('integre');
   });
 });

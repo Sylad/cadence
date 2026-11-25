@@ -14,7 +14,7 @@ import { aiguiller, BRAS_COMPLET, BRAS_LEGER, chemin, modeleRun, referencesDuDep
 import { lignePasses, modeleDeDepart, modeleDit, numeroCorrection, PASSE_FABLE, revueDuPlan, runsDuLot, type Passe, type Revue } from './escalade.js';
 import { heureLocale, reconnaitreQuota, type Quota } from './quota.js';
 import { causeSession } from '../trace.js';
-import { arreterGroupe, dansGroupe, dormir, type GroupeArrete } from '../processus.js';
+import { arreterGroupe, dansGroupe, dormir, type AvecGroupe } from '../processus.js';
 import { CONSIGNE_FINI, garderRapport, origineRapport, type EtatRapport } from '../rapport.js';
 import { cheminWorktree, HOOKS, reglagesRun } from '../socle.js';
 import { briefRegistre, entreeCommitee, preparerRegistre, registreOuvert, registreTouche } from '../registre.js';
@@ -45,7 +45,7 @@ export interface Conflit { cible: string; sur: string; fichiers: string[]; resol
 export interface Correction { rouge: string; message?: string; verte?: boolean; commits?: number; fichiers?: string[] }
 export type EtatRun = 'en-cours' | 'interrompu' | 'attente' | 'quota' | 'sans-commit' | 'echec' | 'conflit' | 'porte-rouge' | 'environnement-perime' | 'sans-porte' | 'refus-integration' | 'integre';
 /** `rapport`, `rapport_tour`, `rapport_sans_marqueur`, `messages` : ../rapport.ts (EtatRapport, issues #57 et #58). */
-export interface Etat extends EtatRapport { id: string; repo: string; branche: string; cible: string; base: string; worktree: string; fichier: string; demande: string;
+export interface Etat extends EtatRapport, AvecGroupe { id: string; repo: string; branche: string; cible: string; base: string; worktree: string; fichier: string; demande: string;
   pieces: string[]; taille: string; mode: 'complet' | 'leger'; modele?: string; acces_cluster: boolean; registre?: string; lot?: string; session: string; cout_usd: number;
   etat: EtatRun; detail: string; debut: string; integre?: string; quota?: Quota; journal?: string; conflits?: Conflit[]; corrections?: Correction[];
   /** L726 (escalade.ts) : pourquoi `modele` ; le run est une correction après revue (un run du lot déjà intégré) ; passes de correction du lot avant ce run ;
@@ -65,7 +65,7 @@ export interface Etat extends EtatRapport { id: string; repo: string; branche: s
   lot_visible?: boolean; nouveautes?: { entrees: string[] | null; manquante: boolean };
   /** L796 : la cible a avancé pendant la porte par des commits sur des fichiers que le run ne touche pas : rebasé sur `sur` ; `porte` a jugé le run avant ;
    * `plan_seul` : les commits arrivés ne touchent que le plan ou le registre, la porte n'est pas rejouée ; sinon elle l'est sur le sha rebasé (revue r1, M1). */
-  cible_avancee?: { sur: string; commits: number; fichiers: string[]; porte: string; plan_seul?: boolean }[]; processus?: GroupeArrete; // L837 (../processus.ts)
+  cible_avancee?: { sur: string; commits: number; fichiers: string[]; porte: string; plan_seul?: boolean }[];
   clos?: { date: string; cible: string; tete: string; integre?: boolean; archives?: string[]; restes?: string[]; force?: true } }
 /** `maintenant` et `attendre` : l'horloge et l'attente du quota (D-15), simulées par les tests ; `attendre: null` rend la main sans attendre la remise à zéro. */
 interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null }
@@ -452,7 +452,8 @@ function retirerRun(e: Etat): void {
 }
 
 function fin(e: Etat, o: Opts, registre = registreOuvert(e.worktree)): Etat {
-  arreterGroupe(e, o.out); if (e.etat !== 'integre' && existsSync(e.worktree)) { e.tete = essaiGit(e.worktree, 'rev-parse', 'HEAD').stdout.trim() || e.tete; noterNouveautes(e); }
+  arreterGroupe(e, o.out); // L837 : tout ce que le run a lancé est arrêté, à chaque fin
+  if (e.etat !== 'integre' && existsSync(e.worktree)) { e.tete = essaiGit(e.worktree, 'rev-parse', 'HEAD').stdout.trim() || e.tete; noterNouveautes(e); }
   rendre(e, o);
   const duree = Math.round((Date.now() - Date.parse(e.debut)) / 1000);
   const ou = e.integre ? ` (${e.cible} = ${e.integre})` : '', rapport = e.rapport_tour ? ` · ${origineRapport(e)}` : '';

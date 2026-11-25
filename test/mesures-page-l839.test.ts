@@ -68,6 +68,15 @@ describe('L839 — compte rendu et code de sortie (sans navigateur)', () => {
     expect(lignes).toEqual(['  ✗ texte tronqué — p.titre : 120 px visibles sur 291 « Un titre » — 375, 1440 px (base)']);
   });
 
+  it('le détail d\'un constat groupé est celui de la plus petite largeur, même avec --largeurs 1440,375', () => {
+    const large = vide(1440);
+    const etroit = vide(375);
+    large.tronques = [{ sel: 'p.titre', visible: 900, contenu: 950, texte: 'Un titre' }];
+    etroit.tronques = [{ sel: 'p.titre', visible: 120, contenu: 291, texte: 'Un titre' }];
+    const lignes = formater(rapport([large, etroit])).split('\n').filter((l) => l.includes('✗'));
+    expect(lignes).toEqual(['  ✗ texte tronqué — p.titre : 120 px visibles sur 291 « Un titre » — 375, 1440 px (base)']);
+  });
+
   it('le défilement horizontal est un constat à lui seul, avec son maximum', () => {
     const a = vide(375);
     a.defilementHorizontal = 241;

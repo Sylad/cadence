@@ -47,7 +47,7 @@ The script reports measures, not verdicts. The reviewer judges each one on the c
 the full title in a tooltip is not a defect. The spacing exception of WCAG 2.5.8 is judged on the capture too.
 
 The text report lists the figures, then the findings **grouped**: the same element with the same text, seen at several widths or in
-several states, is one line that says where (`— 375, 768 px (base, panneau)`), with the detail of the narrowest width. At most
+several states, is one line that says where (`— 375, 768 px (base, panneau)`), with the detail of the narrowest width, whatever the order of `--largeurs`. At most
 `--max` groups per family are listed (5 by default), the rest is counted. `--json` writes every measure; `--captures` writes one
 full-page screenshot per width and state (`mesures-<state>-<width>.png`), which the reviewer opens only when it needs to see one.
 

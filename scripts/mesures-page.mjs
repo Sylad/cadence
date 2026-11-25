@@ -142,10 +142,10 @@ const ou = (vus) => `${[...new Set(vus.map((v) => v.largeur))].join(', ')} px ($
 
 /**
  * Les constats regroupés : un même élément au même texte, vu à plusieurs largeurs ou dans plusieurs états, fait UNE ligne qui dit où ; le
- * détail est celui de la plus petite largeur. `max` groupes par famille au plus (la suite est comptée, le JSON a tout).
+ * détail est celui de la plus petite largeur, quel que soit l'ordre de `--largeurs`. `max` groupes par famille au plus (la suite est comptée, le JSON a tout).
  */
 export function constatsGroupes(r) {
-  const passes = r.passes.filter((p) => !p.erreur);
+  const passes = r.passes.filter((p) => !p.erreur).sort((a, b) => a.largeur - b.largeur);
   const out = [];
   const defil = passes.filter((p) => p.defilementHorizontal > 0);
   if (defil.length) out.push({ famille: 'defilement', nom: 'défilement horizontal', detail: `jusqu'à ${Math.max(...defil.map((p) => p.defilementHorizontal))} px`, vus: defil });

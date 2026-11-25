@@ -69,4 +69,9 @@ Coût attendu : deux revues Opus (~150 k jetons chacune au mode actuel). À joue
 
 ## Résultat du banc complet
 
-Non joué (L839 prépare le banc et le mesure sur le cas réduit seulement, par consigne : il coûte deux revues Opus).
+Non joué sur UXW-36 (il coûte deux revues Opus sur un écran lourd).
+
+Un **banc court** l'a remplacé le 25-11 : la revue de `test/fixtures/mesures/defauts.html` par `claude -p`, 2 essais par bras,
+sans `Mode: script`, avec `Mode: script`, et avec le Code Mode de Claude Code. Les trois bras retrouvent les 7 défauts connus.
+Le mode script coûte autant (+3 %), prend plus de jetons (+71 %) et dure 2,3 fois plus longtemps : sur ce banc il ne remplit
+pas le critère. Chiffres, limites et verdict : [docs/etudes/2026-11-25-code-mode-banc-court.md](../etudes/2026-11-25-code-mode-banc-court.md).

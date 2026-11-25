@@ -212,7 +212,7 @@ function mpMesurer(plafondMots) {
 const FONCTIONS = [mpVisible, mpSel, mpTexte, mpLignes, mpDansUnDefileur, mpDebordements, mpTronques, mpOuCoupe, mpRectsMot, mpNoeudsTexte, mpMotsDuNoeud,
   mpMots, mpLibelleIsole, mpSautsDeLigne, mpCibles, mpPolices, mpLargeurs, mpMesurer];
 
-/** Le code évalué dans la page : il pose `window.__mesures` puis rend les mesures (`plafond` = mots lus au plus). */
+/** Le code évalué dans la page : une expression qui rend les mesures sans rien poser sur `window` (`plafond` = mots lus au plus). */
 export const scriptMesures = (plafond) => `(() => {
 const LIBELLES = ${JSON.stringify(LIBELLES)};
 const CIBLES = ${JSON.stringify(CIBLES)};

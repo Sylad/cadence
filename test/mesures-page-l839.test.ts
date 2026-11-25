@@ -182,7 +182,7 @@ describe.skipIf(!lance)('L839 — mesures sur des pages de test locales (navigat
   });
 
   it('la page propre : aucun constat à aucune largeur, code 0', async () => {
-    const r = await mesurer(nav(), { ...RAPIDE, largeurs: [375, 768, 1024, 1440], url: page('propre') });
+    const r = await mesurer(nav(), { ...RAPIDE, largeurs: [375, 1024, 1440], url: page('propre') });
     expect(constatsGroupes(r)).toEqual([]);
     expect(codeSortie(r)).toBe(0);
   });

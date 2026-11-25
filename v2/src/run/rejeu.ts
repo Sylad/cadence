@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
 import { lignesARelire } from '../../../scripts/analyse.mjs';
-import { jouerRejeu, rejeuxDesTests, rejouerRouges } from '../../../scripts/rejeu-rouges.mjs';
+import { jouerRejeu, rejeuDeCommandeJouee, rejeuxDesTests, rejouerRouges } from '../../../scripts/rejeu-rouges.mjs';
 export { avecMesure } from '../../../scripts/passes-porte-rouge.mjs'; // les commits d'une correction, écrits à côté de la mesure qui les lit
 
 /** Un test rouge dans la suite de la porte, vert rejoué seul. */
@@ -25,7 +25,7 @@ function rejeux(cwd: string) {
 
 /** Les rouges d'une commande de test rejoués seuls ; `vert` : il n'en reste aucun ; `dit` : ce que la sortie rendue à la session ajoute. */
 function rejeuSeul(e: Joueur, c: string, sortie: string, out: (l: string) => void): { vert: boolean; dit: string } {
-  const rejeu = rejeux(e.worktree).get(c), j = rejouerRouges(sortie, rejeu, (x) => jouerRejeu(x, e.worktree));
+  const rejeu = rejeuDeCommandeJouee(rejeux(e.worktree), c), j = rejouerRouges(sortie, rejeu, (x) => jouerRejeu(x, e.worktree));
   if (j.raison) {
     out(`porte du run : rouges non rejoués seuls (L842) — ${j.raison}`);
     return { vert: false, dit: `\nrouges non rejoués seuls (L842) : ${j.raison}` };

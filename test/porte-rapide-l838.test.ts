@@ -1,10 +1,11 @@
 // L838 (D-33, étude L835) : la porte rapide de cadence run — pendant le run, seuls les tests touchés par le diff du lot ; la suite complète reste à la
 // porte de livraison. Sélection déclarée par projet (run.fastGate), repli sûr sur la suite complète dès qu'elle est incertaine.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join, posix } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { aucunTest, commandeDerivee, etapeTests, jouer, lirePorteRapide, selectionner, SCRIPT } from '../scripts/porte-rapide.mjs';
+import { aucunTest, commandeDerivee, etapeTests, jouer, lirePorteJouee, lirePorteRapide, selectionner, SCRIPT } from '../scripts/porte-rapide.mjs';
+import { rejeuDeCommandeJouee, rejeuxDesTests } from '../scripts/rejeu-rouges.mjs';
 import { lireRegeneration } from '../scripts/regeneration.mjs';
 import { cleanupTempDirs, tempDir } from './helpers.js';
 
@@ -51,6 +52,13 @@ describe('lirePorteRapide : la clé run.fastGate de cadence.yaml', () => {
     expect(() => lirePorteRapide({ fastGate: { command: 'x {files}', dir: '../a' } }, {}, 'c.yaml')).toThrow(/run\.fastGate\.dir/);
     expect(() => lirePorteRapide({ fastGate: { command: 'x {files}', full: 'a' } }, {}, 'c.yaml')).toThrow(/run\.fastGate\.full/);
     expect(() => lirePorteRapide({ fastGate: 'oui' }, {}, 'c.yaml')).toThrow(/run\.fastGate : true, ou/);
+  });
+
+  it('revue L838 (m2) : chaque page de docs/ que docs/config.md lie est publiée avec le paquet (pas de lien mort dans le paquet installé)', () => {
+    const racine = join(import.meta.dirname, '..'), files: string[] = JSON.parse(readFileSync(join(racine, 'package.json'), 'utf8')).files;
+    const liees = [...readFileSync(join(racine, 'docs/config.md'), 'utf8').matchAll(/\]\(([^)#:]+\.md)(?:#[^)]*)?\)/g)].map((m) => posix.join('docs', m[1]));
+    expect(liees).toContain('docs/mesures/porte-rapide-l838.md');
+    expect(liees.filter((f) => !files.includes(f))).toEqual([]);
   });
 
   it('run.fastGate est une clé connue de run: (la validation de cadence.yaml l\'accepte)', () => {
@@ -136,6 +144,24 @@ describe('etapeTests et jouer : ce que la porte du run lance', () => {
     expect(sortie.join('')).toContain('aucun test touché trouvé par la commande liée — suite complète jouée');
     for (const t of ['No tests found, exiting with code 1', '=== no tests ran in 0.01s ===']) expect(aucunTest(`x\n${t}`)).toBe(true);
     expect(aucunTest(' Test Files  3 passed (3)\nsee: no tests found later')).toBe(false);
+  });
+
+  it('revue L838 (M1) : lirePorteJouee relit la commande d\'etapeTests (guillemets, espaces) ; rejeuDeCommandeJouee rend le rejeu de la suite qu\'elle remplace', () => {
+    const { r, depart } = depot();
+    ecrire(r, "src/l'a b.ts", 'y\n'); commit(r);
+    const cmd = etapeTests(r, depart, CFG, {}, ['npx vitest run']).commandes[0];
+    expect(lirePorteJouee(cmd)).toEqual({ liee: "npx vitest related --run 'src/l'\\''a b.ts'", complete: 'npx vitest run' });
+    expect(lirePorteJouee('npx vitest run')).toBeNull();
+    expect(lirePorteJouee(`node autre.mjs --jouer a --sinon b`)).toBeNull();
+    const seul = rejeuxDesTests({ test: 'npx vitest run' }, r);
+    expect(rejeuDeCommandeJouee(seul, cmd)).toBe(seul.get('npx vitest run')); // la porte rapide rejoue ses rouges comme la porte complète (vitest : fichier entier)
+    expect(rejeuDeCommandeJouee(seul, 'npx vitest run')).toBe(seul.get('npx vitest run'));
+    expect(rejeuDeCommandeJouee(seul, 'make')).toBeUndefined();
+    // porte en parties : la partie du dossier de la commande liée ; une suite qui n'est pas celle de la porte : la raison le dit
+    const parties = rejeuxDesTests({ test: [{ dir: 'a', run: 'npx jest' }, { dir: 'b', run: 'npx vitest run' }] }, r);
+    const enB = etapeTests(r, depart, { ...CFG, dir: 'src' }, {}, [...parties.keys()]).commandes[0].replace("cd src && ", 'cd b && ');
+    expect(rejeuDeCommandeJouee(parties, enB)).toBe(parties.get('cd b && npx vitest run'));
+    expect(rejeuDeCommandeJouee(seul, enB)).toMatchObject({ raison: expect.stringMatching(/^porte rapide \(run\.fastGate\) : sa suite .* ne désigne pas/) });
   });
 
   it('le script en ligne de commande : usage refusé (code 2), --jouer rend le code de ce qu\'il a joué', () => {

@@ -9,6 +9,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { join } from 'node:path';
 import { commandeDePartie, lirePorteTest } from './etapes-porte.mjs';
+import { lirePorteJouee } from './porte-rapide.mjs';
 import { failedTests, hasUnnamedFailure, isComposedGate, jestTestFiles, NO_TEST_RAN, nodeTestFiles, nodeTestRan, replayFile, replayRanFile, shellArg, stripAnsi } from './rouges-porte.mjs';
 
 /** Au-delà de ce nombre de rouges dans une commande, rien n'est rejoué : la charge fait rougir quelques tests, pas une suite entière. */
@@ -94,6 +95,22 @@ export function rejeuxDesTests(orchestrate, racine) {
   if (!Array.isArray(t.porte)) rejeux.set(t.porte, rejeuDeLaCommande(t.porte, typeof o.testReplay === 'string' ? o.testReplay.trim() : undefined, racine));
   else for (const p of t.porte) rejeux.set(commandeDePartie(p), rejeuDeLaCommande(p.run, p.replay, join(racine, p.dir), p));
   return rejeux;
+}
+
+/**
+ * Le rejeu d'une commande jouée par la porte (`rejeux` : rejeuxDesTests). Revue L838 (M1) : la porte rapide (run.fastGate) joue `porte-rapide.mjs --jouer
+ * <liée> --sinon <suite>` ; ses rouges se rejouent seuls par le rejeu de la suite qu'elle remplace — orchestrate.test, ou la partie dont le dossier est celui
+ * de la commande liée (« cd <dir> && … ») — comme ceux de la porte complète. undefined : commande inconnue de la porte.
+ */
+export function rejeuDeCommandeJouee(rejeux, commande) {
+  if (rejeux.has(commande)) return rejeux.get(commande);
+  const rapide = lirePorteJouee(commande);
+  if (!rapide) return undefined;
+  const suite = [...rejeux.keys()], dans = /^cd \S+ && /.exec(rapide.liee)?.[0];
+  if (suite.length === 1 && suite[0] === rapide.complete) return rejeux.get(suite[0]);
+  const partie = dans && suite.length > 1 && suite.join(' && ') === rapide.complete ? suite.find((c) => c.startsWith(dans)) : undefined;
+  if (partie) return rejeux.get(partie);
+  return { raison: `porte rapide (run.fastGate) : sa suite (« ${rapide.complete} ») ne désigne pas une commande de test de la porte dont rejouer les rouges seuls` };
 }
 
 /** Le nombre écrit juste avant `mot` dans la ligne `t` (« 1 passed »), ou juste après (« Passed: 1 ») ; null sans nombre. */

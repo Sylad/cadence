@@ -61,6 +61,28 @@ describe('cadence run : porte rapide déclarée (run.fastGate, L838)', () => {
     expect(e.portes?.map((p) => p.ok)).toEqual([false, true]);
   });
 
+  it('revue L838 (M1) : un rouge nommé de la porte rapide, vert rejoué seul, est sensible à la charge (L842) : aucune correction, aucun verdict noté', () => {
+    // faux lanceur : « --lie » imprime un rouge nommé (la porte rapide) ; un fichier seul (le rejeu de testReplay) est vert ; sans argument (suite complète) : trace
+    const repo = depot(), trace = join(repo, '..', 'trace.txt'), { l, out } = io(), appels: unknown[] = [];
+    writeFileSync(join(repo, 'lanceur.sh'), `if [ $# -eq 0 ]; then echo complete >> ${trace}; exit 0; fi
+if [ "$1" = --lie ]; then echo ' FAIL  a.test.ts > s > charge'; exit 1; fi
+echo " ✓ $1 (2 tests)"; echo ' Tests  2 passed (2)'; exit 0\n`);
+    writeFileSync(join(repo, 'cadence.yaml'), 'orchestrate:\n  test: bash lanceur.sh\n  testReplay: bash lanceur.sh {files}\nrun:\n  fastGate:\n    command: bash lanceur.sh --lie {files}\n');
+    git(repo, 'add', '-A'); git(repo, ...ID, 'commit', '-qm', 'porte rapide');
+    const e = executerRun({ repo, demande: 'Fais-le', lot: 'L9', exec: fauxClaude([commite('fait.txt')], appels as never), out });
+    expect(e.etat).toBe('integre');
+    expect(appels).toHaveLength(1); // la session du travail seule, aucune passe de correction
+    expect(e.corrections).toBeUndefined();
+    expect(lire(trace)).toBe(''); // ni la suite complète, ni « commande de test inconnue de la porte »
+    expect(l.join('\n')).not.toContain('rouges non rejoués seuls');
+    expect(e.sensibles_charge).toEqual([expect.objectContaining({ test: 'a.test.ts > s > charge' })]);
+    expect(l.join('\n')).toMatch(/test sensible à la charge : a\.test\.ts > s > charge — rouge dans la suite, vert rejoué seul/);
+    expect(e.portes?.at(-1)).toMatchObject({ ciblee: true, ok: true });
+    const integre = git(repo, 'rev-parse', 'main');
+    expect(verdictPour(repo, integre)).toBeNull();
+    expect(l.join('\n')).toContain(`porte du run : aucun verdict noté pour ${integre.slice(0, 7)} — la porte rapide (run.fastGate, L838) n'a joué que les tests touchés ; des rouges de la suite ont été excusés`);
+  });
+
   it('cadence.yaml sans run.fastGate : la suite complète, comme avant, et son verdict', () => {
     const repo = depot(), { l, out } = io();
     const e = executerRun({ repo, demande: 'Fais-le', lot: 'L9', exec: fauxClaude([commite('fait.txt')]), out });

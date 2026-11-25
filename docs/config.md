@@ -148,7 +148,8 @@ declares for them and the tests that cite the name of a touched file that is not
 import it). **The full suite is played instead, and the run says why**, whenever the selection is uncertain: a file deleted or moved (the tests
 that imported it cannot be found from the diff), a file of `full` touched, a file outside `dir`, no file at all, or a command that finds no test
 (`No test files found`, `No tests found`, `no tests ran`). A green fast gate records **no verdict** for the sha: the delivery gate plays the
-whole suite. The state of the run keeps each gate it played (`portes`: targeted or not, green or red, seconds) and the integrated detail says
+whole suite. A red test of a fast gate is first replayed alone, like one of the full gate (L842), through the replay of the suite it stands
+for (`testReplay`, deduced launcher, or the replay of the part whose folder is `dir`). The state of the run keeps each gate it played (`portes`: targeted or not, green or red, seconds) and the integrated detail says
 « porte rapide (run.fastGate) : tests touchés par N fichier(s) du lot ; la suite complète se joue à la porte de livraison ». A malformed key
 (no `{files}`, a command that cannot be derived, a `dir` outside the repository) is refused by `cadence run` (state `sans-porte`) and by the
 gate that validates `cadence.yaml`. Measure on cadence itself: [porte-rapide-l838](mesures/porte-rapide-l838.md).

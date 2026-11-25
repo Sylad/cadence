@@ -149,6 +149,13 @@ export function etapeTests(racine, depart, cfg, yaml, complete) {
   return { commandes: [cmd], ciblee: true, ligne: `porte rapide (run.fastGate) : tests touchés par ${s.fichiers.length} fichier(s) du lot ; la suite complète se joue à la porte de livraison (cadence verify --gate)` };
 }
 
+/** L'inverse de la commande d'`etapeTests` : `{ liee, complete }` d'un `--jouer` de ce script (mots relus comme les écrit argShell), null pour toute autre
+ * commande. Revue L838 (M1) : le rejeu seul des rouges (L842, scripts/rejeu-rouges.mjs) retrouve ainsi la suite dont la porte rapide tient lieu. */
+export function lirePorteJouee(commande) {
+  const mots = [...commande.matchAll(/(?:'[^']*'|\\.|[^\s'\\])+/g)].map((m) => m[0].replace(/'([^']*)'|\\(.)/g, (_, q, e) => q ?? e));
+  return mots.length === 6 && mots[1] === SCRIPT && mots[2] === '--jouer' && mots[4] === '--sinon' ? { liee: mots[3], complete: mots[5] } : null;
+}
+
 /** `--jouer <commande liée> --sinon <suite complète>` : la commande liée ; si son lanceur n'a trouvé aucun test, la suite complète. Code : celui de la dernière jouée. */
 export function jouer(liee, complete, io = { out: (t) => process.stdout.write(t), err: (t) => process.stderr.write(t) }) {
   const r = spawnSync('bash', ['-c', liee], { encoding: 'utf8', maxBuffer: 256 << 20 });

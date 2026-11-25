@@ -106,8 +106,8 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // scripts/rejeu-rouges.mjs, la lecture des rouges dans scripts/rouges-porte.mjs, partagée avec src) et chaque correction note ses commits (avecMesure, dans scripts/passes-porte-rouge.mjs avec la mesure qui les lit) ; somme du noyau 2998, sous les 3000 du design, sans ligne tassée.
   // Revue L842 (B1) : run 1331 (+2, dans src/run/rejeu.ts) : la porte du run ne note aucun verdict quand des rouges ont été excusés (verify --gate en décide) ; somme du noyau 3000.
   // L838 (rebase sur L842) : run 1370 (+39) ; accueil 161 (-39, module pas encore écrit, 0 ligne mesurée) pour garder la somme du noyau à 3000.
-  // L837 (revue, mineur 5) : run 1371 mesurées après L838 (+1, budget 1370 non tenu) : l'appel d'arrêt de fin() rendu à sa propre ligne ; le champ processus de l'état passe à
-  // src/processus.ts (AvecGroupe, avec la lecture par /proc ou ps et les démons partagés épargnés). La somme du noyau est à 3000 : relever run attend Sylvain, sans ligne tassée.
+  // L837 (revue, mineur 5) : run 1370 mesurées après L838, budget inchangé : l'appel d'arrêt de fin() rendu à sa propre ligne (+1), une ligne vide en double retirée de
+  // run.ts (-1) ; le champ processus de l'état passe à src/processus.ts (AvecGroupe, avec la lecture par /proc ou ps et les démons partagés épargnés), sans ligne tassée.
   // L775 : bench 1609 (+21), sequence 717 (+2), mesure 2326 : le détecteur de fuites ignore les appels refusés par le hook du bras (refusParHook, partagé
   // avec lectureReferences), sans ligne tassée.
   // L777 : bench 1672 (+63), mesure 2389 : « tests d'origine verts » compte les tests d'origine réussis par bras (testsReussis, cachesReussis, lus dans les

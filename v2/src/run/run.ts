@@ -530,7 +530,6 @@ export function repondreRun(id: string, repo: string, reponse: string, o: Opts):
   } finally { rendreVerrou(fichierVerrou(f)); }
 }
 
-
 /** D-15 : un run en quota attend l'heure de remise à zéro, puis reprend la même session dans le même worktree. Pendant l'attente, la branche est rendue (fin()
  * est passé) : le lead travaille ; le verrou reste à ce processus (rôle « attente », D-18) : un --reponse est refusé. Relue à chaque tranche, un état changé
  * à la main (plus en quota, autre heure) ou un verrou qui n'est plus le sien arrête cette attente. */

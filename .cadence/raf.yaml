@@ -4341,11 +4341,12 @@ lots:
       - { date: 2026-11-25, text: "Précision du 25-11 (lead) : le « Code Mode » de la vidéo est une fonction expérimentale de Claude Code (doc https://code.claude.com/docs/en/code-mode.md, suivie dans veille/code-mode/) : Claude écrit du JavaScript qui enchaîne ses outils (Bash, Read, Edit, MCP) en une étape, seul le résultat lu revient au contexte. S'active par la variable CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1 (env de la commande, sans toucher settings.json), marche avec claude -p et les sous-agents (outil REPL dans leur liste tools). Banc révisé : un même lot ou une même revue UX déjà faite, rejoué avec et sans la variable ; mesures : tokens, coût, durée, défauts connus retrouvés. Limites à vérifier : auto mode juge le code et non chaque appel, hooks PreToolUse (arret-18h30, pipefail) qui doivent encore voir les commandes, exécution > 10 min." }
   - id: L840
     title: "Un cadence run d'adoption (D-31) peut lancer cadence analyse : ses runs s'arrêtent sinon sur une question"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-25
     notes:
       - { date: 2026-11-25, text: "Vécu 25-11 : finance L183, ol L270, jobmail L23/L24, evatosorus L54, discotheque L25 — la session du run s'est vu refuser cadence analyse --init (sauf finance, qui l'a pu) ; ~20 min d'arrêt par run au premier cas, puis le lead écrit la base dans le worktree et reprend par --reponse. Mesure : prochaines adoptions (avatar L75, codex L94, warhammer L254, maritime QA-AN1) sans arrêt." }
+    started: 2026-11-25
   - id: L841
     title: "Issue 74 (compte pro) : raf demande new \"<texte>\" crée une entrée du registre (D-n suivant, texte mot pour mot, ouverte), mise en attente sur une branche tenue comme raf add ; aujourd'hui l'entrée s'écrit à la main et attend la fin du run pour être commitée"
     status: todo

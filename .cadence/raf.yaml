@@ -3510,6 +3510,7 @@ lots:
     finished: 2026-11-15
     notes:
       - { date: 2026-11-16, text: "16-11, réponse du compte pro (boîte entre-claudes) : plus aucune vague depuis le 02-11, ~90 cadence run depuis le 10-11 ; rien ne casse chez lui. Écarts réels à trancher avant le retrait : run n'a ni testReplay, ni probe, ni acceptation scellée ; cadence-hud lit encore ~/.cadence/orchestrate/ (waves/, hud-context/)." }
+      - { date: 2026-11-25, text: "25-11 : R0 fait — réponse écrite du compte pro (boîte, 2026-11-24-tests-pertinence.md, section pro 25-11 09:56) : vagues plus utilisées, liste des commandes vivantes juste, Q1 complète, Q2 ligne des créneaux suffit, Q3 garder ux-reviewer seul, Q4 rebrancher inspecteur et perf, Q5 porte: + migrate + avertir ; validé par Sylvain le 25-11. Lots R1 à R7 ajoutés." }
   - id: L728
     title: "Issue #58 du compte pro : cadence run garde comme rapport le message du tour du prompt quand la session finit ce tour avec un travail encore en arrière-plan (« la recette tourne, je surveille ») et donne son vrai rapport dans un tour ouvert plus tard par une notification — l'inverse de #57 (L720). Le rapport est celui du dernier tour qui finit sans tâche de fond restante ; à défaut, le dernier message, et la fin de run dit de quel tour il vient"
     status: done
@@ -4357,6 +4358,8 @@ lots:
     status: todo
     estimate: 1
     created: 2026-11-25
+    notes:
+      - { date: 2026-11-25, text: "25-11 : choisi par Sylvain comme premier gain de l'étude D-33 (« Rejeu avant correction ») ; à lancer dès que L840 rend le dépôt (même code de cadence run), avant les bancs de 12 h si le temps le permet" }
   - id: L843
     title: "(D-33, étude docs/etudes/2026-11-25-temps-lot-prod-et-tests.md §5 P4) Garde contre les tests à l'horloge murale : le cliquet d'analyse refuse dans un test neuf un performance.now()/Date.now() comparé à une borne absolue ; reprise des 13 tests cadence cités. Mesure : rouges « charge » par semaine → 0"
     status: todo
@@ -4391,6 +4394,41 @@ lots:
     title: "(D-33, étude docs/etudes/2026-11-25-temps-lot-prod-et-tests.md §5 P12) Tests de texte de doc : un contrôleur unique (liens, ancres, bornes) remplace les « la page dit X » liés à un lot passé. Mesure : rouges « doc » par mois"
     status: todo
     estimate: 1
+    created: 2026-11-25
+  - id: L850
+    title: "Retrait des vagues R1 : couper cadence orchestrate et supprimer les fichiers « vagues seulement » (docs/etudes/retrait-vagues.md §4 ; réponse du compte pro du 25-11, validée par Sylvain)"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-25
+  - id: L851
+    title: "Retrait des vagues R2, après R1 : retirer les déclarations de vague des 31 fichiers mixtes et élaguer les cas pilote (docs/etudes/retrait-vagues.md §4, mesure de fin au tableau)"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-25
+  - id: L852
+    title: "Retrait des vagues R3, après R2 : réécrire les 892 cas de test mixtes sans montage de vague (docs/etudes/retrait-vagues.md §4, mesure de fin au tableau)"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-25
+  - id: L853
+    title: "Retrait des vagues R4, après R3 : gardes de vague du second ordre (deliver, pre-push, spec reseal/green, raf done, lead tour…) ; créneaux = plafond − lead hold − cadence run, la ligne de lead tour suffit (Q2 du pro) (docs/etudes/retrait-vagues.md §4, mesure de fin au tableau)"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-25
+  - id: L854
+    title: "Retrait des vagues R5, après R4 : rebrancher cadence-inspector et l'en-tête perf (perf, corrections, inspect) sur les journaux de cadence run (Q4 du pro) (docs/etudes/retrait-vagues.md §4, mesure de fin au tableau)"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-25
+  - id: L855
+    title: "Retrait des vagues R6, après R4 : extraire le vivant hors de src/orchestrate/ puis supprimer le dossier ; renommer la clé orchestrate: en porte: avec cadence migrate, avertir (pas refuser) sur les clés inconnues (Q5 du pro) (docs/etudes/retrait-vagues.md §4, mesure de fin au tableau)"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-25
+  - id: L856
+    title: "Retrait des vagues R7, après R5 et R6 : docs porte.md et acceptation.md ; garder ux-reviewer (maquette et conformité), retirer acceptance-writer, spec-writer, precheck-reader (Q3 du pro) ; publier en 3.0.0 (docs/etudes/retrait-vagues.md §4, mesure de fin au tableau)"
+    status: todo
+    estimate: 0.5
     created: 2026-11-25
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

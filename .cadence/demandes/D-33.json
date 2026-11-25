@@ -1,30 +1,35 @@
 {
-  "id": "D-33",
-  "texte": "ce que j'aimerais qu'on regarde aussi c'est qu'est-ce qui ralenti, est ce que l'on peu mutualiser des traitements CI, banc de tests, etc... (comme l'histoire des CI lancé sur plusieurs lots par exemple)",
-  "date": "2026-11-24",
-  "etat": "ouverte",
-  "preuve": "",
-  "precisions": [
-    {
-      "date": "2026-11-24",
-      "texte": "Sylvain : « l'idée est de ne pas ralentirs les dev »"
-    },
-    {
-      "date": "2026-11-24",
-      "texte": "Premiers relevés (lead) : CI « tests » de cadence ~55 min par push sur main (23 runs en 3 jours, 6 rouges), sans annulation des runs dépassés (pushes à 2 min d'écart joués en entier), suite jouée 4 fois par push (npm test et publish --dry-run, sous Node 22 et 24) ; warhammer « Contrôles frontend » 14 min par lot (20 runs). Lots mis en attente du plan : CI mutualisée (0,5 j) et étude tous projets (1 j)."
-    },
-    {
-      "date": "2026-11-24",
-      "texte": "Cause trouvée par le run L826 (lead) : le cgroup init.scope de Big-Blue limitait à 4 915 tâches (pids.max) ; avec 4 runs en parallèle, 4 347 prises au repos, la porte de cadence échouait en EAGAIN sans défaut (5 échecs, une passe de correction). Sylvain a levé la limite le 24-11 (max, drop-in init.scope.d/tasks.conf TasksMax=infinity) ; à vérifier après redémarrage de WSL."
-    },
-    {
-      "date": "2026-11-24",
-      "texte": "Sylvain : « il manque la couverture de code par les tests, et verifier ce qu'ils font, ca me parait ennormes comme nombre de tests ». Relevé du lead : 623 fichiers de test dans cadence, dont 298 lisent docs/CHANGELOG/README/yaml ; aucun outil de couverture (@vitest/coverage absent). L835 couvre : couverture par projet, classement des tests (comportement / texte de doc / config / doublon), utilité d'après l'historique des portes et CI ; le mécanisme générique qui en sortira est un lot à part."
-    }
-  ],
-  "lots": [
-    "L834",
-    "L835",
-    "L838"
-  ]
+ "id": "D-33",
+ "texte": "ce que j'aimerais qu'on regarde aussi c'est qu'est-ce qui ralenti, est ce que l'on peu mutualiser des traitements CI, banc de tests, etc... (comme l'histoire des CI lancé sur plusieurs lots par exemple)",
+ "date": "2026-11-24",
+ "etat": "ouverte",
+ "preuve": "",
+ "precisions": [
+  {
+   "date": "2026-11-24",
+   "texte": "Sylvain : « l'idée est de ne pas ralentirs les dev »"
+  },
+  {
+   "date": "2026-11-24",
+   "texte": "Premiers relevés (lead) : CI « tests » de cadence ~55 min par push sur main (23 runs en 3 jours, 6 rouges), sans annulation des runs dépassés (pushes à 2 min d'écart joués en entier), suite jouée 4 fois par push (npm test et publish --dry-run, sous Node 22 et 24) ; warhammer « Contrôles frontend » 14 min par lot (20 runs). Lots mis en attente du plan : CI mutualisée (0,5 j) et étude tous projets (1 j)."
+  },
+  {
+   "date": "2026-11-24",
+   "texte": "Cause trouvée par le run L826 (lead) : le cgroup init.scope de Big-Blue limitait à 4 915 tâches (pids.max) ; avec 4 runs en parallèle, 4 347 prises au repos, la porte de cadence échouait en EAGAIN sans défaut (5 échecs, une passe de correction). Sylvain a levé la limite le 24-11 (max, drop-in init.scope.d/tasks.conf TasksMax=infinity) ; à vérifier après redémarrage de WSL."
+  },
+  {
+   "date": "2026-11-24",
+   "texte": "Sylvain : « il manque la couverture de code par les tests, et verifier ce qu'ils font, ca me parait ennormes comme nombre de tests ». Relevé du lead : 623 fichiers de test dans cadence, dont 298 lisent docs/CHANGELOG/README/yaml ; aucun outil de couverture (@vitest/coverage absent). L835 couvre : couverture par projet, classement des tests (comportement / texte de doc / config / doublon), utilité d'après l'historique des portes et CI ; le mécanisme générique qui en sortira est un lot à part."
+  },
+  {
+   "date": "2026-11-25",
+   "texte": "25-11 (lead) : étude L835 livrée (docs/etudes/2026-11-25-temps-lot-prod-et-tests.md, poussée). Verdict : le temps part dans les portes rouges (17 % seulement attrapent un vrai défaut, 41 % tests sensibles à la charge, 20 % environnement) et dans l'attente fin de run → livraison (p90 1,7 à 3 h), pas dans la CI (1 à 4 min, warhammer 10). Couverture : cadence 96 %, trous maritime frontend 54 % et warhammer backend 58 %. 52 % du temps de la suite de cadence = tests des vagues (retrait au plan). Lots ouverts : L842 à L849 (cadence), warhammer P7 (CI), maritime P10 (journal d'étapes, à ouvrir quand son run rend le plan), L838 (porte rapide)."
+  }
+ ],
+ "lots": [
+  "L834",
+  "L835",
+  "L838",
+  "L842"
+ ]
 }

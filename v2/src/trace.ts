@@ -4,6 +4,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { constants } from 'node:os';
+import { arreterProcessusDuRun, lignesArret } from './processus.js';
 
 /** Les lignes qui disent pourquoi un run s'est arrêté commencent ainsi ; --liste montre la dernière d'un run interrompu. */
 export const CAUSE = 'cause d\'arrêt';
@@ -56,8 +57,12 @@ export function veiller(args: string[], env: NodeJS.ProcessEnv, cwd: string, out
   const gestion = SIGNAUX.map((s) => [s, recu(s)] as const);
   for (const [s, g] of gestion) process.on(s, g);
   return new Promise((fini) => run.on('exit', (code, signal) => {
+    // L837 : un run tué (signal) n'a pas joué sa fin : le veilleur arrête les processus qui portent sa marque (session, porte, serveurs). Avant la ligne de
+    // fin du run : l'enveloppe de la session, arrêtée ici, écrit sa propre cause, et la dernière cause du journal (--liste) reste celle du run.
+    const arret = env.CADENCE_RUN_ID ? lignesArret(env.CADENCE_RUN_ID, arreterProcessusDuRun(env.CADENCE_RUN_ID)) : [];
     if (signal) out(ligneCause(`le processus du run (pid ${run.pid}) a reçu ${signal} et s'est arrêté (code ${128 + (constants.signals[signal] ?? 0)})`));
     else out(`fin du processus du run (pid ${run.pid}, ${horodatage()}) : code ${code}`);
+    for (const l of arret) out(l);
     if (signale) { clearTimeout(grace); return mourir(); } // le veilleur signalé ne rend pas la main : il meurt de son signal
     for (const [s, g] of gestion) process.off(s, g);
     fini(signal ? 128 + (constants.signals[signal] ?? 0) : code ?? 1);

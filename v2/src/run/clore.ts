@@ -4,6 +4,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { etatVu, occupantRun, oublierReglages, sauver, type Etat } from './run.js';
+import { arreterEtDire } from '../processus.js';
 
 /** Un run qui vit encore ou se reprend (--reponse) n'est pas fini : ni « intégré à la main », ni clos — sauf, sans processus vivant, quand sa tête est déjà
  * sur la cible (L767). */
@@ -101,6 +102,7 @@ export function clore(e: Etat, out: (l: string) => void): number {
   const p = occupantRun(e.fichier);
   // L767 : un run qui se reprend se clôt seulement quand aucun processus ne le tient et que sa tête est déjà sur la cible (intégré à la main)
   if (p || (REPRENABLES.includes(vu) && !integration(e).integre)) return refus(`le run est ${vu}${p ? ` (processus ${p.pid})` : ''} : il se reprend (cadence run --reponse ${e.id} "…") ou s'attend, il ne se clôt pas`);
+  arreterEtDire(e.id, out); // L837 : un run tué peut laisser sa session ou un serveur ; aucun processus ne tient le run
   let wt: ReturnType<typeof worktreeConnu>, tetes: Tete[];
   try {
     wt = worktreeConnu(e); tetes = tetesDuRun(e, wt);

@@ -14,6 +14,7 @@ import { aiguiller, BRAS_COMPLET, BRAS_LEGER, chemin, modeleRun, referencesDuDep
 import { lignePasses, modeleDeDepart, modeleDit, numeroCorrection, PASSE_FABLE, revueDuPlan, runsDuLot, type Passe, type Revue } from './escalade.js';
 import { heureLocale, reconnaitreQuota, type Quota } from './quota.js';
 import { causeSession } from '../trace.js';
+import { arreterGroupe, dansGroupe, dormir, type GroupeArrete } from '../processus.js';
 import { CONSIGNE_FINI, garderRapport, origineRapport, type EtatRapport } from '../rapport.js';
 import { cheminWorktree, HOOKS, PORTE_MS, reglagesRun } from '../socle.js';
 import { briefRegistre, entreeCommitee, preparerRegistre, registreOuvert, registreTouche } from '../registre.js';
@@ -61,7 +62,7 @@ export interface Etat extends EtatRapport { id: string; repo: string; branche: s
   lot_visible?: boolean; nouveautes?: { entrees: string[] | null; manquante: boolean };
   /** L796 : la cible a avancé pendant la porte par des commits sur des fichiers que le run ne touche pas : rebasé sur `sur` ; `porte` a jugé le run avant ;
    * `plan_seul` : les commits arrivés ne touchent que le plan ou le registre, la porte n'est pas rejouée ; sinon elle l'est sur le sha rebasé (revue r1, M1). */
-  cible_avancee?: { sur: string; commits: number; fichiers: string[]; porte: string; plan_seul?: boolean }[];
+  cible_avancee?: { sur: string; commits: number; fichiers: string[]; porte: string; plan_seul?: boolean }[]; processus?: GroupeArrete; // L837 (../processus.ts)
   clos?: { date: string; cible: string; tete: string; integre?: boolean; archives?: string[]; restes?: string[]; force?: true } }
 /** `maintenant` et `attendre` : l'horloge et l'attente du quota (D-15), simulées par les tests ; `attendre: null` rend la main sans attendre la remise à zéro. */
 interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null }
@@ -92,7 +93,7 @@ function tenir(e: Etat): void {
 function tenu(e: Etat, o: Opts, corps: () => Etat): Etat {
   tenir(e); const retirer = inscrireCreneau(e); // L710 : le run vivant prend un créneau de sessions (../verrou.ts)
   try {
-    return corps();
+    return dansGroupe(e, o.out, corps); // L837 : ce qu'un run tué a laissé est arrêté ; tout ce que le run lance porte sa marque, fin() l'arrête
   } catch (x) {
     e.etat = 'echec'; e.detail = `erreur pendant le run : ${(x as Error).message ?? x}`;
     return fin(e, o);
@@ -459,7 +460,7 @@ function retirerRun(e: Etat): void {
 }
 
 function fin(e: Etat, o: Opts, registre = registreOuvert(e.worktree)): Etat {
-  if (e.etat !== 'integre' && existsSync(e.worktree)) { e.tete = essaiGit(e.worktree, 'rev-parse', 'HEAD').stdout.trim() || e.tete; noterNouveautes(e); }
+  arreterGroupe(e, o.out); if (e.etat !== 'integre' && existsSync(e.worktree)) { e.tete = essaiGit(e.worktree, 'rev-parse', 'HEAD').stdout.trim() || e.tete; noterNouveautes(e); }
   rendre(e, o);
   const duree = Math.round((Date.now() - Date.parse(e.debut)) / 1000);
   const ou = e.integre ? ` (${e.cible} = ${e.integre})` : '', rapport = e.rapport_tour ? ` · ${origineRapport(e)}` : '';
@@ -536,8 +537,6 @@ export function repondreRun(id: string, repo: string, reponse: string, o: Opts):
   } finally { rendreVerrou(fichierVerrou(f)); }
 }
 
-/** Attente bloquante, sans processus fils (le run est synchrone de bout en bout). */
-const dormir = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 /** D-15 : un run en quota attend l'heure de remise à zéro, puis reprend la même session dans le même worktree. Pendant l'attente, la branche est rendue (fin()
  * est passé) : le lead travaille ; le verrou reste à ce processus (rôle « attente », D-18) : un --reponse est refusé. Relue à chaque tranche, un état changé

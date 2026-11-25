@@ -46,7 +46,8 @@ describe('le journal d\'un run --fond dit qui il était et ce qui l\'a arrêté 
       expect([pgid, sid]).toEqual([ppid, ppid]); // le veilleur, détaché (setsid), est le parent du run et le chef de son groupe et de sa session
 
       process.kill(pidRun, 'SIGTERM'); // le run seul, comme un kill <pid> du verrou
-      const ligne = await attendre(() => lu().split('\n').find((l) => l.includes('SIGTERM')), PLAFOND, `rien sur SIGTERM dans le journal :\n${lu()}`);
+      // L837 : le veilleur arrête ensuite la session, dont l'enveloppe écrit aussi sa ligne SIGTERM ; on lit celle du run
+      const ligne = await attendre(() => lu().split('\n').find((l) => l.includes('le processus du run') && l.includes('SIGTERM')), PLAFOND, `rien sur SIGTERM dans le journal :\n${lu()}`);
       expect(ligne).toMatch(new RegExp(`^cause d'arrêt ${HEURE} : le processus du run \\(pid ${pidRun}\\) a reçu SIGTERM et s'est arrêté \\(code 143\\)$`));
       await attendre(() => (vivant(pidRun) ? undefined : true), PLAFOND, 'le run vit encore');
       await attendre(() => (vivant(ppid) ? undefined : true), PLAFOND, 'le veilleur vit encore après le run');

@@ -4351,6 +4351,46 @@ lots:
     status: todo
     estimate: 1
     created: 2026-11-25
+  - id: L842
+    title: "(D-33, étude docs/etudes/2026-11-25-temps-lot-prod-et-tests.md §5 P3) Rejeu seul d'un test rouge avant toute correction dans cadence run, pour tous les projets (comme testReplay de cadence) : 22 corrections de porte sur 54 venaient de tests sensibles à la charge. Mesure : part des passes porte rouge sans commit de code"
+    status: todo
+    estimate: 1
+    created: 2026-11-25
+  - id: L843
+    title: "(D-33, étude docs/etudes/2026-11-25-temps-lot-prod-et-tests.md §5 P4) Garde contre les tests à l'horloge murale : le cliquet d'analyse refuse dans un test neuf un performance.now()/Date.now() comparé à une borne absolue ; reprise des 13 tests cadence cités. Mesure : rouges « charge » par semaine → 0"
+    status: todo
+    estimate: 1
+    created: 2026-11-25
+  - id: L844
+    title: "(D-33, étude docs/etudes/2026-11-25-temps-lot-prod-et-tests.md §5 P5) Préflight d'environnement de porte : Node lu dans engines/.nvmrc, build avant test quand les tests lisent dist/, outils de la pile présents, fichiers privés résolus depuis le clone principal — 11 rouges sur 54. Mesure : 0 rouge d'environnement sur deux semaines"
+    status: todo
+    estimate: 1
+    created: 2026-11-25
+  - id: L845
+    title: "(D-33, étude docs/etudes/2026-11-25-temps-lot-prod-et-tests.md §5 P6) Données générées dans la porte : la commande build régénère les JSON Nouveautés (cadence news build) au lieu d'un geste à la main — 3 rouges et l'oubli qui les cause. Mesure : 0 rouge « JSON Nouveautés »"
+    status: todo
+    estimate: 1
+    created: 2026-11-25
+  - id: L846
+    title: "(D-33, étude docs/etudes/2026-11-25-temps-lot-prod-et-tests.md §5 P8) Délai fin de run → livraison : livrer ensemble les lots prêts d'un même dépôt (une CI) et afficher ce délai dans le tour du lead (p90 1,7 à 3 h). Mesure : p90 par projet sous 45 min"
+    status: todo
+    estimate: 1
+    created: 2026-11-25
+  - id: L847
+    title: "(D-33, étude docs/etudes/2026-11-25-temps-lot-prod-et-tests.md §5 P9) Relevé de couverture hebdomadaire hors porte (avec releve-qualite), cliquet seulement là où elle est basse (maritime frontend 54 %, warhammer backend 58 %) ; rejoint L838. Mesure : couverture qui ne baisse pas, +10 points en un mois sur les deux suites basses"
+    status: todo
+    estimate: 1
+    created: 2026-11-25
+  - id: L848
+    title: "(D-33, étude docs/etudes/2026-11-25-temps-lot-prod-et-tests.md §5 P11) Job Node 24 de la CI de cadence : comprendre ses 11 min d'écart avec Node 22, à défaut le jouer seulement à la publication. Mesure : durée du run CI par push"
+    status: todo
+    estimate: 1
+    created: 2026-11-25
+  - id: L849
+    title: "(D-33, étude docs/etudes/2026-11-25-temps-lot-prod-et-tests.md §5 P12) Tests de texte de doc : un contrôleur unique (liens, ancres, bornes) remplace les « la page dit X » liés à un lot passé. Mesure : rouges « doc » par mois"
+    status: todo
+    estimate: 1
+    created: 2026-11-25
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

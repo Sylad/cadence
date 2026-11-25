@@ -4524,6 +4524,11 @@ lots:
     status: todo
     estimate: 1
     created: 2026-11-25
+  - id: L871
+    title: "Tests instables repérés sans modèle : à partir des résultats des portes déjà journalisés (cadence run, verify --gate, vagues), lister chaque semaine les tests qui passent puis échouent sur le même arbre (même sha ou même empreinte), avec leur taux ; ligne ⚠ dans cadence lead tour. Vécu 25-11 : test_page.sh de cluster-sante échouait au hasard depuis avant L7 (PORT_SERVEUR sous set -e), découvert par chance ; une porte rouge ne dit pas si c'est le code ou un test instable. Idée vue dans les modèles de tâches planifiées de l'app Claude (« Suivi des tests instables »), reprise ici sans modèle donc sans jeton. Mesure : nombre de tests instables connus, et portes rouges rejouées vertes sans changement de code (cible : en baisse)"
+    status: todo
+    estimate: 1
+    created: 2026-11-25
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

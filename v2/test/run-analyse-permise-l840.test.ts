@@ -34,10 +34,15 @@ function avec(repo: string, fichiers: Record<string, string>): string {
   return repo;
 }
 const PERMISES = ['cadence analyse --init', 'cadence analyse --help', 'cadence analyse', 'cadence analyse --contre main', 'cadence analyse --init --outil eslint --contre main',
-  'npx cadence analyse --init', 'cadence analyse --contre main 2>&1 > analyse.txt', 'cadence analyse --init && git add -A'];
+  'npx cadence analyse --init', 'cadence analyse --contre main 2>&1 > analyse.txt', 'cadence analyse --init && git add -A', 'cadence analyse --init &>/dev/null',
+  'cadence analyse 2>&1 --init | tail', 'cadence analyse >&2 --contre main', 'cadence analyse &> log.txt --init'];
+/** Revue r1 (M1) : une redirection avant l'option (`2>&1`, `>&2`, `&>`, `&>>`, `2>&-`, `<&`, `>|`) ne cache pas --ecrire ni --migrer, ni ne coupe la commande. */
+const REDIRIGEES = ['cadence analyse 2>&1 --ecrire', 'cadence analyse >&2 --migrer --contre main', 'cadence analyse &>/dev/null --ecrire', 'cadence analyse &>>log --ecrire',
+  'cadence analyse &> /dev/null --ecrire', 'cadence analyse 2>&- --ecrire', 'cadence analyse 0<&3 --migrer', 'cadence analyse >| f --ecrire',
+  'cadence analyse 2>&1 >&2 --migrer --contre main', 'cadence analyse {fd}>&2 --ecrire', '>f cadence deliver', '2>&1 cadence analyse --ecrire'];
 const REFUSEES = ['cadence deliver', 'cadence deliver --dry-run', 'cadence analyse --ecrire', 'cadence analyse --migrer --contre main', 'cadence analyse --init --init',
   'cadence analyse --contre', 'cadence analyse --contre main --frobnicate', 'cadence run --liste', 'cadence spec L1 on', 'cadence spec check docs/specs/a/fiche.yaml',
-  'raf done L1', 'cadence', 'cadence --version', 'cadence analyse --init; cadence deliver', 'npx cadence verify --gate'];
+  'raf done L1', 'cadence', 'cadence --version', 'cadence analyse --init; cadence deliver', 'npx cadence verify --gate', ...REDIRIGEES];
 
 describe('L840 : cadence analyse permise dans la session d un run, et seulement elle', () => {
   it('session de run factice : cadence analyse --init (et --help, sans option, --contre) permise, cadence deliver et le reste refusés', () => {
@@ -53,6 +58,7 @@ describe('L840 : cadence analyse permise dans la session d un run, et seulement 
     expect(vus['cadence deliver']).toBe('refusé (motif cadence deliver)');
     expect(vus['cadence analyse --ecrire']).toContain('les seules commandes cadence permises sont `cadence analyse` (sans option, --init, --contre <ref>');
     expect(vus['cadence spec check docs/specs/a/fiche.yaml']).toBe('refusé (motif cadence spec)'); // sans fiche nommée au brief, spec reste interdite
+    for (const c of REDIRIGEES.filter((x) => x.includes('analyse'))) expect(vus[c], c).toMatch(/^refusé \(hook\)/);
   });
 
   it('reprise par --reponse : la session reprise garde la même règle', () => {
@@ -83,8 +89,8 @@ describe('L840 : cadence analyse permise dans la session d un run, et seulement 
       + '`cadence analyse` (sans option, `--init`, `--contre <ref>`, `--outil <nom>`, `--help`), nommée plus haut)');
   });
 
-  it('la demande cite D-31 ou cadence analyse : docs/analyse.md jointe comme pièce (mode complet), nommée dans le brief', () => {
-    for (const demande of ['Adopte l analyse du dépôt (D-31)', 'Lance cadence analyse --init et commite la base', 'Déclare la clé analyse: de cadence.yaml']) {
+  it('la demande cite cadence analyse, la clé analyse: ou l analyse statique : docs/analyse.md jointe comme pièce (mode complet), nommée dans le brief', () => {
+    for (const demande of ['Adopte l analyse statique du dépôt', 'Lance cadence analyse --init et commite la base', 'Déclare la clé analyse: de cadence.yaml']) {
       const appels: Appel[] = [];
       const e = executerRun({ repo: depot(), demande, exec: fauxClaude([commite('fait.txt')], appels), out: () => {} });
       expect(e.pieces, demande).toContain(DOC_ANALYSE);
@@ -97,15 +103,16 @@ describe('L840 : cadence analyse permise dans la session d un run, et seulement 
     }
     // mode complet (pièce jointe) : les hooks du bras (lecture-obligatoire, avec l'environnement de la session) et cadence-permise laissent passer --init
     let avant = '';
-    executerRun({ repo: depot(), demande: 'Adopte cadence analyse (D-31)', exec: fauxClaude([(cwd, args, env) => { avant = verdict(args, cwd, 'cadence analyse --init', env); commite('fait.txt')(cwd); }]), out: () => {} });
+    executerRun({ repo: depot(), demande: 'Adopte cadence analyse', exec: fauxClaude([(cwd, args, env) => { avant = verdict(args, cwd, 'cadence analyse --init', env); commite('fait.txt')(cwd); }]), out: () => {} });
     expect(avant).toBe('permis');
     expect(readFileSync(DOC_ANALYSE, 'utf8')).toMatch(/^# Static analysis per technology/); // la pièce existe, publiée avec le paquet (files de package.json)
   });
 
-  it('le lot du plan cite cadence analyse ou D-31 : la pièce est jointe sans mot de la demande', () => {
+  it('le lot du plan cite cadence analyse (titre ou note) : la pièce est jointe sans mot de la demande ; un identifiant de demande ne suffit pas (revue r1, M2)', () => {
     const plan = 'version: 1\nproject: x\nprefix: L\nlots:\n  - id: L1\n    title: "Adopter cadence analyse dans ce projet (D-31)"\n    status: todo\n'
-      + '  - id: L2\n    title: Autre\n    status: todo\n    notes:\n      - { date: 2026-11-24, text: "lot d adoption D-31" }\n  - id: L3\n    title: Analyse du besoin\n    status: todo\n';
-    for (const [i, [lot, jointe]] of ([['L1', true], ['L2', true], ['L3', false]] as const).entries()) {
+      + '  - id: L2\n    title: Autre\n    status: todo\n    notes:\n      - { date: 2026-11-24, text: "lot d adoption : cadence analyse --init" }\n  - id: L3\n    title: Analyse du besoin\n    status: todo\n'
+      + '  - id: L4\n    title: "Adoption (D-31)"\n    status: todo\n';
+    for (const [i, [lot, jointe]] of ([['L1', true], ['L2', true], ['L3', false], ['L4', false]] as const).entries()) {
       const repo = avec(depot(), { '.cadence/raf.yaml': plan }), appels: Appel[] = [];
       const e = executerRun({ id: `20261125090000-${200 + i}`, repo, demande: 'Fais le lot', lot, exec: fauxClaude([commite('fait.txt')], appels), out: () => {} });
       expect(e.pieces.includes(DOC_ANALYSE), lot).toBe(jointe);
@@ -129,9 +136,9 @@ describe('L840 : cadence analyse permise dans la session d un run, et seulement 
 
   it('analyseCitee et leverPourCadence : mots cités, faux amis écartés', () => {
     const repo = depot();
-    for (const d of ['D-31', 'demande d-31 du registre', 'cadence analyse', 'CADENCE ANALYSE --init', 'la clé analyse: du cadence.yaml', 'Analyse statique ESLint'])
+    for (const d of ['cadence analyse', 'CADENCE ANALYSE --init', 'la clé analyse: du cadence.yaml', 'Analyse statique ESLint'])
       expect(analyseCitee(repo, d), d).toBe(true);
-    for (const d of ['analyse du besoin', 'D-310', 'XD-31', 'Analyse les logs', 'cadence spec check']) expect(analyseCitee(repo, d), d).toBe(false);
+    for (const d of ['analyse du besoin', 'D-31', 'demande d-31 du registre', 'Adopte (D-31)', 'Analyse les logs', 'cadence spec check']) expect(analyseCitee(repo, d), d).toBe(false);
     expect(leverPourCadence("N'utilise ni `raf` ni `cadence`.")).toBe("N'utilise ni `raf` ni `cadence`.");
   });
 });

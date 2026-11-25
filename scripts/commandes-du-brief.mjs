@@ -94,8 +94,9 @@ function analyseDeclaree(repo) {
     return false;
   }
 }
-/** La demande ou le lot du plan (titre, notes) cite l'analyse : `cadence analyse`, la clé `analyse:`, « analyse statique » ou D-31. */
-const CITE_ANALYSE = /cadence analyse|(^|[^\w-])analyse:|analyse statique|(^|[^\w-])d-31(?!\d)/;
+/** La demande ou le lot du plan (titre, notes) cite l'analyse : `cadence analyse`, la clé `analyse:` ou « analyse statique ». Revue r1 (M2) : aucun identifiant
+ * de demande (chaque dépôt a son registre, ses D-<n> n'ont pas le même sens ailleurs). */
+const CITE_ANALYSE = /cadence analyse|(^|[^\w-])analyse:|analyse statique/;
 export function analyseCitee(repo, demande, lot) {
   const l = lotDuPlan(repo, lot), texte = `${demande}\n${l ? JSON.stringify({ ...l, tasks: undefined }) : ''}`;
   return CITE_ANALYSE.test(plat(texte));
@@ -124,9 +125,10 @@ export const interditsDuRun = (interdits, { specCheck = false } = {}) => interdi
 export const avecRefusCadence = (reglages, hooks, { specCheck = false } = {}) => ({ ...reglages, hooks: { ...reglages.hooks, PreToolUse: [...(reglages.hooks?.PreToolUse ?? []),
   { matcher: 'Bash', hooks: [{ type: 'command', command: `node "${join(hooks, 'cadence-permise.mjs')}"${specCheck ? ' --spec' : ''}`, timeout: 10 }] }] } });
 
-/** Les morceaux d'une commande shell : texte entre guillemets, caractère échappé, heredoc (`<<[-]MOT`, dont le corps est sauté), séparateur (&& || ; | &
- * retour à la ligne, `$(`, `(`, `)`, `` ` ``), texte. */
-const MORCEAU = /"(?:\\[\s\S]|[^"\\])*"?|'[^']*'?|\\[\s\S]|<<<|<<(-?)[ \t]*(?:'([^'\n]*)'|"([^"\n]*)"|\\?([^\s;|&<>()`'"]+))|&&|\|\||\|&|\$\(|[;|&\n()`]|[^"'\\;|&\n()`$<]+|[$<]/gy;
+/** Les morceaux d'une commande shell : texte entre guillemets, caractère échappé, heredoc (`<<[-]MOT`, dont le corps est sauté), opérateur de redirection
+ * (`&>`, `&>>`, `>&`, `<&`, `>|`, `>>`, `<>`, `>`, `<` : revue r1 de L840, M1, son `&` ou son `|` ne sépare pas), séparateur (&& || ; | & retour à la ligne,
+ * `$(`, `(`, `)`, `` ` ``), texte. */
+const MORCEAU = /"(?:\\[\s\S]|[^"\\])*"?|'[^']*'?|\\[\s\S]|<<<|<<(-?)[ \t]*(?:'([^'\n]*)'|"([^"\n]*)"|\\?([^\s;|&<>()`'"]+))|&>>?|[<>]&|>\||>>|<>|[<>]|&&|\|\||\|&|\$\(|[;|&\n()`]|[^"'\\;|&\n()`$<>]+|\$/gy;
 const SEPARE = /^(?:&&|\|\||\|&|\$\(|[;|&\n()`])$/;
 /** Ce qui précède le programme sans le changer : affectation, `!`, `{`, mot-clé, env/command/exec/time/nohup/sudo (chemin compris : `/usr/bin/env`), npx et
  * npm|pnpm|yarn exec|dlx, node, et leurs options. */
@@ -179,16 +181,25 @@ function segmentsDe(commande) {
   return segments;
 }
 
-/** L840 : les arguments de `cadence analyse` permis : --help, -h, --init, --contre <ref>, --outil <nom> (chacun une fois), rien d'autre ; une redirection
- * (`> f`, `2>&1`) n'est pas un argument. */
+/** Une redirection en tête de mot : descripteur facultatif (`2`, `{fd}`) puis `&>`, `&>>`, `>&`, `<&`, `>|`, `>>`, `<>`, `>` ou `<`. */
+const REDIRECTION = /^(?:\d+|\{\w+\})?(?:&>>?|[<>]&|>\||>>|<>|[<>])/;
+/** Revue r1 de L840 (M1) : les mots d'une commande sans ses redirections (`2>&1`, `>&2`, `&>/dev/null`, `2>&-`, `> f`, `&> f` : un opérateur seul a sa cible
+ * dans le mot suivant) ; ni une redirection ni sa cible ne sont des arguments du programme. */
+function sansRedirections(mots) {
+  const reste = [];
+  for (let i = 0; i < mots.length; i++) {
+    const r = REDIRECTION.exec(mots[i]);
+    if (!r) reste.push(mots[i]);
+    else if (r[0] === mots[i]) i++;
+  }
+  return reste;
+}
+/** L840 : les arguments de `cadence analyse` permis : --help, -h, --init, --contre <ref>, --outil <nom> (chacun une fois), rien d'autre ; `args` est déjà
+ * sans redirections (sansRedirections). */
 function analysePermise(args) {
   const vus = new Set();
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (/^\d*>/.test(a)) {
-      i += /^\d*>&?$/.test(a) ? 1 : 0; // `> f` : la cible est le mot suivant
-      continue;
-    }
     if (vus.has(a)) return false;
     vus.add(a);
     if (OPTIONS_ANALYSE.has(a)) continue;
@@ -209,7 +220,8 @@ function permise(programme, args, specCheck) {
  * `bash -c '…'` ne sont pas ouverts. */
 export function cadenceHorsPermises(commande, cwd, { specCheck = false } = {}) {
   for (const segment of segmentsDe(String(commande))) {
-    const mots = segment.trim().replace(/(?:npm|pnpm|yarn)\s+(?:exec|dlx)\b/g, 'npx').split(/\s+/).map((w) => w.replace(/^["']|["']$/g, ''));
+    const mots = sansRedirections(segment.trim().replace(/(?:npm|pnpm|yarn)\s+(?:exec|dlx)\b/g, 'npx').split(/\s+/).filter(Boolean))
+      .map((w) => w.replace(/^["']|["']$/g, ''));
     let avant = '';
     while (mots.length && PREFIXE.test(mots[0]) && !programmeDe(mots[0], cwd)) {
       const mot = mots.shift();

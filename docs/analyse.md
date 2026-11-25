@@ -185,8 +185,9 @@ the command is part of the identity, so pointing it at another ruleset is refuse
   and the waves of `cadence orchestrate` do not play it yet.
 - **In the session of a `cadence run`** (L840): the session may run `cadence analyse` itself — without option, `--init`,
   `--contre <ref>`, `--outil <name>`, `--help` — so that an adoption lot no longer stops on a question; `--ecrire`, `--migrer`
-  and every other cadence or raf command stay with the lead (hook `v2/hooks/cadence-permise.mjs`). When the request or the
-  plan's lot cites `cadence analyse`, the `analyse:` key, « analyse statique » or D-31, this page is attached to the run as a
+  and every other cadence or raf command stay with the lead (hook `v2/hooks/cadence-permise.mjs`, which reads a redirection
+  such as `2>&1`, `>&2` or `&>/dev/null` as a redirection, never as a command separator). When the request or the
+  plan's lot cites `cadence analyse`, the `analyse:` key or « analyse statique », this page is attached to the run as a
   piece to read before writing; a repository that declares `analyse:` gets the command named in the brief, without the piece.
 - **The CI**: `npx cadence analyse --contre <the commit before the push>` (full-depth checkout), after the build — the
   [CI recipe](#the-ci-recipe) below, never `--contre origin/main`.

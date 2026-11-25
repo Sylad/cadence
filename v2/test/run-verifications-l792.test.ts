@@ -73,7 +73,10 @@ describe('L792 : vérifications nommées dans le brief de cadence run', () => {
     expect(e.spec_check).toBeUndefined();
     expect(prompt(appels[0])).not.toMatch(/Vérifications du projet|spec check/);
     expect(prompt(appels[0])).toContain("N'utilise ni `raf` ni `cadence`. Ignore");
-    expect(interdits(appels[0])).toEqual(expect.arrayContaining(['Bash(cadence spec:*)', 'Bash(cadence run:*)', 'Bash(raf:*)']));
+    // revue r1 (m1) : l'interdiction complète, outil par outil — tous ceux de bin/cadence.js sauf analyse, spec entière, raf
+    const attendus = [...OUTILS_CADENCE.filter((t) => t !== 'analyse').map((t) => `Bash(cadence ${t}:*)`), 'Bash(cadence spec:*)', 'Bash(raf:*)'];
+    expect(attendus.length).toBe(OUTILS_CADENCE.length + 1);
+    expect(interdits(appels[0])).toEqual(expect.arrayContaining(attendus));
     expect(interdits(appels[0])).not.toContain('Bash(cadence analyse:*)');
   });
 

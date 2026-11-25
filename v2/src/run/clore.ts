@@ -6,8 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { etatVu, occupantRun, oublierReglages, sauver, type Etat } from './run.js';
 import { arreterEtDire } from '../processus.js';
 
-/** Un run qui vit encore ou se reprend (--reponse) n'est pas fini : ni « intégré à la main », ni clos — sauf, sans processus vivant, quand sa tête est déjà
- * sur la cible (L767). */
+/** Un run qui vit ou se reprend (--reponse) n'est ni « intégré à la main » ni clos, sauf sans processus vivant et sa tête déjà sur la cible (L767). */
 const REPRENABLES = ['en-cours', 'interrompu', 'attente', 'quota'];
 export const ARCHIVES = 'refs/cadence/archive/';
 export interface Tete { ref: string; sha: string }

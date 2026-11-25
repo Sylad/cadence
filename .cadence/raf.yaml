@@ -4355,11 +4355,12 @@ lots:
     created: 2026-11-25
   - id: L842
     title: "(D-33, étude docs/etudes/2026-11-25-temps-lot-prod-et-tests.md §5 P3) Rejeu seul d'un test rouge avant toute correction dans cadence run, pour tous les projets (comme testReplay de cadence) : 22 corrections de porte sur 54 venaient de tests sensibles à la charge. Mesure : part des passes porte rouge sans commit de code"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-25
     notes:
       - { date: 2026-11-25, text: "25-11 : choisi par Sylvain comme premier gain de l'étude D-33 (« Rejeu avant correction ») ; à lancer dès que L840 rend le dépôt (même code de cadence run), avant les bancs de 12 h si le temps le permet" }
+    started: 2026-11-25
   - id: L843
     title: "(D-33, étude docs/etudes/2026-11-25-temps-lot-prod-et-tests.md §5 P4) Garde contre les tests à l'horloge murale : le cliquet d'analyse refuse dans un test neuf un performance.now()/Date.now() comparé à une borne absolue ; reprise des 13 tests cadence cités. Mesure : rouges « charge » par semaine → 0"
     status: todo

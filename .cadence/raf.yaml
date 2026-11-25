@@ -4324,22 +4324,31 @@ lots:
     created: 2026-11-24
   - id: L837
     title: "cadence run laisse des processus vivants après sa fin (vécu 24-11 : astro preview --port 4391 du run codex 20261124152233-2770189, encore là 26 min après ; tuer le groupe de processus du run à sa fin). Mesure : aucun processus d'un run vivant après sa fin (contrôle à la fin de chaque run)"
-    status: todo
+    status: done
     estimate: 0.5
     created: 2026-11-24
+    started: 2026-11-25
+    review: { date: 2026-11-25, verdict: "conforme (seconde revue 25-11 : M1 macOS par ps, M2 démons partagés épargnés, M3 --reponse testé, budget 1370 ; chaque test rougit sans le correctif ; notes : ps ne sépare pas args et env (processus.ts:80), serveur sous un tmux lancé par la session survit — compromis v1 documenté)", commit: 68004f96103d628d1e30c3d4d09a0e8bdbd5913f }
+    finished: 2026-11-25
   - id: L838
     title: "Mécanisme générique de couverture et de porte rapide : cliquet de couverture par projet (cadence analyse) et porte par tests touchés en cours de lot (la suite complète reste à la porte de livraison), réutilisable par le compte pro (question pro du 24-11, sa D-23). Après l'étude L835. Mesure : temps de porte en cours de lot, couverture qui ne baisse pas"
-    status: todo
+    status: done
     estimate: 1
     after: [ L835 ]
     created: 2026-11-24
+    started: 2026-11-25
+    review: { date: 2026-11-25, verdict: "conforme (seconde revue 25-11 : M1 rejeu sous fastGate corrigé et prouvé, test v2 rouge sans le correctif ; m2 page de mesure publiée ; tests sous charge non affaiblis ; note : fastGate.dir hors partie exacte pas rejoué)", commit: 3733cc463c629e684dd7ca3abf3a13ed5d54147d }
+    finished: 2026-11-25
+    tasks:
+      - { id: t1, title: "Cliquet de couverture par projet (cadence analyse), critère 2 de L838 non fait : couverture qui ne baisse pas", status: todo }
   - id: L839
     title: "D-34 : « code mode » pour le ux-reviewer — au lieu de clics et instantanés Playwright un par un (chaque page remonte dans le contexte), l'agent écrit un script Playwright qui mesure tout d'un coup (largeurs, défilement horizontal, coupures de mots, sauts de lignes) et ne rend que les chiffres. Vécu 24-11 : ux-reviewer 63,63 $ sur 24 h (16 % du jour, tarif API), revue UXW-36 seule ~158 k tokens et 69 appels d'outils. Banc : rejouer une même revue déjà faite (ex. maritime UXW-36, défaut M1 connu) en mode script contre le mode actuel. Mesure : coût et tokens par revue, défauts connus retrouvés ; on ne garde le mode script que s'il trouve autant pour moins cher"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-24
     notes:
       - { date: 2026-11-25, text: "Précision du 25-11 (lead) : le « Code Mode » de la vidéo est une fonction expérimentale de Claude Code (doc https://code.claude.com/docs/en/code-mode.md, suivie dans veille/code-mode/) : Claude écrit du JavaScript qui enchaîne ses outils (Bash, Read, Edit, MCP) en une étape, seul le résultat lu revient au contexte. S'active par la variable CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1 (env de la commande, sans toucher settings.json), marche avec claude -p et les sous-agents (outil REPL dans leur liste tools). Banc révisé : un même lot ou une même revue UX déjà faite, rejoué avec et sans la variable ; mesures : tokens, coût, durée, défauts connus retrouvés. Limites à vérifier : auto mode juge le code et non chaque appel, hooks PreToolUse (arret-18h30, pipefail) qui doivent encore voir les commandes, exécution > 10 min." }
+    started: 2026-11-25
   - id: L840
     title: "Un cadence run d'adoption (D-31) peut lancer cadence analyse : ses runs s'arrêtent sinon sur une question"
     status: done
@@ -4352,19 +4361,25 @@ lots:
     finished: 2026-11-25
   - id: L841
     title: "Issue 74 (compte pro) : raf demande new \"<texte>\" crée une entrée du registre (D-n suivant, texte mot pour mot, ouverte), mise en attente sur une branche tenue comme raf add ; aujourd'hui l'entrée s'écrit à la main et attend la fin du run pour être commitée"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-25
     started: 2026-11-25
     review: { date: 2026-11-25, verdict: "conforme : bloquant levé (écritures en attente renumérotées avec le D-n réservé), aucune régression sur les tests L695, L722, L779 et L841", commit: 9b50209c457ace6b098cbcf85ff8562f5c7f7e38 }
+    finished: 2026-11-25
   - id: L842
     title: "(D-33, étude docs/etudes/2026-11-25-temps-lot-prod-et-tests.md §5 P3) Rejeu seul d'un test rouge avant toute correction dans cadence run, pour tous les projets (comme testReplay de cadence) : 22 corrections de porte sur 54 venaient de tests sensibles à la charge. Mesure : part des passes porte rouge sans commit de code"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-25
     notes:
       - { date: 2026-11-25, text: "25-11 : choisi par Sylvain comme premier gain de l'étude D-33 (« Rejeu avant correction ») ; à lancer dès que L840 rend le dépôt (même code de cadence run), avant les bancs de 12 h si le temps le permet" }
     started: 2026-11-25
+    review: { date: 2026-11-25, verdict: "conforme (B1 et M1 de la revue r1 levés, aucun nouveau constat)", commit: e35abb30d70340c5e8fe3c570bd2047824a777d3 }
+    tasks:
+      - { id: t1, title: "B1 : ne pas noter de verdict vert de la porte du run quand des rouges ont été excusés (v2/src/run/run.ts:177 → push-guard accepte sans verify --gate), avec un test", status: done }
+      - { id: t2, title: "M1 : rejouer le fichier vitest entier (pas seulement -t feuille, scripts/rejeu-rouges.mjs:96), un rouge dépendant de l'ordre ne doit pas être excusé ; test sur un vrai vitest", status: done }
+    finished: 2026-11-25
   - id: L843
     title: "(D-33, étude docs/etudes/2026-11-25-temps-lot-prod-et-tests.md §5 P4) Garde contre les tests à l'horloge murale : le cliquet d'analyse refuse dans un test neuf un performance.now()/Date.now() comparé à une borne absolue ; reprise des 13 tests cadence cités. Mesure : rouges « charge » par semaine → 0"
     status: todo
@@ -4454,6 +4469,36 @@ lots:
     title: "Un commit de plan du lead (raf todo/start/done) laisse périmé le plan.json publié par le projet (warhammer frontend/public/plan-data/plan.json) : vécu 25-11, L259 rouvert → porte de L254 rouge (plan-data.test.mjs), une passe de correction et un refus d'intégration. Déclarer dans cadence.yaml la commande qui régénère les données dérivées du plan (plan: derive:) et la jouer à chaque écriture de raf, ou la vérifier au pre-commit. Mesure : aucune porte rouge pour un plan.json périmé."
     status: todo
     estimate: 1
+    created: 2026-11-25
+  - id: L861
+    title: "Rejeu des rouges pytest (L842) : fichier::test rejoué seul, un rouge dépendant de l'ordre peut être excusé à tort, comme vitest avant le correctif ; rejouer le fichier entier ou refuser l'excuse (vécu 25-11, revue L842 ; mesure : test sur un vrai pytest où un test précédent remplit un cache)"
+    status: todo
+    estimate: 1
+    created: 2026-11-25
+  - id: L862
+    title: "Push-guard aveugle aux verdicts en attente : un raf review conforme mis dans plan-en-attente.yaml (main tenue par un run) ne compte pas pour le pre-push, qui refuse le push d'un sha relu (vécu 25-11, L840/L841 relus conformes, push refusé pendant le run L838) ; lire aussi les review en attente, ou les appliquer sur une branche de plan ; mesure : aucun push de sha relu refusé pendant un run"
+    status: todo
+    estimate: 1
+    created: 2026-11-25
+  - id: L863
+    title: "Cliquet de couverture par projet (titre de L838, non fait) : la couverture des tests ne baisse pas d'un lot à l'autre, déclarée dans cadence.yaml, figée comme l'analyse D-31 (revue L838, 25-11 ; mesure : un lot qui retire des tests couverts échoue à la porte)"
+    status: todo
+    estimate: 1
+    created: 2026-11-25
+  - id: L864
+    title: "Issue #75 : la limite de 5 h (« You've hit your 5-hour limit · resets 1:30pm ») met cadence run en echec au lieu de quota, et le run ne repart pas seul à l'heure de remise à zéro (vécu compte pro 25-11 : 3 runs arrêtés entre 12:13 et 12:22, repris à la main à 13:34) ; reconnaître ce message comme quota, reprendre à l'heure annoncée ; mesure : test sur le texte réel, aucun run en echec pour une limite de 5 h"
+    status: todo
+    estimate: 1
+    created: 2026-11-25
+  - id: L865
+    title: "Issue #76 (compte pro, 25-11) : deux cadence run du même dépôt finissent à quelques secondes d'écart ; le second passe en refus-integration sur l'index.lock du premier alors que sa porte est verte (repris à la main par --reponse). Attendu : l'intégration attend le verrou (verrou d'intégration par dépôt, ou nouvel essai borné sur index.lock) au lieu de rendre le lot ; test qui fait finir deux runs ensemble. Mesure : aucun refus-integration dû à index.lock"
+    status: todo
+    estimate: 1
+    created: 2026-11-25
+  - id: L866
+    title: "Choix du lot suivant selon la priorité des projets : le 25-11 le lead a lancé fonds-ecran L11 alors que cadence, blue-fleet et ol-companion (plus haut dans priority:) avaient des lots tirables dans des dépôts libres — il choisissait de mémoire (« cadence > maritime > le reste »). Attendu : lead release / lead tour nomment « à lancer maintenant : <projet>:<lot> » = premier tirable dans l'ordre priority: d'un dépôt sans run ; un hook PreToolUse avertit quand un cadence run vise un projet plus bas que ce premier (raison à donner). Mesure : lancements hors ordre sans raison = 0 par jour"
+    status: todo
+    estimate: 0.5
     created: 2026-11-25
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

@@ -81,10 +81,20 @@ const opusDe = (par) => Object.entries(par).filter(([m]) => /opus/i.test(m)).red
 const jsonls = (d) => (existsSync(d) ? readdirSync(d).filter((n) => n.endsWith('.jsonl')) : []);
 const sousDossiers = (d) => (existsSync(d) ? readdirSync(d).map((n) => join(d, n)).filter((p) => statSync(p).isDirectory()) : []);
 
+/** L839 : appels d'outils d'un transcript (blocs tool_use des réponses, chaque id une fois), hors SubagentHandback qui rend la réponse. */
+export function outilsDe(texte) {
+  const ids = new Set();
+  for (const e of lignesJson(texte)) {
+    const blocs = e.type === 'assistant' && Array.isArray(e.message?.content) ? e.message.content : [];
+    for (const b of blocs) if (b?.type === 'tool_use' && b.name !== 'SubagentHandback') ids.add(b.id ?? ids.size);
+  }
+  return ids.size;
+}
+
 /** Une ligne de mesure pour un transcript de sous-agent relié à son appel. */
 function mesure(session, appel, texte) {
   const par = jetonsParModele(texte), reponse = reponseDe(texte);
-  return { session, date: appel.date, modeles: par, opus: opusDe(par), total: Object.values(par).reduce((n, v) => n + v, 0), reponse, ratee: estRatee(reponse) };
+  return { session, date: appel.date, modeles: par, opus: opusDe(par), total: Object.values(par).reduce((n, v) => n + v, 0), outils: outilsDe(texte), reponse, ratee: estRatee(reponse) };
 }
 
 /** Date du premier message d'un transcript de sous-agent (null sans horodatage). */
@@ -117,7 +127,7 @@ const mediane = (v) => { if (!v.length) return 0; const s = [...v].sort((a, b) =
 /** Rapport texte : une ligne par appel, puis la synthèse (médiane des jetons Opus, ratées). */
 export function rendre(appels, agent = 'livreur') {
   if (!appels.length) return `${agent} : aucun appel trouvé`;
-  const lignes = appels.map((a) => `${String(a.date ?? '?').slice(0, 16)}  opus ${a.opus}  total ${a.total}  ${Object.keys(a.modeles).join(',') || '?'}  ${a.ratee ? 'RATÉE' : 'ok'}  ${a.reponse.slice(0, 80)}`);
+  const lignes = appels.map((a) => `${String(a.date ?? '?').slice(0, 16)}  opus ${a.opus}  total ${a.total}  outils ${a.outils}  ${Object.keys(a.modeles).join(',') || '?'}  ${a.ratee ? 'RATÉE' : 'ok'}  ${a.reponse.slice(0, 80)}`);
   const ratees = appels.filter((a) => a.ratee).length;
   return [...lignes, `${agent} : ${appels.length} appel(s), jetons Opus médiane ${mediane(appels.map((a) => a.opus))}, total ${appels.reduce((n, a) => n + a.opus, 0)} ; ratées ${ratees}`].join('\n');
 }

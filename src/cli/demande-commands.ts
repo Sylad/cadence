@@ -3,6 +3,8 @@
 // L841 (issue 74 du compte pro) : raf demande new "<texte>" crée l'entrée D-<n suivant> ; en attente, le D-n est réservé tout de suite.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { parseArgs } from 'node:util';
+import { OPTIONS_RAF } from '../../scripts/options-raf.mjs';
 import { isDay } from '../dates.js';
 import { RafError } from '../plan.js';
 import { deferPlanWrite, type Holder, type PendingWrite, readPending } from '../repo-held.js';
@@ -24,6 +26,39 @@ const reservedBy = (w: PendingWrite): string | null => {
   const at = w.argv.indexOf('--id');
   return w.argv[0] === 'demande' && w.argv[1] === 'new' && at > 0 ? (w.argv[at + 1] ?? null) : null;
 };
+
+/**
+ * Revue L841 r1 : le D-n visé par une écriture `raf demande <D-n> precision|etat|lot …` en attente et sa place dans l'argv, ou null. L'argv est celui
+ * que raf a reçu : il se lit avec la table d'options de raf, une option placée avant la commande ne se prend pas pour l'identifiant.
+ */
+function targetOf(argv: string[]): { at: number; id: string } | null {
+  const { tokens } = parseArgs({ args: argv, allowPositionals: true, options: OPTIONS_RAF, strict: false, tokens: true });
+  const [cmd, id] = tokens.filter((t) => t.kind === 'positional');
+  return cmd?.value === 'demande' && id && id.value !== 'new' && isId(id.value) ? { at: id.index, id: id.value } : null;
+}
+
+/** Revue L841 r1 : les numéros réservés qu'une application de l'attente a dû renuméroter (réservé → créé), relevés par carryRenumbered. */
+const renumbered = new Map<string, string>();
+
+/**
+ * Revue L841 r1 : après un `raf demande new` joué depuis l'attente dont le D-n réservé était pris (un run l'a intégré entre-temps), les écritures qui
+ * suivent et visaient ce D-n (lot, précision, état mises en attente après le new) suivent l'entrée renumérotée : sans cela, elles s'appliqueraient à
+ * la demande d'un autre. Réécrites en place, elles le restent dans l'attente si une écriture échoue avant elles. Rend les lignes qui le disent.
+ */
+export function carryRenumbered(later: PendingWrite[]): string[] {
+  const lines: string[] = [];
+  for (const [from, to] of renumbered) {
+    const moved = later.filter((w) => {
+      const t = targetOf(w.argv);
+      if (t?.id !== from) return false;
+      w.argv[t.at] = to;
+      return true;
+    });
+    if (moved.length) lines.push(`${from} → ${to} : ${moved.length} écriture(s) en attente qui visaient ${from}, réservée, suivent l'entrée renumérotée`);
+  }
+  renumbered.clear();
+  return lines;
+}
 
 /** Les numéros des fichiers D-<n>.json d'un dossier du registre. */
 const numbersIn = (dir: string) => (existsSync(dir) ? readdirSync(dir).filter((f) => /^D-\d+\.json$/.test(f)).map((f) => Number(f.slice(2, -5))) : []);
@@ -151,6 +186,7 @@ function createDemande(c: EarlyCtx): number {
       throw err;
     }
     const moved = reserved && reserved !== id ? ` (${reserved}, réservée, a été prise entre-temps dans le registre)` : '';
+    if (reserved && reserved !== id) renumbered.set(reserved, id);
     c.io.out(`${noted(id, text)}${moved} — ${DEMANDES}/${id}.json créé, à commiter`);
     return 0;
   }

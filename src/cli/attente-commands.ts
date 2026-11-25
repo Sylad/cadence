@@ -1,5 +1,5 @@
 // Le plan en attente (L695, D-9) : `raf add|note|start|done|review|ux|demande` (L722, L779 pour start) sur une branche tenue par un programme, puis `raf attente [appliquer]`.
-import { checkRegistryWrite, deferNewDemande, isRegistryWrite } from './demande-commands.js';
+import { carryRenumbered, checkRegistryWrite, deferNewDemande, isRegistryWrite } from './demande-commands.js';
 import { checkGateUsage, reviewedAt, seenArgs } from './gates.js';
 import { applyPending, deferPlanWrite, holderHere, PENDING_PLAN, readPending } from '../repo-held.js';
 import { RafError } from '../plan.js';
@@ -33,13 +33,15 @@ function staleStart(argv: string[], c: EarlyCtx): string | null {
 function apply(c: EarlyCtx, run: Run): number {
   applying = true;
   try {
-    return applyPending(c.root, (argv) => {
+    return applyPending(c.root, (argv, later) => {
       const stale = staleStart(argv, c);
       if (stale) {
         c.io.out(stale);
         return 0;
       }
       const code = run(argv, c.io);
+      // Revue L841 r1 : un new renuméroté emmène les écritures en attente qui visaient son D-n réservé.
+      for (const l of carryRenumbered(later)) c.io.out(l);
       return typeof code === 'number' ? code : 1;
     }, c.io.out);
   } finally {
@@ -84,6 +86,8 @@ function checked(command: string, c: EarlyCtx): string[] {
 function refuseInternalOptions(command: string, c: EarlyCtx): void {
   if (applying) return;
   if (c.values.vu !== undefined || c.values['vu-depot']) throw new RafError('--vu et --vu-depot sont réservés au plan en attente : la mise en attente d\'une revue les écrit, raf attente appliquer les lit');
+  // Revue L841 r1 : --jour n'existe que pour raf demande new ; ailleurs, c'est une option inconnue (une faute de frappe ne passe pas en silence).
+  if (command !== 'demande' && c.values.jour !== undefined) throw new RafError(`option inconnue : --jour (interne à raf demande new) — raf ${command} ne la lit pas`);
   if (command === 'demande' && (c.values.jour !== undefined || c.values.id !== undefined)) {
     throw new RafError('--id et --jour de raf demande new sont réservés au plan en attente : la mise en attente les écrit (le D-n réservé, le jour de la demande), raf attente appliquer les lit');
   }

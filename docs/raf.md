@@ -193,7 +193,8 @@ with the code; `cadence run --demande-humaine` creates an entry). It never rewri
   plan), so two `new` in a row get two numbers, and the entries a `cadence run` holding the branch wrote in its worktree
   (`--demande-humaine`) are counted too. A precision, a state or a lot can already be queued for a reserved number.
   Applied later, the entry keeps the day it was asked; if its number was taken in between, it moves to the next free one
-  and the line says so.
+  and the line says so; the precisions, states and lots queued for the reserved number follow it to the new one (a line
+  `D-4 → D-5 : …` says how many), never the entry that took the number.
 - `raf demande D-3 precision "text"` appends `{ date, texte }` to `precisions` (the date is today, `RAF_TODAY` included).
 - `raf demande D-3 etat livrée "commit abc1234, test x"` sets `etat` (`ouverte`, `livrée`, `vérifiée`, `abandonnée`; typed
   without accents too) and appends the proof to `preuve` after a « · » (the proof of an earlier lot stays). A proof is

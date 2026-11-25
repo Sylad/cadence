@@ -152,13 +152,16 @@ export function deferPlanWrite(root: string, h: Holder, argvOf: string[] | ((pen
   return `mis en attente : raf ${argv.join(' ')} — la branche ${h.branch} est tenue par ${h.label} (pid ${h.pid}) ; écrit dans ${PENDING_PLAN}, ${applier(h)} (${all.length} en attente)`;
 }
 
-/** Joue les écritures en attente dans l'ordre ; la première qui échoue et les suivantes restent en attente. */
-export function applyPending(root: string, raf: (argv: string[]) => number, out: (l: string) => void): number {
+/**
+ * Joue les écritures en attente dans l'ordre ; la première qui échoue et les suivantes restent en attente. `raf` reçoit aussi les écritures qui suivent :
+ * il peut les réécrire (revue L841 r1 : celles qui visent un D-n réservé puis renuméroté), et la réécriture reste dans l'attente si l'une échoue.
+ */
+export function applyPending(root: string, raf: (argv: string[], later: PendingWrite[]) => number, out: (l: string) => void): number {
   const { done, left } = withPendingLock(root, () => {
     const all = readPending(root);
     let n = 0;
     for (const w of all) {
-      if (raf(w.argv) !== 0) break;
+      if (raf(w.argv, all.slice(n + 1)) !== 0) break;
       n++;
     }
     const rest = all.slice(n);

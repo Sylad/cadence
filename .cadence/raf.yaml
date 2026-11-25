@@ -4539,6 +4539,11 @@ lots:
     status: todo
     estimate: 1
     created: 2026-11-25
+  - id: L874
+    title: "cadence run : passage à Fable non déclenché par deux revues UX non conformes (blue-fleet L6, 25-11 : UX r1 et r2 non conformes posées par raf ux, 4e passe de correction, run 20261125175348-2173456 resté sur Opus « par défaut ») — compter aussi les verdicts raf ux non conformes et les passes de correction dans la règle L726 ; test sur un plan à deux raf ux non conformes. Mesure : la passe suivante part en Fable et la ligne de lancement le dit"
+    status: todo
+    estimate: 1
+    created: 2026-11-25
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

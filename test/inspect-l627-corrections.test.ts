@@ -98,8 +98,11 @@ describe('cadence inspect (L627) — corrections de la revue', () => {
       const o = { config: { test: 'true', gate: { host: 'machine', maxParallel: 1 } } as OrchestrateConfig, repo: h.repo, sha: git(h.repo, 'rev-parse', 'HEAD'), dir: h.repo, needClean: true, label: 'porte du lot L1', local: async () => ({ code: 0, output: '' }), say: (l: string) => events.push(`say ${l}`), trace: (l: string) => events.push(l) };
       let release!: () => void;
       const first = withPlace(o, () => new Promise<void>((r) => (release = r)));
-      await new Promise((r) => setTimeout(r, 300));
+      // Sous la charge (porte du 25-11, charge 50 : trois runs en parallèle), 300 puis 200 ms ne suffisaient pas au faux ssh : on attend l'événement, puis le même délai.
+      const jusqua = async (vu: () => boolean) => { for (const fin = Date.now() + 20_000; !vu() && Date.now() < fin;) await new Promise((r) => setTimeout(r, 25)); };
+      await jusqua(() => events.includes('porte : début'));
       const second = withPlace(o, async () => {});
+      await jusqua(() => events.some((e) => e.includes('en attente d\'un créneau de porte')));
       await new Promise((r) => setTimeout(r, 200));
       expect(events.filter((e) => e === 'porte : début')).toHaveLength(1);
       expect(events.some((e) => e.includes('en attente d\'un créneau de porte'))).toBe(true);
@@ -110,7 +113,7 @@ describe('cadence inspect (L627) — corrections de la revue', () => {
     } finally {
       process.env = saved;
     }
-  });
+  }, 60_000);
 });
 
 describe('cadence inspect (L627) — seconde revue', () => {

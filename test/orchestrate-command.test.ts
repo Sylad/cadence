@@ -2001,7 +2001,7 @@ describe('--continue (L147)', () => {
     expect(lots.slice(0, 2)).toEqual(['b:L1', 'a:L1']); // premier tirage : un lot par dépôt, b d'abord
     expect(lots.slice(2)).toEqual(['b:L2', 'b:L3', 'a:L2', 'a:L3']); // remplissage : b tant qu'il a des lots prêts, puis a — un remplissage qui ignorerait --priority tirerait a:L2 avant b:L2
     expect(o.out.filter((l) => l.startsWith('créneau libre rempli par '))).toEqual(['créneau libre rempli par b:L2', 'créneau libre rempli par b:L3', 'créneau libre rempli par a:L2', 'créneau libre rempli par a:L3']);
-  });
+  }, 120_000); // six lots en worktrees : 30 s dépassées sous la charge de trois runs en parallèle (porte du 25-11), vert seul
 });
 
 describe("--goal et clé goal: du lot (L258) : l'objectif remplace le titre dans le brief, relayé dans le tableau", () => {

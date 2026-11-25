@@ -11,6 +11,10 @@
     {
       "date": "2026-11-24",
       "texte": "Contexte (lead) : réponse à « je viens de revoir une nouvelle video sur code mode, les influenceur ia semble fan de se truc ». Proposition acceptée : un lot cadence mesuré qui essaie le code mode (script Playwright au lieu d'appels d'outils un par un) sur le ux-reviewer, le poste où il peut compter, et ne le garde que s'il trouve autant de défauts pour moins cher."
+    },
+    {
+      "date": "2026-11-25",
+      "texte": "Correction du lead : le Code Mode est une fonction expérimentale de Claude Code (CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1), pas seulement l'idée de Cloudflare évoquée la veille ; L839 le mesure tel quel sur un cadence run et une revue UX rejoués."
     }
   ]
 }

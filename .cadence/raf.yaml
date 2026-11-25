@@ -4343,13 +4343,14 @@ lots:
       - { id: t1, title: "Cliquet de couverture par projet (cadence analyse), critère 2 de L838 non fait : couverture qui ne baisse pas", status: todo }
   - id: L839
     title: "D-34 : « code mode » pour le ux-reviewer — au lieu de clics et instantanés Playwright un par un (chaque page remonte dans le contexte), l'agent écrit un script Playwright qui mesure tout d'un coup (largeurs, défilement horizontal, coupures de mots, sauts de lignes) et ne rend que les chiffres. Vécu 24-11 : ux-reviewer 63,63 $ sur 24 h (16 % du jour, tarif API), revue UXW-36 seule ~158 k tokens et 69 appels d'outils. Banc : rejouer une même revue déjà faite (ex. maritime UXW-36, défaut M1 connu) en mode script contre le mode actuel. Mesure : coût et tokens par revue, défauts connus retrouvés ; on ne garde le mode script que s'il trouve autant pour moins cher"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-24
     notes:
       - { date: 2026-11-25, text: "Précision du 25-11 (lead) : le « Code Mode » de la vidéo est une fonction expérimentale de Claude Code (doc https://code.claude.com/docs/en/code-mode.md, suivie dans veille/code-mode/) : Claude écrit du JavaScript qui enchaîne ses outils (Bash, Read, Edit, MCP) en une étape, seul le résultat lu revient au contexte. S'active par la variable CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1 (env de la commande, sans toucher settings.json), marche avec claude -p et les sous-agents (outil REPL dans leur liste tools). Banc révisé : un même lot ou une même revue UX déjà faite, rejoué avec et sans la variable ; mesures : tokens, coût, durée, défauts connus retrouvés. Limites à vérifier : auto mode juge le code et non chaque appel, hooks PreToolUse (arret-18h30, pipefail) qui doivent encore voir les commandes, exécution > 10 min." }
     started: 2026-11-25
-    review: { date: 2026-11-25, verdict: "non conforme : 1 majeur (section Script mode et banc réduit restent livrés malgré le verdict « ne pas garder » du banc), 3 mineurs (pourcentages d'économie démentis, sorties brutes du banc seulement dans un scratchpad, compte toolu_cc_) ; banc, chiffres et m1/m4 conformes — revues/cadence-L839c-code.md", commit: ea1eba19162eadf7fc8bb1db73264b41d90869b1 }
+    review: { date: 2026-11-25, verdict: "conforme (relu par le lead 25-11 : section Script mode, cadence mesures et banc réduit retirés sans dépendance restante, test de retrait ; verdict du banc gardé en 6 JSON vérifiés contre l'étude ; porte verte 11 250 tests)", commit: e877d9d5d624705b9a22f462f393a98c62892b29 }
+    finished: 2026-11-25
   - id: L840
     title: "Un cadence run d'adoption (D-31) peut lancer cadence analyse : ses runs s'arrêtent sinon sur une question"
     status: done

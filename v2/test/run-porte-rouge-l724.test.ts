@@ -26,7 +26,7 @@ describe('cadence run : correction après porte rouge (L724)', () => {
     const etat = relire(e), journal = l.join('\n');
     expect(etat.etat).toBe('integre');
     expect(etat.rapport).toBe(RAPPORT); // le « fini » de la correction ne le remplace pas
-    expect(etat.corrections).toEqual([{ rouge: '$ test -f fait.txt\n', message: CORRECTION, verte: true }]);
+    expect(etat.corrections).toEqual([{ rouge: '$ test -f fait.txt\n', message: CORRECTION, verte: true, commits: 1, fichiers: ['fait.txt'] }]); // L842 : ce que la correction a commité
     expect(etat.messages).toEqual([{ texte: RAPPORT, tour: 1, marque: true }, { texte: CORRECTION, tour: 1, sujet: 'correction après porte rouge' }]);
     expect(etat.detail).toBe(`porte rouge ($ test -f fait.txt) corrigée par la session, porte verte ensuite ; la session : ${CORRECTION}`);
     const lignes = [
@@ -48,7 +48,7 @@ describe('cadence run : correction après porte rouge (L724)', () => {
     const etat = relire(e);
     expect(etat.etat).toBe('porte-rouge');
     expect(etat.rapport).toBe(RAPPORT);
-    expect(etat.corrections).toEqual([{ rouge: '$ test -f fait.txt\n', message: 'fini, corrigé je crois', verte: false }]);
+    expect(etat.corrections).toEqual([{ rouge: '$ test -f fait.txt\n', message: 'fini, corrigé je crois', verte: false, commits: 1, fichiers: ['b.txt'] }]);
   });
 
   it('porte-rouge puis --reponse : la réponse est une correction, le rapport du travail reste, la porte verte ensuite est notée', () => {
@@ -70,7 +70,7 @@ describe('cadence run : correction après porte rouge (L724)', () => {
     const etat = relire(e);
     expect(etat.etat).toBe('integre');
     expect(etat.rapport).toBe(RAPPORT); // la reprise après quota continue la correction : son « fini » ne remplace pas le rapport
-    expect(etat.corrections).toEqual([{ rouge: '$ test -f fait.txt\n', message: CORRECTION, verte: true }]);
+    expect(etat.corrections).toEqual([{ rouge: '$ test -f fait.txt\n', message: CORRECTION, verte: true, commits: 1, fichiers: ['fait.txt'] }]); // L842 : ce que la correction a commité
     expect(etat.messages?.at(-1)).toEqual({ texte: CORRECTION, tour: 1, sujet: 'correction après porte rouge' });
     expect(l.join('\n')).toMatch(/quota revenu : reprise de la session/);
   });

@@ -99,6 +99,8 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // changent ce qu'elle juge), sauf si les commits arrivés ne touchent que le plan ou le registre des demandes (dePlan), sans ligne tassée.
   // L840 : run et hooks inchangés : cadence analyse bornée permise dans toute session de run, docs/analyse.md jointe quand la demande ou le lot la cite
   // (commandesNommees, interditsDuRun de scripts/commandes-du-brief.mjs) ; seul-spec-check.mjs devient cadence-permise.mjs, même taille, sans ligne tassée.
+  // L842 : run 1329 (+60, dont src/run/rejeu.ts) : la porte du run rejoue seul chaque test rouge avant toute correction (rejeuSeul ; la déduction, le rejeu et la preuve vivent dans
+  // scripts/rejeu-rouges.mjs, la lecture des rouges dans scripts/rouges-porte.mjs, partagée avec src) et chaque correction note ses commits (avecMesure, dans scripts/passes-porte-rouge.mjs avec la mesure qui les lit) ; somme du noyau 2998, sous les 3000 du design, sans ligne tassée.
   // L775 : bench 1609 (+21), sequence 717 (+2), mesure 2326 : le détecteur de fuites ignore les appels refusés par le hook du bras (refusParHook, partagé
   // avec lectureReferences), sans ligne tassée.
   // L777 : bench 1672 (+63), mesure 2389 : « tests d'origine verts » compte les tests d'origine réussis par bras (testsReussis, cachesReussis, lus dans les

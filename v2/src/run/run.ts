@@ -23,7 +23,8 @@ import { commandesDeRegeneration, regenerer, retirerRegenerations, TRAILER_REGEN
 import { avecRefusCadence, commandesNommees, interditsDuRun, leverPourCadence } from '../../../scripts/commandes-du-brief.mjs'; // L792, L840 : commandes cadence permises
 import { noterVerdict } from '../../../scripts/verdicts-porte.mjs'; // L786 : même écriture que src/gate-verdict.ts (verify --gate)
 import { lireEtapes } from '../../../scripts/etapes-porte.mjs'; // L786 (revue r1, M1) : mêmes étapes que verify --gate
-import { etapeAnalyse, lignesARelire } from '../../../scripts/analyse.mjs'; // L801 : l'étape analyse de la porte, cliquet par outil
+import { etapeAnalyse } from '../../../scripts/analyse.mjs'; // L801 : l'étape analyse de la porte, cliquet par outil
+import { avecMesure, jouerCommandes, lignesSensibles, type Sensible } from './rejeu.js'; // L842 : rouges rejoués seuls avant correction, commits des corrections
 import { consigneNouveautes, entreesQuiCitent, ligneNouveautes, lotVisible } from '../../../scripts/nouveautes-du-run.mjs'; // L794 : entrée Nouveautés d'un lot visible
 import { debutProcessus, inscrireCreneau, occupantVivant, prendreVerrou, rendreVerrou, roleVerrou } from '../verrou.js';
 
@@ -37,8 +38,9 @@ const BASCULE_FABLE = `La limite Opus est atteinte : tu continues sur Fable. Rep
  * ne l'a pas résolu, `message` : son dernier mot. */
 export interface Conflit { cible: string; sur: string; fichiers: string[]; resolu?: boolean; message?: string }
 /** L724 : une porte rouge rendue à la session pour correction ; `rouge` : la sortie de la porte, `message` : le dernier mot de la session,
- * `verte` : la porte rejouée après la correction, absente tant qu'elle n'a pas été rejouée. */
-export interface Correction { rouge: string; message?: string; verte?: boolean }
+ * `verte` : la porte rejouée après la correction, absente tant qu'elle n'a pas été rejouée. L842 : `commits` et `fichiers`, ce que ses sessions ont commité
+ * (la mesure des passes « porte rouge » sans commit de code, scripts/passes-porte-rouge.mjs). */
+export interface Correction { rouge: string; message?: string; verte?: boolean; commits?: number; fichiers?: string[] }
 export type EtatRun = 'en-cours' | 'interrompu' | 'attente' | 'quota' | 'sans-commit' | 'echec' | 'conflit' | 'porte-rouge' | 'environnement-perime' | 'sans-porte' | 'refus-integration' | 'integre';
 /** `rapport`, `rapport_tour`, `rapport_sans_marqueur`, `messages` : ../rapport.ts (EtatRapport, issues #57 et #58). */
 export interface Etat extends EtatRapport { id: string; repo: string; branche: string; cible: string; base: string; worktree: string; fichier: string; demande: string;
@@ -51,7 +53,8 @@ export interface Etat extends EtatRapport { id: string; repo: string; branche: s
    * --clore, avec ses archives et ce qui est resté (worktree non propre, branche) ; `force` : un état clos avant la 5e passe, sans preuve d'intégration. */
   tete?: string; /** Revue L764 r1 (M3) : la porte lue au commit du run quand elle diffère de celle de la cible, reprise au détail de l'état integre. */
   porte_changee?: string; /** Revue L801 r3 (M2) : ce que l'analyse d'une porte verte dit à relire (ligne de base neuve, config changée par déclaration). */
-  analyse_dite?: string[];
+  analyse_dite?: string[]; /** L842 : les tests sensibles à la charge de chaque porte jouée (rouges dans la suite, verts rejoués seuls, ./rejeu.ts). */
+  sensibles_charge?: Sensible[];
   /** L792 : le brief nomme `cadence spec check` (scripts/commandes-du-brief.mjs) ; la session peut la lancer, reprises comprises. */
   spec_check?: boolean;
   /** L794 : le lot du plan est visible (scripts/nouveautes-du-run.mjs) ; `nouveautes` : à la fin, les entrées du commit du run qui le citent (null : git illisible). */
@@ -161,13 +164,8 @@ function perime(e: Etat, out: (l: string) => void): string | null {
 const horsCommit = (cwd: string) => (fichiersNonCommites(cwd, { tous: true }) ?? ['(git status illisible)']).join('\n');
 function jouerPorte(cmds: string[], e: Etat, out: (l: string) => void): { ok: boolean; sortie: string } {
   // L786 (revue r1, M2) : le sha lu AVANT la porte ; un verdict n'est noté que pour un arbre égal à ce commit avant et après, au même HEAD.
-  const cwd = e.worktree, sha = git(cwd, 'rev-parse', 'HEAD'), avant = horsCommit(cwd), dites: string[] = [];
-  let p = { ok: true, sortie: '' };
-  for (const c of cmds) {
-    const r = spawnSync('bash', ['-c', c], { cwd, encoding: 'utf8', timeout: PORTE_MS, maxBuffer: 64 << 20 });
-    if (r.status !== 0) { p = { ok: false, sortie: `$ ${c}\n${`${r.stdout ?? ''}${r.stderr ?? ''}`.slice(-4000)}${r.error ? `\n${r.error.message}` : ''}` }; break; }
-    dites.push(...lignesARelire(r.stdout ?? ''));
-  }
+  const cwd = e.worktree, sha = git(cwd, 'rev-parse', 'HEAD'), avant = horsCommit(cwd);
+  const { p, dites } = jouerCommandes(cmds, e, out, PORTE_MS); // L842 : une commande de test rouge rejoue seuls ses rouges ; verts seuls, elle compte verte
   // Revue L801 r3 (M2) : une porte verte n'est pas muette — dit une fois par changement (comme porte_changee), gardé pour le détail de l'état integre.
   if (p.ok && cmds.length) { for (const l of dites) if (!e.analyse_dite?.includes(l)) out(l); e.analyse_dite = dites.length ? dites : undefined; }
   if (!cmds.length) return p; // --sans-porte : aucune porte n'a jugé, rien n'est noté
@@ -196,7 +194,9 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false, sujet?: string
   const bras = { ...(e.mode === 'leger' ? BRAS_LEGER : BRAS_COMPLET), modele: e.modele ?? 'opus' }; // L763 : ses hooks s'ajoutent à ceux du socle
   const socle = reglagesRun(e.worktree, process.env, bras.settings);
   const reglages = avecRefusCadence(socle, HOOKS, { specCheck: e.spec_check }); // L840, L792 (revue r1, M1) : tout cadence ou raf hors analyse bornée et spec check|qa refusé par hook
-  const brut = exec(['-p', prompt, ...(neuve ? ['--session-id', e.session] : e.session ? ['--resume', e.session] : []), ...argsClaude(bras, e.worktree, interdits, reglages)], { cwd: e.worktree, env }); // L705 : coupes du socle (../socle.ts)
+  // L705 : coupes du socle (../socle.ts) ; L842 : ce que commite une session de correction s'ajoute à sa correction (avecMesure)
+  const brut = avecMesure(e.corrections, e.worktree, sujet === SUJET_CORRECTION,
+    () => exec(['-p', prompt, ...(neuve ? ['--session-id', e.session] : e.session ? ['--resume', e.session] : []), ...argsClaude(bras, e.worktree, interdits, reglages)], { cwd: e.worktree, env }));
   const id = ajouterSession(claudeVide(), brut.stdout).modeles.join(', '); // L756 (issue #61) : l'id exact de la session, pas l'alias passé à --model
   if (id) e.passes.at(-1)!.id_modele = id;
   const r = lire(brut), cause = causeSession(brut); if (cause) o.out(cause); // L711 : une session arrêtée par un signal le dit dans le journal, avant la suite habituelle
@@ -412,7 +412,7 @@ function suite(e: Etat, o: Opts): Etat {
   const regenere = regenerations(e);
   // L723 : intégré, mais une fusion écrite par la session est à relire ; L724 : de même pour une correction après porte rouge
   e.detail = [...(e.porte_changee ? [`${e.porte_changee} — à relire : la porte qui a jugé le run est la sienne`] : []), ...(e.analyse_dite ?? []).map((l) => `${l} — à relire`),
-    ...(e.cible_avancee ?? []).map((a) => cibleAvancee(e, a)), ...(e.conflits ?? []).filter((c) => c.resolu).map((c) => conflitResolu(e, c)), ...(e.corrections ?? []).filter((c) => c.verte).map(correctionFaite),
+    ...lignesSensibles(e.sensibles_charge), ...(e.cible_avancee ?? []).map((a) => cibleAvancee(e, a)), ...(e.conflits ?? []).filter((c) => c.resolu).map((c) => conflitResolu(e, c)), ...(e.corrections ?? []).filter((c) => c.verte).map(correctionFaite),
     ...(regenere.length ? [`fichiers générés régénérés par le run avant la porte (run.regenerate, L781) : commit ${regenere.join(', ')}`] : [])].join('\n');
   const registre = registreOuvert(e.worktree);
   noterNouveautes(e);

@@ -1,7 +1,11 @@
 // Part de la machine de chaque session (L350) : le 26-10, 32 cœurs et 4 sessions, vitest à 31 workers par suite, et des tests qui passaient seuls rougissaient ensemble.
 
 import { isAbsolute, join, relative } from 'node:path';
-import { failedTests, jestTestFiles, nodeTestFiles, nodeTestRan, stripAnsi, testDurationMs, timeoutLimits } from './baseline.js';
+import { failedTests, jestTestFiles, nodeTestFiles, nodeTestRan, testDurationMs, timeoutLimits } from './baseline.js';
+import { NO_TEST_RAN, replayFile, replayRanFile, shellArg } from '../../scripts/rouges-porte.mjs';
+
+// L842 : le fichier d'un rouge, la preuve qu'un rejeu l'a joué et la porte composée vivent dans scripts/rouges-porte.mjs, partagés avec la porte de `cadence run`.
+export { isComposedGate, NO_TEST_RAN, replayFile, replayRanFile, shellArg } from '../../scripts/rouges-porte.mjs';
 
 /** Variable posée dans l'environnement des sessions et de la porte : le nombre de workers que leurs lanceurs de tests ont le droit d'ouvrir. */
 export const TEST_WORKERS_ENV = 'CADENCE_TEST_WORKERS';
@@ -26,18 +30,6 @@ export function testWorkersText(n: number): string {
 }
 
 /**
- * Le fichier à rejouer seul pour un test rouge : « fichier > suite > test » (vitest), « fichier::test » (pytest), « fichier » seul (jest : `FAIL src/a.test.ts`).
- * En espace de travail le nom est précédé de « |paquet| » : ce n'est pas une partie du chemin. Null quand le nom n'en désigne aucun (rien à rejouer seul) : y compris le « Suite › test » de jest, que `jestTestFiles` rattache au fichier FAIL qui le précède dans la même sortie.
- */
-export function replayFile(test: string): string | null {
-  // Le premier séparateur rencontré borne le chemin : un « :: » ou un « > » dans le titre du test (« a.test.ts > suite > cas::x ») n'en fait pas partie.
-  const seps = [test.indexOf('::'), test.indexOf(' > ')].filter((i) => i >= 0);
-  const head = seps.length ? test.slice(0, Math.min(...seps)) : /^\S+$/.test(test.trim()) ? test : '';
-  const file = head.trim().replace(/^\|[^|\s]*\|\s+/, ''); // espace de travail vitest : « |paquet|  src/a.test.ts »
-  return /^\S.*\.\w+$/.test(file) ? file : null;
-}
-
-/**
  * Le fichier à rejouer pour chaque nom rouge de `output` : le « location: » de node --test d'abord (L514 : un titre libre n'est pas un chemin, même s'il n'a pas d'espace), puis le nom (vitest, pytest), puis le fichier FAIL de jest.
  * `nodeTitles` dit si le nom est un titre node --test : son rejeu vert ne s'imprime pas avec son fichier, il se prouve par sa ligne « ok N - titre » (`nodeTestRan`).
  */
@@ -59,46 +51,6 @@ export interface ReplayPlace {
   root: string;
   dir?: string;
 }
-
-/** Un argument de commande sans risque pour `sh -c` : tel quel s'il est simple, entre apostrophes sinon. */
-export function shellArg(s: string): string {
-  return /^[\w./@+=,:-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`;
-}
-
-/**
- * Une porte composée : plusieurs lanceurs ou un sous-shell, c'est-à-dire un `&&` ou un `||` hors apostrophes et guillemets, ou une parenthèse (sous-shell `( … )`, substitution `$( … )`, fonction). Le premier lanceur qui rougit coupe avant le suivant :
- * le rejeu seul d'un de ses tests ne dit rien du reste. `orchestrate.testReplay` est refusé à la lecture de cadence.yaml pour une telle porte (L354) : le rejeu seul ne vaut que pour un lanceur unique.
- */
-export function isComposedGate(command: string): boolean {
-  let quote = '';
-  for (let i = 0; i < command.length; i++) {
-    const ch = command[i];
-    if (quote) {
-      if (ch === '\\' && quote === '"') i++;
-      else if (ch === quote) quote = '';
-    } else if (ch === '\\') i++;
-    else if (ch === "'" || ch === '"') quote = ch;
-    else if (ch === '(' || command.startsWith('&&', i) || command.startsWith('||', i)) return true;
-  }
-  return false;
-}
-
-/** Une ligne d'écho de la commande par son lanceur de paquets, qui recopie ses arguments (les fichiers rejoués compris) : npm 12 « npm notice run … », « npm warn … », « npm ERR! … » ; npm et pnpm « > vitest run … » ; yarn « $ vitest run … ». */
-const LAUNCHER_ECHO = /^\s*(?:npm (?:notice|warn|WARN|ERR!?|error)\b|>\s|\$\s)/;
-
-/**
- * Le rejeu a-t-il exécuté ce fichier (L354) ? Il figure, chemin entier, sur une ligne du lanceur : ni une fin d'un autre chemin (`a.test.ts` dans `src/a.test.ts`), ni une ligne d'écho de la commande par npm, pnpm ou yarn, qui recopie
- * tous les fichiers demandés, ceux qu'un lanceur d'un autre espace de travail n'a pas joués compris. Mesuré le 26-10 : npm 12.2.0 écrit « npm notice run 'vitest' run … <fichiers> » sur stderr pour `npx …` comme pour `npm test -- …`.
- */
-export function replayRanFile(output: string, file: string): boolean {
-  const re = new RegExp(`(?:^|[^\\w./-])${file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w.-])`);
-  return stripAnsi(output)
-    .split('\n')
-    .some((line) => !LAUNCHER_ECHO.test(line) && re.test(line));
-}
-
-/** Sortie d'un lanceur qui n'a trouvé aucun test à rejouer : la ligne de fin du lanceur (vitest « No test files found, exiting with code », jest « No tests found, exiting with code », pytest « no tests ran in »), en début de ligne — pas ces mots cités dans le titre ou la sortie d'un test. */
-export const NO_TEST_RAN = /^\W*(?:no test files? found, exiting with code|no tests? found, exiting with code|no tests ran in)\b/im;
 
 /** Rejeux d'un test rouge de la porte, seul (L354) : rouge aux deux, il est compté. */
 const REPLAYS = 2;

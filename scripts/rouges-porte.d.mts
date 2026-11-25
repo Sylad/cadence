@@ -1,0 +1,15 @@
+export const MARKERS: RegExp[];
+export const FILE_LOAD_FAIL: RegExp;
+export const NO_TEST_RAN: RegExp;
+export function clean(s: string): string;
+export function stripAnsi(s: string): string;
+export function failedTests(output: string): string[];
+export function unloadedSuites(output: string): string[];
+export function jestTestFiles(output: string): Map<string, string>;
+export function nodeTestFiles(output: string): Map<string, string>;
+export function nodeTestRan(output: string, title: string): boolean;
+export function hasUnnamedFailure(output: string, loadFailsNamed?: boolean): boolean;
+export function replayFile(test: string): string | null;
+export function shellArg(s: string): string;
+export function isComposedGate(command: string): boolean;
+export function replayRanFile(output: string, file: string): boolean;

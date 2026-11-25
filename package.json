@@ -43,6 +43,8 @@
     "scripts/verdicts-porte.d.mts",
     "scripts/etapes-porte.mjs",
     "scripts/etapes-porte.d.mts",
+    "scripts/porte-rapide.mjs",
+    "scripts/porte-rapide.d.mts",
     "scripts/commandes-du-brief.mjs",
     "scripts/commandes-du-brief.d.mts",
     "scripts/nouveautes-du-run.mjs",

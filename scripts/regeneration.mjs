@@ -4,8 +4,8 @@
 // (v2/src/run/regenerer.ts) et par la validation de cadence.yaml (src/config.ts, readRunConfig) : un fichier que l'une accepte, l'autre l'accepte.
 // JavaScript sans dépendance, comme scripts/references.mjs : src et v2 l'importent hors de leur rootDir. Il lit la valeur déjà analysée (pas de yaml ici).
 
-const FORME = 'run: { purgeAfterDays: <jours>, worktreeOutside: <true|false>, regenerate: [{ command: <commande>, dir: <dossier du dépôt> }] }';
-const CLES_RUN = ['purgeAfterDays', 'worktreeOutside', 'regenerate']; // les clés de run: lues ailleurs : v2/src/run/purger.ts, v2/src/socle.ts
+const FORME = 'run: { purgeAfterDays: <jours>, worktreeOutside: <true|false>, regenerate: [{ command: <commande>, dir: <dossier du dépôt> }], fastGate: <true|{ command, dir, full }> }';
+const CLES_RUN = ['purgeAfterDays', 'worktreeOutside', 'regenerate', 'fastGate']; // les clés de run: lues ailleurs : v2/src/run/purger.ts, v2/src/socle.ts ; fastGate : scripts/porte-rapide.mjs (L838)
 const estObjet = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const texte = (v) => typeof v === 'string' && v.trim() !== '';
 

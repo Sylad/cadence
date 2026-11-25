@@ -23,7 +23,7 @@ A gate is a check that sends a lot back instead of letting it through. It is dec
 |---|---|---|---|
 | Code review | `reviewSince`, written by `raf review enable` | plan | `raf done` on a lot with commits whose review is not recorded ([raf](raf.md)) |
 | UX review | `uxSince`, written by `raf ux enable` | plan | `raf done` on a `--visible` lot with no UX review ([news](news.md)) |
-| Tests | `orchestrate.test` (with `testReplay`, `testRelated`) | cadence.yaml | a lot whose suite is red after a write step: it goes to a correction pass ([orchestrate](orchestrate-cycle.md)) |
+| Tests | `orchestrate.test` (with `testReplay`, `testRelated`; `run.fastGate` for `cadence run`) | cadence.yaml | a lot whose suite is red after a write step: it goes to a correction pass ([orchestrate](orchestrate-cycle.md)); in a `cadence run` with `run.fastGate`, only the touched tests, the full suite at the delivery gate ([below](#fast-gate-during-a-run-runfastgate)) |
 | Build | `orchestrate.build` | cadence.yaml | a lot whose build or typecheck is red, played before the tests |
 | Static analysis | `analyse` | cadence.yaml | a run whose code adds a violation to a declared tool (ESLint, tsc, ruff, Checkstyle, PMD, SpotBugs, SARIF) above its versioned baseline, or raises that baseline: played by the gate of `cadence run` between build and tests ([analyse](analyse.md)) |
 | Code without a test | `orchestrate.testGate` | cadence.yaml | code files changed with no test file touched: a correction pass before the review |
@@ -126,6 +126,32 @@ red gate, with the files put back as they were; this has its own correction, it 
 Before every rebase and every resumed session, all the run's regeneration commits are removed and played again on the updated tree.
 Output written to files that git ignores is seen by the gate but never committed. `dir` is relative to the repository, without `..`,
 `/` or `~`; any other key, or a malformed entry, is refused by `cadence run` and by the gate that validates `cadence.yaml`, with the key at fault.
+
+## Fast gate during a run: `run.fastGate`
+
+By default the gate of `cadence run` plays the whole suite before it integrates. A project whose suite is long declares a **fast gate** (L838):
+during the run, the test step plays only the tests touched by the diff of the lot, and the full suite is played once, at the delivery gate
+(`cadence verify --gate`, which the pre-push hook requires for the pushed sha). Build and `analyse` are played as before.
+
+```yaml
+run:
+  fastGate: true                               # derived from orchestrate.test « [npx ]vitest run[ options] » : vitest related --run [options] {files}
+  # or
+  fastGate:
+    command: npx jest --findRelatedTests {files} # any launcher that takes the touched files; {files} is required
+    dir: backend                                 # files are passed relative to it and the command runs in it (default: the root)
+    full: [package-lock.json, jest.config.js]    # touching one of them plays the full suite (cadence.yaml always does)
+```
+
+The files given to the command are the files the lot adds or changes since its start on the target branch, plus the tests that `bounds`
+declares for them and the tests that cite the name of a touched file that is not code (a page, a data file: the test reads it, it does not
+import it). **The full suite is played instead, and the run says why**, whenever the selection is uncertain: a file deleted or moved (the tests
+that imported it cannot be found from the diff), a file of `full` touched, a file outside `dir`, no file at all, or a command that finds no test
+(`No test files found`, `No tests found`, `no tests ran`). A green fast gate records **no verdict** for the sha: the delivery gate plays the
+whole suite. The state of the run keeps each gate it played (`portes`: targeted or not, green or red, seconds) and the integrated detail says
+« porte rapide (run.fastGate) : tests touchés par N fichier(s) du lot ; la suite complète se joue à la porte de livraison ». A malformed key
+(no `{files}`, a command that cannot be derived, a `dir` outside the repository) is refused by `cadence run` (state `sans-porte`) and by the
+gate that validates `cadence.yaml`. Measure on cadence itself: [porte-rapide-l838](mesures/porte-rapide-l838.md).
 
 ## Short writing: `ecriture:`
 

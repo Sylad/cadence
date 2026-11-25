@@ -184,3 +184,9 @@
 - Intégration (`rebaserDisjoint`, v2/src/run/run.ts) : cible avancée pendant la porte par des commits disjoints du diff du run, sans cadence.yaml, run sans commit de régénération → rebase puis porte rejouée sur le sha rebasé, hors du compte des 3 rebases de L723 (10 fois au plus de suite) ; commits du plan ou du registre seuls (`dePlan`) → avance rapide sans rejouer la porte. Noté dans `cible_avancee` (`plan_seul`) et le détail de `integre`. Sinon chemin L723.
 - Lancement (`commiterStart`) : avec `--lot`, un plan non commité qui ne diffère de HEAD que par le statut (et `started`) du lot est commité par le run (`plan: <lot> démarré` ou gabarit `plan.commit`) avant le worktree.
 - Décision : pas de porte rejouée pour un commit disjoint (le pre-push L786 exige une porte au sha poussé) ; tests L723 (deux runs, 3 rebases), L786 m5, L695 e2e et Ctrl-C mis à jour pour des avances qui chevauchent ou pour lire les porteurs. Tests : test/run-verrou-fichiers-l796.test.ts, v2/test/run-disjoint-l796.test.ts.
+
+## cadence run : porte rapide, run.fastGate (L838, D-33)
+
+- `scripts/porte-rapide.mjs` : lecture de `run.fastGate` (aussi validée par `src/config-set.ts`), sélection des tests touchés (`choisir`, repli sûr sur la suite complète) et `--jouer <liée> --sinon <complète>` ; `src/docsync.ts` y prend `motif`/`ensemble`.
+- `v2/src/run/porte-run.ts` : la porte jouée par le run (sortie de run.ts), aucun verdict après une porte rapide, mesure `portes[]` dans l'état.
+- Mesure : `docs/mesures/porte-rapide-l838.md`. Reste à faire : le cliquet de couverture (critère 2 du lot).

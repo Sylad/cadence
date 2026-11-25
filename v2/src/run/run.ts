@@ -16,16 +16,17 @@ import { heureLocale, reconnaitreQuota, type Quota } from './quota.js';
 import { causeSession } from '../trace.js';
 import { arreterGroupe, dansGroupe, dormir, type GroupeArrete } from '../processus.js';
 import { CONSIGNE_FINI, garderRapport, origineRapport, type EtatRapport } from '../rapport.js';
-import { cheminWorktree, HOOKS, PORTE_MS, reglagesRun } from '../socle.js';
+import { cheminWorktree, HOOKS, reglagesRun } from '../socle.js';
 import { briefRegistre, entreeCommitee, preparerRegistre, registreOuvert, registreTouche } from '../registre.js';
 import { fichiersNonCommites, nommerFichiers, PLAN_EN_ATTENTE } from '../../../scripts/arbre-non-commite.mjs'; // L722 : même lecture que src/repo-held.ts
 import { environnementPerime, ignorerPerime, lignesPerime } from '../../../scripts/environnement-porte.mjs'; // L764 : même lecture que src/verify-gate.ts
 import { commandesDeRegeneration, regenerer, retirerRegenerations, TRAILER_REGENERATION } from './regenerer.js';
 import { avecRefusCadence, commandesNommees, interditsDuRun, leverPourCadence } from '../../../scripts/commandes-du-brief.mjs'; // L792, L840 : commandes cadence permises
-import { noterVerdict } from '../../../scripts/verdicts-porte.mjs'; // L786 : même écriture que src/gate-verdict.ts (verify --gate)
+import { jouerPorte, ligneTestsTouches, quelleSuite } from './porte-run.js'; // L786, L838 : la porte jouée, son verdict et sa mesure
 import { lireEtapes } from '../../../scripts/etapes-porte.mjs'; // L786 (revue r1, M1) : mêmes étapes que verify --gate
 import { etapeAnalyse } from '../../../scripts/analyse.mjs'; // L801 : l'étape analyse de la porte, cliquet par outil
-import { avecMesure, jouerCommandes, lignesSensibles, type Sensible } from './rejeu.js'; // L842 : rouges rejoués seuls avant correction, commits des corrections
+import { avecMesure, lignesSensibles, type Sensible } from './rejeu.js'; // L842 : rouges rejoués seuls avant correction, commits des corrections
+import { etapeTests, lirePorteRapide as lireTestsTouches, type PorteRapide } from '../../../scripts/porte-rapide.mjs'; // L838 : run.fastGate, les tests touchés seulement
 import { consigneNouveautes, entreesQuiCitent, ligneNouveautes, lotVisible } from '../../../scripts/nouveautes-du-run.mjs'; // L794 : entrée Nouveautés d'un lot visible
 import { debutProcessus, inscrireCreneau, occupantVivant, prendreVerrou, rendreVerrou, roleVerrou } from '../verrou.js';
 
@@ -56,6 +57,8 @@ export interface Etat extends EtatRapport { id: string; repo: string; branche: s
   porte_changee?: string; /** Revue L801 r3 (M2) : ce que l'analyse d'une porte verte dit à relire (ligne de base neuve, config changée par déclaration). */
   analyse_dite?: string[]; /** L842 : les tests sensibles à la charge de chaque porte jouée (rouges dans la suite, verts rejoués seuls, ./rejeu.ts). */
   sensibles_charge?: Sensible[];
+  /** L838 : la porte rapide (run.fastGate) a joué les tests touchés seulement, la ligne qui le dit ; `portes` : chaque porte jouée, sa portée, son issue et sa durée. */
+  porte_rapide?: string; portes?: { ciblee: boolean; ok: boolean; duree_s: number }[];
   /** L792 : le brief nomme `cadence spec check` (scripts/commandes-du-brief.mjs) ; la session peut la lancer, reprises comprises. */
   spec_check?: boolean;
   /** L794 : le lot du plan est visible (scripts/nouveautes-du-run.mjs) ; `nouveautes` : à la fin, les entrées du commit du run qui le citent (null : git illisible). */
@@ -130,15 +133,17 @@ function copierDeps(repo: string, wt: string): void {
   }
 }
 
-const cadenceYaml = (repo: string) => (existsSync(join(repo, 'cadence.yaml')) ? parse(readFileSync(join(repo, 'cadence.yaml'), 'utf8')) as { orchestrate?: object; analyse?: unknown } | null : null);
+const cadenceYaml = (repo: string) => (existsSync(join(repo, 'cadence.yaml')) ? parse(readFileSync(join(repo, 'cadence.yaml'), 'utf8')) as { orchestrate?: object; analyse?: unknown; run?: unknown } | null : null);
 const orchestrate = (repo: string): { prodAccess?: boolean } => cadenceYaml(repo)?.orchestrate ?? {};
 /** L786 (revue r1, M1) : les étapes de verify --gate (scripts/etapes-porte.mjs : build puis test, en chaîne ou en parties) ; `refus` : cadence.yaml que
  * verify --gate refuserait, rien n'est joué ni noté. L801 : l'analyse (clé analyse:, scripts/analyse.mjs) après le build, avant les tests, contre `cible`. */
-function etapesDeCadenceYaml(repo: string, cible = 'main'): { commandes: string[]; refus?: string } {
+function etapesDeCadenceYaml(repo: string, cible = 'main'): { commandes: string[]; tests: string[]; rapide?: PorteRapide | null; refus?: string } {
   const p = lireEtapes(orchestrate(repo)), a = etapeAnalyse(cadenceYaml(repo)?.analyse, cible);
-  if (p.refus !== undefined || a.refus !== undefined) return { commandes: [], refus: p.refus !== undefined ? `orchestrate.${p.refus}` : a.refus };
-  const [build, ...reste] = p.etapes, avant = build?.nom === 'build' ? build.commandes : [];
-  return { commandes: [...avant, ...a.commandes, ...(avant.length ? reste : p.etapes).flatMap((x) => x.commandes)] };
+  let rapide: PorteRapide | null = null, r: string | undefined; // L838 : run.fastGate mal formé, rien n'est joué (comme une porte que verify --gate refuserait)
+  try { rapide = lireTestsTouches(cadenceYaml(repo)?.run, orchestrate(repo), 'cadence.yaml'); } catch (x) { r = (x as Error).message; }
+  if (p.refus !== undefined || a.refus !== undefined || r !== undefined) return { commandes: [], tests: [], refus: p.refus !== undefined ? `orchestrate.${p.refus}` : a.refus ?? r };
+  const [build, ...reste] = p.etapes, avant = build?.nom === 'build' ? build.commandes : [], tests = (avant.length ? reste : p.etapes).flatMap((x) => x.commandes);
+  return { commandes: [...avant, ...a.commandes, ...tests], tests, rapide };
 }
 const commandesDeCadenceYaml = (repo: string, cible?: string): string[] => etapesDeCadenceYaml(repo, cible).commandes;
 /** L764 : la porte d'un run est lue dans cadence.yaml AU COMMIT DU RUN (le worktree, rebasé sur la cible) : un run qui corrige sa propre commande de porte est
@@ -150,7 +155,12 @@ function commandesDuRun(e: Etat, out: (l: string) => void): string[] {
   // Revue L764 r1 : dite une fois par changement (m1, pas à chaque essai ni rebase), gardée pour le détail de l'état integre (M3, comme un conflit résolu, L723).
   if (dit && dit !== e.porte_changee) out(dit);
   e.porte_changee = dit;
-  return cmds;
+  // L838 : avec run.fastGate, l'étape des tests ne joue que les tests touchés depuis le départ du lot sur la cible (scripts/porte-rapide.mjs, repli sûr sur la suite)
+  const { tests, rapide } = etapesDeCadenceYaml(e.worktree, e.cible), depart = essaiGit(e.worktree, 'merge-base', 'HEAD', e.cible).stdout.trim();
+  const t = etapeTests(e.worktree, depart, rapide ?? null, cadenceYaml(e.worktree), tests);
+  if (t.ligne) out(t.ligne);
+  e.porte_rapide = t.ciblee ? t.ligne : undefined;
+  return [...cmds.slice(0, cmds.length - tests.length), ...t.commandes];
 }
 /** L764 : l'environnement du worktree avant la porte (node_modules en retard sur package-lock.json, Node du PATH hors de .nvmrc ou engines.node) ; la sortie
  * à rendre quand il est périmé, null sinon (ou CADENCE_PORTE_ENV=jouer, dit dans le journal). */
@@ -161,24 +171,6 @@ function perime(e: Etat, out: (l: string) => void): string | null {
   if (ignorerPerime(process.env)) { out(['porte du run : environnement périmé, porte jouée quand même (CADENCE_PORTE_ENV=jouer) — un rouge peut venir de lui :', ...lignes.slice(1, -1)].join('\n')); return null; }
   return [...lignes, `  après la remise à niveau : cadence run --reponse ${e.id} "environnement remis à niveau" (la session reprend, puis la porte est rejouée)`].join('\n');
 }
-/** L786 (revue r1, M2) : les fichiers du worktree hors du commit (modifiés, indexés, non suivis même cachés ; les ignorés exceptés), '' s'il est propre ; git muet : sale. */
-const horsCommit = (cwd: string) => (fichiersNonCommites(cwd, { tous: true }) ?? ['(git status illisible)']).join('\n');
-function jouerPorte(cmds: string[], e: Etat, out: (l: string) => void): { ok: boolean; sortie: string } {
-  // L786 (revue r1, M2) : le sha lu AVANT la porte ; un verdict n'est noté que pour un arbre égal à ce commit avant et après, au même HEAD.
-  const cwd = e.worktree, sha = git(cwd, 'rev-parse', 'HEAD'), avant = horsCommit(cwd);
-  const { p, dites, excuses } = jouerCommandes(cmds, e, out, PORTE_MS); // L842 : une commande de test rouge rejoue seuls ses rouges ; verts seuls, elle compte verte
-  // Revue L801 r3 (M2) : une porte verte n'est pas muette — dit une fois par changement (comme porte_changee), gardé pour le détail de l'état integre.
-  if (p.ok && cmds.length) { for (const l of dites) if (!e.analyse_dite?.includes(l)) out(l); e.analyse_dite = dites.length ? dites : undefined; }
-  if (!cmds.length) return p; // --sans-porte : aucune porte n'a jugé, rien n'est noté
-  const apres = horsCommit(cwd), tete = git(cwd, 'rev-parse', 'HEAD');
-  const pourquoi = [...(avant ? [`avant la porte, l'arbre portait des fichiers hors du commit (${avant.split('\n').length})`] : []),
-    ...(apres ? [`après la porte, l'arbre porte des fichiers hors du commit (${apres.split('\n').length})`] : []), ...(tete !== sha ? [`HEAD est passé à ${tete.slice(0, 7)}`] : []), ...excuses];
-  // L786 : le verdict du commit jugé, là où le hook pre-push le lit (même fichier que verify --gate).
-  if (!pourquoi.length) noterVerdict(cwd, sha, p.ok ? 0 : 1, new Date());
-  else out(`porte du run : aucun verdict noté pour ${sha.slice(0, 7)} — ${pourquoi.join(' ; ')} : la porte n'a pas jugé ce commit seul, le hook pre-push exigera une porte de verify à ce sha`);
-  return p;
-}
-
 // L709 (issue #55) : rien de ce qui lie un processus à la session Claude Code lanceuse (pid, socket, auth rafraîchie par l'hôte) ; `neuve` : 1re session, id de l'état.
 const LIEN_HOTE = /^CLAUDE_(PID|SSH_\w+|CODE_(CHILD_SESSION|MESSAGING_\w+|SDK_HAS_HOST_AUTH_REFRESH|HOST_SESSION_ID|SESSION_ID))$/;
 /** `sujet` : une session qui ne fait pas le travail demandé (L723 : la résolution d'un conflit) ; ses messages ne remplacent pas le rapport du travail. */
@@ -388,7 +380,7 @@ function suite(e: Etat, o: Opts): Etat {
       if ((g && !g.ok ? rougesRegeneration++ : rouges++) === 1) { if (attendue) attendue.verte = false; e.etat = 'porte-rouge'; e.detail = p.sortie; return fin(e, o); }
       o.out(`porte rouge : reprise de la session pour corriger :\n${p.sortie}`);
       ouvrirCorrection(e, p.sortie, o.out);
-      if (!session(e, `La porte complète est rouge après ton travail :\n${p.sortie}\nCorrige la cause (sans affaiblir aucun test), commite, ${CONSIGNE_FINI}.`, o, false, SUJET_CORRECTION)) return fin(e, o);
+      if (!session(e, `La porte ${quelleSuite(e)} est rouge après ton travail :\n${p.sortie}\nCorrige la cause (sans affaiblir aucun test), commite, ${CONSIGNE_FINI}.`, o, false, SUJET_CORRECTION)) return fin(e, o);
     }
     let refus = avancer(e, br, cible), rejouer = false;
     // L796 : la cible a avancé sur des fichiers disjoints : rebase ; plan ou registre seuls, avance rapide sans porte ; sinon porte rejouée sur le sha rebasé,
@@ -412,7 +404,7 @@ function suite(e: Etat, o: Opts): Etat {
   e.integre = git(e.repo, 'rev-parse', '--short', e.cible); e.etat = 'integre';
   const regenere = regenerations(e);
   // L723 : intégré, mais une fusion écrite par la session est à relire ; L724 : de même pour une correction après porte rouge
-  e.detail = [...(e.porte_changee ? [`${e.porte_changee} — à relire : la porte qui a jugé le run est la sienne`] : []), ...(e.analyse_dite ?? []).map((l) => `${l} — à relire`),
+  e.detail = [...(e.porte_changee ? [`${e.porte_changee} — à relire : la porte qui a jugé le run est la sienne`] : []), ...(e.analyse_dite ?? []).map((l) => `${l} — à relire`), ...ligneTestsTouches(e),
     ...lignesSensibles(e.sensibles_charge), ...(e.cible_avancee ?? []).map((a) => cibleAvancee(e, a)), ...(e.conflits ?? []).filter((c) => c.resolu).map((c) => conflitResolu(e, c)), ...(e.corrections ?? []).filter((c) => c.verte).map(correctionFaite),
     ...(regenere.length ? [`fichiers générés régénérés par le run avant la porte (run.regenerate, L781) : commit ${regenere.join(', ')}`] : [])].join('\n');
   const registre = registreOuvert(e.worktree);

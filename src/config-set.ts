@@ -12,6 +12,7 @@ import { commitPaths, dirtyPaths, gitRoot, restorePaths } from './git.js';
 import { findProjects, isProject, readDepth, readLeadChain, readLeadContextThreshold, readLeadUx } from './lead.js';
 import { readEvalEntries } from './lot-evals.js';
 import { lireRegeneration } from '../scripts/regeneration.mjs';
+import { lirePorteRapide } from '../scripts/porte-rapide.mjs';
 import { lireAnalyse } from '../scripts/analyse.mjs';
 import { lireEcriture } from '../scripts/ecriture.mjs';
 import { readYamlKey } from './yaml-keys.js';
@@ -46,6 +47,7 @@ export function validateConfig(file: string, root: string): void {
   readEvalEntries(file); // revue L755 : une clé evals mal formée couperait la porte de raf done en silence
   readReferencesConfig(file);
   try { lireRegeneration(readYamlKey(file, 'run'), file); } catch (e) { throw new RafError((e as Error).message); } // L781 : run.regenerate, le code de cadence run
+  try { lirePorteRapide(readYamlKey(file, 'run'), readYamlKey(file, 'orchestrate'), file); } catch (e) { throw new RafError((e as Error).message); } // L838 : run.fastGate, le code de cadence run
   try { lireAnalyse(readYamlKey(file, 'analyse'), file); } catch (e) { throw new RafError((e as Error).message); } // L801 : analyse, le code de la porte de cadence run
   try { lireEcriture(readYamlKey(file, 'ecriture'), file); } catch (e) { throw new RafError((e as Error).message); } // L803 : ecriture, le code de cadence ecriture
   readMigrateConfig(file);

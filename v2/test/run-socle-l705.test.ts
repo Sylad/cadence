@@ -14,6 +14,9 @@ const PLUGINS = { 'superpowers@claude-plugins-official': true, 'feature-dev@clau
   'playwright@claude-plugins-official': true, 'context7@claude-plugins-official': false };
 const PREMIER_PLAN = { hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: `node "${join(HOOKS, 'premier-plan.mjs')}"`, timeout: 10 }] }] },
   env: { BASH_MAX_TIMEOUT_MS: String(PORTE_MS) } };
+// L840 : dans une session du run, le hook cadence-permise (cadence analyse bornée seule permise) suit celui du socle
+const SESSION = { ...PREMIER_PLAN, hooks: { PreToolUse: [...PREMIER_PLAN.hooks.PreToolUse,
+  { matcher: 'Bash', hooks: [{ type: 'command', command: `node "${join(HOOKS, 'cadence-permise.mjs')}"`, timeout: 10 }] }] } };
 const reglagesLus = (args: string[]) => JSON.parse(readFileSync(args[args.indexOf('--settings') + 1], 'utf8')) as Record<string, unknown>;
 
 describe('L705 : coupes du socle de cadence run', () => {
@@ -36,7 +39,7 @@ describe('L705 : coupes du socle de cadence run', () => {
     expect(vus).toHaveLength(2); // la reprise après une porte rouge aussi
     for (const r of vus) expect(r).toEqual({
       enabledPlugins: { 'superpowers@claude-plugins-official': false, 'feature-dev@claude-plugins-official': false, 'qodo@claude-plugins-official': false },
-      disableClaudeAiConnectors: true, autoMemoryEnabled: false, ...PREMIER_PLAN }); // L763 : le refus de run_in_background (run-inactif-l763.test.ts)
+      disableClaudeAiConnectors: true, autoMemoryEnabled: false, ...SESSION }); // L763 : le refus de run_in_background (run-inactif-l763.test.ts)
   });
 
   it('mode complet : les coupes s\'ajoutent au hook de lecture du bras, qui reste', () => {

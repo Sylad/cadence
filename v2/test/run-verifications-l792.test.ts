@@ -21,10 +21,10 @@ function avec(repo: string, fichiers: Record<string, string>): string {
   return repo;
 }
 const reglages = (a: string[]) => JSON.parse(readFileSync(a[a.indexOf('--settings') + 1], 'utf8')) as { hooks?: { PreToolUse?: unknown[] } };
-const HOOK = join(HOOKS, 'seul-spec-check.mjs');
+const HOOK = join(HOOKS, 'cadence-permise.mjs'); // L840 : seul-spec-check.mjs renommé, --spec quand le brief nomme spec check
 /** Le code de sortie et l'erreur du hook pour une commande Bash, comme Claude Code l'appelle (entrée JSON sur stdin). */
 function hook(command: string, cwd?: string): { code: number | null; err: string } {
-  const r = spawnSync('node', [HOOK], { input: JSON.stringify({ tool_name: 'Bash', tool_input: { command }, ...(cwd ? { cwd } : {}) }), encoding: 'utf8' });
+  const r = spawnSync('node', [HOOK, '--spec'], { input: JSON.stringify({ tool_name: 'Bash', tool_input: { command }, ...(cwd ? { cwd } : {}) }), encoding: 'utf8' });
   return { code: r.status, err: r.stderr };
 }
 const YAML = 'orchestrate:\n  build: test -d docs\n  test: test -f fait.txt\n  accept: npx vitest run -c vitest.acceptation.config.ts\n';
@@ -52,7 +52,7 @@ describe('L792 : vérifications nommées dans le brief de cadence run', () => {
     expect(d).toEqual(expect.arrayContaining(['Bash(raf:*)', 'Bash(cadence run:*)', 'Bash(cadence orchestrate:*)', 'Bash(cadence deliver:*)', 'Bash(cadence spec reseal:*)', 'Bash(cadence spec green:*)']));
     // aucun motif ne sait dire « spec sauf check|qa » (un deny `cadence spec:*` l'emporterait) : le reste de spec est refusé par le hook
     expect(d.filter((x) => /cadence spec( check)?:/.test(x))).toEqual([]);
-    expect(hooks).toContain('seul-spec-check.mjs');
+    expect(hooks).toContain('cadence-permise.mjs\\" --spec');
     expect(hooks).toContain('premier-plan.mjs'); // le hook du socle est gardé
   });
 
@@ -67,13 +67,14 @@ describe('L792 : vérifications nommées dans le brief de cadence run', () => {
     expect(p).toMatch(/Tu es le responsable de cette demande/);
   });
 
-  it('ni fiche ni demande qui en parle : brief inchangé, cadence entièrement interdite', () => {
+  it('ni fiche ni demande qui en parle : brief inchangé, cadence interdite sauf analyse (L840)', () => {
     const appels: Appel[] = [];
     const e = executerRun({ repo: depot(), demande: 'Crée fait.txt', exec: fauxClaude([commite('fait.txt')], appels), out: () => {} });
     expect(e.spec_check).toBeUndefined();
     expect(prompt(appels[0])).not.toMatch(/Vérifications du projet|spec check/);
     expect(prompt(appels[0])).toContain("N'utilise ni `raf` ni `cadence`. Ignore");
-    expect(interdits(appels[0])).toContain('Bash(cadence:*)');
+    expect(interdits(appels[0])).toEqual(expect.arrayContaining(['Bash(cadence spec:*)', 'Bash(cadence run:*)', 'Bash(raf:*)']));
+    expect(interdits(appels[0])).not.toContain('Bash(cadence analyse:*)');
   });
 
   it('M1 (revue r1) : le hook refuse cadence spec <lot> on|off et tout autre cadence ou raf, laisse passer spec check|qa et le reste', () => {
@@ -83,7 +84,7 @@ describe('L792 : vérifications nommées dans le brief de cadence run', () => {
       'cadence run --liste', 'cadence orchestrate --status', 'raf start L1', 'raf spec L1 on', 'cadence raf done L1', 'cadence --version']) {
       const r = hook(c);
       expect(r.code, c).toBe(2);
-      expect(r.err).toContain('la seule commande cadence permise est `cadence spec check|qa <fiche.yaml>`');
+      expect(r.err).toContain('`cadence spec check|qa <fiche.yaml>`');
     }
     for (const c of ['cadence spec check docs/specs/a/fiche.yaml', 'cadence spec qa docs/specs/a/fiche.yaml > /tmp/qa.md', 'npx cadence spec check a/fiche.yaml',
       'for f in docs/specs/*/fiche.yaml; do cadence spec check "$f"; done', 'node bin/cadence.js spec check a/fiche.yaml', 'npx vitest run',
@@ -143,11 +144,12 @@ describe('L792 : vérifications nommées dans le brief de cadence run', () => {
     expect(hook('cadence spec L1 on').code).toBe(2);
   });
 
-  it('sans fiche : pas de hook seul-spec-check (cadence reste interdite en entier)', () => {
+  it('sans fiche : le hook cadence-permise sans --spec (L840 : cadence analyse bornée seule permise)', () => {
     let hooks = '';
     const fait = commite('fait.txt');
     executerRun({ repo: depot(), demande: 'Crée fait.txt', exec: fauxClaude([(c, a) => { hooks = JSON.stringify(reglages(a).hooks); fait(c); }], []), out: () => {} });
-    expect(hooks).not.toContain('seul-spec-check.mjs');
+    expect(hooks).toContain('cadence-permise.mjs\\"');
+    expect(hooks).not.toContain('--spec');
     expect(hooks).toContain('premier-plan.mjs');
   });
 

@@ -45,7 +45,8 @@ describe('L763 (1) : le hook refuse run_in_background dans une session de cadenc
       const e = executerRun({ repo: depot(), demande: 'Crée fait.txt', exec: fauxClaude([(cwd, a) => { r = reglagesLus(a); commite('fait.txt')(cwd); }]), out: () => {} });
       expect(e.etat).toBe('integre');
       expect(r!.env).toEqual({ BASH_MAX_TIMEOUT_MS: String(PORTE_MS) });
-      expect(r!.hooks.PreToolUse).toEqual([{ matcher: 'Bash', hooks: [{ type: 'command', command: `node "${HOOK}"`, timeout: 10 }] }]);
+      expect(r!.hooks.PreToolUse).toEqual([{ matcher: 'Bash', hooks: [{ type: 'command', command: `node "${HOOK}"`, timeout: 10 }] },
+        { matcher: 'Bash', hooks: [{ type: 'command', command: `node "${join(HOOKS, 'cadence-permise.mjs')}"`, timeout: 10 }] }]); // L840
       const commande = r!.hooks.PreToolUse[0].hooks[0].command;
       expect(jouerHook(commande, bash({ run_in_background: true }), r!.env).status).toBe(2);
       expect(jouerHook(commande, bash({})).status).toBe(0);
@@ -56,7 +57,7 @@ describe('L763 (1) : le hook refuse run_in_background dans une session de cadenc
       const e = executerRun({ repo: depot(), demande: 'Crée fait.txt', complet: true, exec: fauxClaude([(cwd, a) => { r = reglagesLus(a); commite('fait.txt')(cwd); }]), out: () => {} });
       expect(e.etat).toBe('integre');
       const commandes = r!.hooks.PreToolUse.map((h) => h.hooks[0].command);
-      expect(commandes).toEqual([`node "${join(HOOKS, 'lecture-obligatoire.mjs')}" || exit 2`, `node "${HOOK}"`]);
+      expect(commandes).toEqual([`node "${join(HOOKS, 'lecture-obligatoire.mjs')}" || exit 2`, `node "${HOOK}"`, `node "${join(HOOKS, 'cadence-permise.mjs')}"`]); // L840
       expect(JSON.stringify(r)).not.toContain('{{HOOKS}}');
     });
   });

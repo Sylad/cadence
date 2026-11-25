@@ -183,6 +183,11 @@ the command is part of the identity, so pointing it at another ruleset is refuse
   after `orchestrate.build` and before `orchestrate.test`; a red analysis goes back to the same session like any red gate,
   with the violations named. A project with only `analyse:` and no build or test still has a gate. `cadence verify --gate`
   and the waves of `cadence orchestrate` do not play it yet.
+- **In the session of a `cadence run`** (L840): the session may run `cadence analyse` itself — without option, `--init`,
+  `--contre <ref>`, `--outil <name>`, `--help` — so that an adoption lot no longer stops on a question; `--ecrire`, `--migrer`
+  and every other cadence or raf command stay with the lead (hook `v2/hooks/cadence-permise.mjs`). When the request or the
+  plan's lot cites `cadence analyse`, the `analyse:` key, « analyse statique » or D-31, this page is attached to the run as a
+  piece to read before writing; a repository that declares `analyse:` gets the command named in the brief, without the piece.
 - **The CI**: `npx cadence analyse --contre <the commit before the push>` (full-depth checkout), after the build — the
   [CI recipe](#the-ci-recipe) below, never `--contre origin/main`.
 - **The weekly measure**: each lowering is a commit of `.cadence/analyse/`; `git log -p -- .cadence/analyse/` shows the

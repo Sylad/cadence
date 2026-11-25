@@ -20,7 +20,7 @@ import { briefRegistre, entreeCommitee, preparerRegistre, registreOuvert, regist
 import { fichiersNonCommites, nommerFichiers, PLAN_EN_ATTENTE } from '../../../scripts/arbre-non-commite.mjs'; // L722 : même lecture que src/repo-held.ts
 import { environnementPerime, ignorerPerime, lignesPerime } from '../../../scripts/environnement-porte.mjs'; // L764 : même lecture que src/verify-gate.ts
 import { commandesDeRegeneration, regenerer, retirerRegenerations, TRAILER_REGENERATION } from './regenerer.js';
-import { avecRefusCadence, commandesNommees, interditsPourSpec, leverPourSpec } from '../../../scripts/commandes-du-brief.mjs'; // L792 : commandes du projet nommées au brief
+import { avecRefusCadence, commandesNommees, interditsDuRun, leverPourCadence } from '../../../scripts/commandes-du-brief.mjs'; // L792, L840 : commandes cadence permises
 import { noterVerdict } from '../../../scripts/verdicts-porte.mjs'; // L786 : même écriture que src/gate-verdict.ts (verify --gate)
 import { lireEtapes } from '../../../scripts/etapes-porte.mjs'; // L786 (revue r1, M1) : mêmes étapes que verify --gate
 import { etapeAnalyse, lignesARelire } from '../../../scripts/analyse.mjs'; // L801 : l'étape analyse de la porte, cliquet par outil
@@ -190,12 +190,12 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false, sujet?: string
   // orchestrate.prodAccess (comme les vagues de la v1) : sans lui, ni kubectl, ni helm, ni KUBECONFIG ; avec lui, la session joue le banc du projet ; L808 (revue r1) : jamais la garde de lecture d'un bras de banc (CADENCE_LECTURE_BORNEE, _ZONES), un run lit ses pièces hors du worktree
   const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !LIEN_HOTE.test(k) && !/^CADENCE_(RUN_JOURNAL|RUN_ID|LECTURE_BORNEE|LECTURE_ZONES)$/.test(k))), CADENCE_CLONE: e.worktree, CADENCE_PIECES: JSON.stringify(e.pieces), CADENCE_BANC_RACINE: dossierRuns(e.repo), ...(e.acces_cluster ? {} : { KUBECONFIG: '/dev/null' }) };
   const coupes = e.acces_cluster ? OUTILS_INTERDITS.filter((x) => !/kubectl|helm/.test(x)) : OUTILS_INTERDITS;
-  const interdits = e.spec_check ? interditsPourSpec(coupes) : coupes; // L792 : cadence spec check, nommée par le brief, reste permise
+  const interdits = interditsDuRun(coupes, { specCheck: e.spec_check }); // L840 : cadence analyse permise ; L792 : cadence spec check aussi quand le brief la nomme
   e.passes = [...(e.passes ?? []), { quoi: quoiPasse(e, neuve, sujet), modele: e.modele ?? 'opus', raison: e.modele_raison ?? (e.modele ? 'choisi au lancement' : 'par défaut') }]; // L726
   sauver(e);
   const bras = { ...(e.mode === 'leger' ? BRAS_LEGER : BRAS_COMPLET), modele: e.modele ?? 'opus' }; // L763 : ses hooks s'ajoutent à ceux du socle
   const socle = reglagesRun(e.worktree, process.env, bras.settings);
-  const reglages = e.spec_check ? avecRefusCadence(socle, HOOKS) : socle; // L792 (revue r1, M1) : tout cadence ou raf hors spec check|qa refusé par hook
+  const reglages = avecRefusCadence(socle, HOOKS, { specCheck: e.spec_check }); // L840, L792 (revue r1, M1) : tout cadence ou raf hors analyse bornée et spec check|qa refusé par hook
   const brut = exec(['-p', prompt, ...(neuve ? ['--session-id', e.session] : e.session ? ['--resume', e.session] : []), ...argsClaude(bras, e.worktree, interdits, reglages)], { cwd: e.worktree, env }); // L705 : coupes du socle (../socle.ts)
   const id = ajouterSession(claudeVide(), brut.stdout).modeles.join(', '); // L756 (issue #61) : l'id exact de la session, pas l'alias passé à --model
   if (id) e.passes.at(-1)!.id_modele = id;
@@ -495,8 +495,8 @@ export function executerRun(a: { id?: string; repo: string; demande: string; pie
   mkdirSync(runs, { recursive: true });
   git(repo, 'worktree', 'add', '-q', '-b', `cadence/run-${id}`, worktree, 'HEAD');
   copierDeps(repo, worktree);
-  const aig = aiguiller(a.demande, worktree, a.pieces ?? [], a.complet);
-  const nommees = commandesNommees(worktree, orchestrate(worktree), a.demande, a.lot); // L792 : lues au commit du run, comme sa porte
+  const nommees = commandesNommees(worktree, orchestrate(worktree), a.demande, a.lot, a.pieces ?? []); // L792, L840 (docs/analyse.md jointe si citée) : lues au commit du run
+  const aig = aiguiller(a.demande, worktree, nommees.pieces, a.complet);
   const visible = lotVisible(worktree, a.lot); // L794 : visible: true ou screen dans le plan du run
   const e: Etat = { id, repo, branche: `cadence/run-${id}`, cible, base: git(worktree, 'rev-parse', 'HEAD'), worktree, fichier: join(runs, `${basename(repo)}-${id}.json`),
     demande: a.demande, pieces: aig.pieces.map((p) => chemin(worktree, p)), taille: a.taille ?? 'fonction', mode: aig.mode, modele, acces_cluster: orchestrate(worktree).prodAccess === true, registre: a.registre, ...(a.lot ? { lot: a.lot } : {}),
@@ -513,7 +513,7 @@ export function executerRun(a: { id?: string; repo: string; demande: string; pie
   const demande = `${a.demande}\n\n${a.lot ? `Lot du plan : ${a.lot}. Cite-le dans chaque message de commit, selon les conventions de commit du dépôt (par exemple feat(${a.lot}): …).\n\n` : ''}${nommees.texte}${nouveautes}`
     + preparerRegistre(worktree, a.registre, { demande: a.demande, lot: a.lot, run: id }); // L701 : la demande de l'humain seule entre au registre
   const brut = readFileSync(aig.bras.brief, 'utf8');
-  const brief = briefRegistre(a.registre)(nommees.nommeSpec ? leverPourSpec(brut) : brut).split('\n').filter((l) => !l.startsWith('- Taille fixée par le gardien')).join('\n').replaceAll('{{DEMANDE}}', demande).replaceAll('{{CLONE}}', worktree)
+  const brief = briefRegistre(a.registre)(leverPourCadence(brut, { specCheck: nommees.nommeSpec, analyse: nommees.analyse })).split('\n').filter((l) => !l.startsWith('- Taille fixée par le gardien')).join('\n').replaceAll('{{DEMANDE}}', demande).replaceAll('{{CLONE}}', worktree)
     .replaceAll('{{QUESTION}}', `${worktree}.question.md`).replaceAll('{{BASE}}', e.base).replaceAll('{{TAILLE}}', e.taille);
   const o = { exec: a.exec, out: a.out, sansPorte: a.sansPorte, raf: a.raf, maintenant: a.maintenant, attendre: a.attendre };
   try { return attendreQuota(tenu(e, o, () => (session(e, brief, o, true) ? suite(e, o) : fin(e, o))), o); } finally { rendreVerrou(fichierVerrou(e.fichier)); }

@@ -1,8 +1,14 @@
 export const OUTILS_CADENCE: string[];
 export function demandeToucheFiches(demande: string): boolean;
-export function commandesNommees(repo: string, orchestrate: unknown, demande: string, lot?: string): { texte: string; nommeSpec: boolean };
+export function commandesNommees(repo: string, orchestrate: unknown, demande: string, lot?: string, pieces?: string[]): { texte: string; nommeSpec: boolean; analyse: boolean; pieces: string[] };
+export const OUTILS_PERMIS: string[];
+export const DOC_ANALYSE: string;
 export function leverPourSpec(brief: string): string;
-export function interditsPourSpec(interdits: string[]): string[];
+export function leverPourCadence(brief: string, o?: { specCheck?: boolean; analyse?: boolean }): string;
+export function analyseCitee(repo: string, demande: string, lot?: string): boolean;
+export function consigneAnalyse(repo: string, demande: string, lot: string | undefined, declare: boolean): { texte: string; nomme: boolean; piece?: string };
+export function interditsDuRun(interdits: string[], o?: { specCheck?: boolean }): string[];
 export function lotAFiches(repo: string, lot: string | undefined): boolean;
-export function avecRefusCadence<T extends { hooks?: Record<string, unknown[]> }>(reglages: T, hooks: string): T & { hooks: Record<string, unknown[]> };
-export function cadenceHorsSpecCheck(commande: string): string | null;
+export function avecRefusCadence<T extends { hooks?: Record<string, unknown[]> }>(reglages: T, hooks: string, o?: { specCheck?: boolean }): T & { hooks: Record<string, unknown[]> };
+export function cadenceHorsSpecCheck(commande: string, cwd?: string): string | null;
+export function cadenceHorsPermises(commande: string, cwd?: string, o?: { specCheck?: boolean }): string | null;

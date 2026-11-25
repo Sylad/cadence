@@ -41,10 +41,12 @@ orchestrate:
 # Toucher un de ces fichiers (ou supprimer, déplacer un fichier) joue la suite complète : ils règlent toute la suite sans être importés par un test.
 # package.json n'y est pas : presque chaque lot y ajoute un fichier publié (files), et ses tests (bounds) sont joués ; une dépendance change le lockfile.
 # Mesure (docs/mesures/porte-rapide-l838.md) : minutes de porte par run (portes[].duree_s de l'état), et aucun défaut vu à la livraison que le run aurait vu.
-run:
-  fastGate:
-    full: [package-lock.json, v2/package-lock.json, 'tsconfig*.json', v2/tsconfig.json, vitest.config.ts, vitest.workspace.ts,
-      v2/vitest.config.ts, test/setup-env.ts, test/global-setup.ts, v2/test/setup-home.ts]
+# À DÉCOMMENTER une fois publiée la version de cadence qui contient L838 : la porte d'un run est jouée par la cadence installée, et une cadence
+# d'avant L838 refuse ce cadence.yaml (« run.fastGate inconnu ») — vécu le 25-11 à la porte du run de L838 lui-même.
+# run:
+#   fastGate:
+#     full: [package-lock.json, v2/package-lock.json, 'tsconfig*.json', v2/tsconfig.json, vitest.config.ts, vitest.workspace.ts,
+#       v2/vitest.config.ts, test/setup-env.ts, test/global-setup.ts, v2/test/setup-home.ts]
 
 # Fumée du paquet (L696, D-11) : avant le tag, cadence release fait npm pack de HEAD, l'installe dans un dossier vide et joue ces commandes
 # depuis le paquet installé ; une rouge refuse la release (dix versions publiées cassées ou rouges du 28-10 au 10-11, dont 2.0.0 et 2.0.1 sans bras-A.md).

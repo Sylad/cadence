@@ -9,7 +9,7 @@ complète reste jouée une fois, à la porte de livraison, car aucun verdict n'e
 
 - Avant : `npx vitest run` sur l'arbre du lot, une fois (`Duration` de vitest).
 - Après : pour des lots déjà livrés, la sélection que fait `choisir` (scripts/porte-rapide.mjs) sur leur diff, avec la clé
-  `run.fastGate` de `cadence.yaml` de ce lot, puis la commande liée jouée telle quelle (`npx vitest related --run <fichiers>`).
+  `run.fastGate` préparée dans `cadence.yaml` (en commentaire jusqu'à la publication de la version qui contient L838), puis la commande liée jouée telle quelle (`npx vitest related --run <fichiers>`).
 - Machine : Big-Blue, 32 cœurs, charge 12 à 47 pendant la mesure (d'autres runs tournaient) : les durées sont des ordres de grandeur.
 - Dans un run, chaque porte garde désormais sa portée et sa durée dans l'état (`portes[]` : `ciblee`, `ok`, `duree_s`) : la mesure
   continue sur les vrais runs sans outil à part.

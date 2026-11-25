@@ -153,6 +153,9 @@ whole suite. The state of the run keeps each gate it played (`portes`: targeted 
 (no `{files}`, a command that cannot be derived, a `dir` outside the repository) is refused by `cadence run` (state `sans-porte`) and by the
 gate that validates `cadence.yaml`. Measure on cadence itself: [porte-rapide-l838](mesures/porte-rapide-l838.md).
 
+The gate of a run is played by the **installed** cadence: declare the key only once every machine runs a version that knows it.
+An older cadence refuses `cadence.yaml` (« run.fastGate inconnu ») and every run of the project ends red at its gate.
+
 ## Short writing: `ecriture:`
 
 `ecriture:` sets the thresholds of `cadence ecriture` (L803): words per sentence (`phrase`, 25), per instruction (`consigne`, 20),

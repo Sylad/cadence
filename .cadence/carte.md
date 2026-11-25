@@ -189,4 +189,5 @@
 
 - `scripts/porte-rapide.mjs` : lecture de `run.fastGate` (aussi validée par `src/config-set.ts`), sélection des tests touchés (`choisir`, repli sûr sur la suite complète) et `--jouer <liée> --sinon <complète>` ; `src/docsync.ts` y prend `motif`/`ensemble`.
 - `v2/src/run/porte-run.ts` : la porte jouée par le run (sortie de run.ts), aucun verdict après une porte rapide, mesure `portes[]` dans l'état.
+- `cadence.yaml` : la clé `run.fastGate` de cadence est en commentaire, à activer après publication (une cadence installée d'avant L838 la refuse).
 - Mesure : `docs/mesures/porte-rapide-l838.md`. Reste à faire : le cliquet de couverture (critère 2 du lot).

@@ -1,0 +1,83 @@
+{
+  "essai": "C1",
+  "bras": "C",
+  "bras_description": "mode script maison (ligne « Mode: script » dans le brief)",
+  "date": "2026-11-25",
+  "modele": "claude-opus-5-5",
+  "claude_code": "2.1.332",
+  "cout_usd": 0.6711,
+  "jetons": {
+    "entree": 28,
+    "ecriture_cache": 43722,
+    "lecture_cache": 484598,
+    "sortie": 11215,
+    "total": 539563
+  },
+  "duree_ms": 241201,
+  "tours": 16,
+  "requetes_modele": 14,
+  "appels_outils": {
+    "total": 15,
+    "par_outil": {
+      "Bash": 10,
+      "Read": 3,
+      "ToolSearch": 1,
+      "mcp__playwright__browser_run_code_unsafe": 1
+    },
+    "code_mode": 0,
+    "journal_hook": 15
+  },
+  "defauts": {
+    "trouves": 7,
+    "sur": 7,
+    "detail": {
+      "D1": {
+        "defaut": "bandeau de 600 px, défilement horizontal à 375 px",
+        "trouve": true,
+        "ligne_du_rapport": 10,
+        "citation": "`div[data-testid=\"bandeau\"]` fait 600 px. Il déborde de 241 px (document 616/375)."
+      },
+      "D2": {
+        "defaut": "titre tronqué",
+        "trouve": true,
+        "ligne_du_rapport": 22,
+        "citation": "4. **Majeur — titre tronqué sans moyen de le lire, aux 4 largeurs.**"
+      },
+      "D3": {
+        "defaut": "mot coupé entre deux lettres",
+        "trouve": true,
+        "ligne_du_rapport": 27,
+        "citation": "`p.etroit` : « Anticonsti | tutionnell | ement », sans trait d'union."
+      },
+      "D4": {
+        "defaut": "valeur séparée de son unité",
+        "trouve": true,
+        "ligne_du_rapport": 30,
+        "citation": "`p.valeur` : « 12 » puis « km/h » sur deux lignes."
+      },
+      "D5": {
+        "defaut": "libellé court sur deux lignes",
+        "trouve": true,
+        "ligne_du_rapport": 32,
+        "citation": "7. **Mineur — libellé court sur deux lignes.**"
+      },
+      "D6": {
+        "defaut": "cible de 16 × 16 px",
+        "trouve": true,
+        "ligne_du_rapport": 18,
+        "citation": "3. **Bloquant — cible « × » (fermer) de 16 × 16 px, aux 4 largeurs.**"
+      },
+      "D7": {
+        "defaut": "police de 10 px",
+        "trouve": true,
+        "ligne_du_rapport": 37,
+        "citation": "9. **Mineur — texte de 10 px.**"
+      }
+    }
+  },
+  "sources": {
+    "flux": "C1.out (stream-json de claude -p, événement result et blocs tool_use)",
+    "hook": "C1/hook.jsonl",
+    "rapport": "C1/rapport.md"
+  }
+}

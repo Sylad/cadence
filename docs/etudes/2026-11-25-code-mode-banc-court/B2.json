@@ -1,0 +1,84 @@
+{
+  "essai": "B2",
+  "bras": "B",
+  "bras_description": "Code Mode de Claude Code (CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1)",
+  "date": "2026-11-25",
+  "modele": "claude-opus-5-5",
+  "claude_code": "2.1.332",
+  "cout_usd": 0.7847,
+  "jetons": {
+    "entree": 26,
+    "ecriture_cache": 49458,
+    "lecture_cache": 495131,
+    "sortie": 14497,
+    "total": 559112
+  },
+  "duree_ms": 139322,
+  "tours": 24,
+  "requetes_modele": 10,
+  "appels_outils": {
+    "total": 18,
+    "par_outil": {
+      "Bash": 2,
+      "Edit": 6,
+      "Read": 6,
+      "Write": 1,
+      "mcp__playwright__browser_run_code_unsafe": 3
+    },
+    "code_mode": 18,
+    "journal_hook": 18
+  },
+  "defauts": {
+    "trouves": 7,
+    "sur": 7,
+    "detail": {
+      "D1": {
+        "defaut": "bandeau de 600 px, défilement horizontal à 375 px",
+        "trouve": true,
+        "ligne_du_rapport": 28,
+        "citation": "1. **Bandeau de 600 px : défilement horizontal à 375 px.** Capture base-375.png."
+      },
+      "D2": {
+        "defaut": "titre tronqué",
+        "trouve": true,
+        "ligne_du_rapport": 54,
+        "citation": "5. **Titre tronqué sans accès au texte entier.** Capture base-1440.png."
+      },
+      "D3": {
+        "defaut": "mot coupé entre deux lettres",
+        "trouve": true,
+        "ligne_du_rapport": 68,
+        "citation": "7. **Mot coupé entre deux lettres sans trait d'union.** « Anticonsti / tutionnell / ement » dans 70 px, aux 4 largeurs."
+      },
+      "D4": {
+        "defaut": "valeur séparée de son unité",
+        "trouve": true,
+        "ligne_du_rapport": 72,
+        "citation": "8. **Valeur séparée de son unité.** « 12 » et « km/h » sont sur deux lignes, dans 48 px."
+      },
+      "D5": {
+        "defaut": "libellé court sur deux lignes",
+        "trouve": true,
+        "ligne_du_rapport": 76,
+        "citation": "9. **Libellé court sur deux lignes.** « Afficher / tout » dans un bouton de 60 px, 36 px de haut."
+      },
+      "D6": {
+        "defaut": "cible de 16 × 16 px",
+        "trouve": true,
+        "ligne_du_rapport": 17,
+        "citation": "- [x] Cibles mesurées : « × » 16 × 16 px, « Ouvrir le panneau » 122 × 21 px, « Afficher tout » 60 × 36 px, « Accueil » 52 × 17 px."
+      },
+      "D7": {
+        "defaut": "police de 10 px",
+        "trouve": true,
+        "ligne_du_rapport": 80,
+        "citation": "10. **Note en 10 px.** « Source : démo » mesure 10 px. Le contraste passe (21:1) mais la lecture est pénible."
+      }
+    }
+  },
+  "sources": {
+    "flux": "B2.out (stream-json de claude -p, événement result et blocs tool_use)",
+    "hook": "B2/hook.jsonl",
+    "rapport": "B2/rapport.md"
+  }
+}

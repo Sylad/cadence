@@ -98,24 +98,6 @@ Run them from the project folder: they read the `parcours:` lines of the page's 
 - One checklist line per page and width: `sondes d'interaction <largeur> : <n> contrôles, <k> parcours, <c> constats` (in the verdict's tally when there is no report file).
 - Exit code 2 (no browser, unreadable expectations, pass broken) is « not verified », never « no finding »; exit code 3 is a partial pass: its `?` lines (clicks not measured, covered, or that tried to write) go under « not verified »; exit code 4 means no click was measured: the interactions of that page and width are « not verified », whatever the rest says. A `!` line is a write the probe blocked: name the control in the report.
 
-## Script mode
-
-Only when the brief carries the line `Mode: script` (L839, on trial until its bench is played: `docs/mesures/ux-mode-script-l839.md` of the package). Every snapshot and screenshot you take comes back into your context; here one command measures everything and returns figures. It applies in every mode that has a page, mockup mode included (a `file://` URL of `maquette.html`). What you judge, the scale and the report stay those of the other sections.
-
-1. **Measure each page once**, from the project folder, before any other browser call:
-
-   ```bash
-   cadence mesures <page url> --json <tmp>/mesures-<page>.json --captures <capture folder> [--etat "<state> → cliquer <selector> ; attendre 300"]…
-   ```
-
-   It covers the four widths of the grid of the last section. Give one `--etat` per state that needs a click (a panel open, a dialog), never on a control that writes. Exit code 2 is « not verified » for the passes it names, never « no finding ».
-2. **Read the text it prints, not the JSON**: open the JSON only for a family cut by `--max`.
-3. **Look with `Read`** at the captures it wrote, never with the browser: the narrowest and the widest width of each state, plus one capture where a finding needs your eyes. This is the Method's « look before judging ».
-4. **What it does not measure**, you measure with ONE Playwright script per page that returns numbers only (`browser_run_code_unsafe` or `browser_evaluate`): text contrast, visible focus over the first 30 Tab stops (outline or box-shadow width), `cursor` on clickable elements, reduced motion (`page.emulateMedia({ reducedMotion: 'reduce' })`), emoji used as icons. Return a compact JSON (counts, and the 5 worst elements with their value), never the page.
-5. **Do not walk the page by hand**: never call `browser_snapshot`, and never take one screenshot per width. A click to see what moves is the job of `cadence sondes` (section Interaction probes), unchanged.
-
-Each `✗` line is a measure, not yet a finding: judge it on the capture and the charter (an ellipsis on purpose with the full text in a tooltip is no defect). The rule to name per family: horizontal scroll and right overflow, WCAG 1.4.10; truncated text, WCAG 1.4.4 or 1.4.10 when the text is lost; word cut between two letters and value split from its unit, the typography of the Lexique de l'Imprimerie nationale (minor unless it misleads); short label on two lines, Nielsen 4 and 8; target under 24 × 24 px, WCAG 2.5.8 (judge the spacing exception on the capture). One checklist line per page: `mesures <page> : <p> passes, <k> constats, code <c>`.
-
 ## Output
 
 A short report:

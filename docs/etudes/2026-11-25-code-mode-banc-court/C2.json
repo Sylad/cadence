@@ -1,0 +1,84 @@
+{
+  "essai": "C2",
+  "bras": "C",
+  "bras_description": "mode script maison (ligne « Mode: script » dans le brief)",
+  "date": "2026-11-25",
+  "modele": "claude-opus-5-5",
+  "claude_code": "2.1.332",
+  "cout_usd": 0.6278,
+  "jetons": {
+    "entree": 32,
+    "ecriture_cache": 39664,
+    "lecture_cache": 569425,
+    "sortie": 9825,
+    "total": 618946
+  },
+  "duree_ms": 233259,
+  "tours": 18,
+  "requetes_modele": 16,
+  "appels_outils": {
+    "total": 17,
+    "par_outil": {
+      "Bash": 11,
+      "Read": 2,
+      "TaskStop": 1,
+      "ToolSearch": 2,
+      "mcp__playwright__browser_run_code_unsafe": 1
+    },
+    "code_mode": 0,
+    "journal_hook": 17
+  },
+  "defauts": {
+    "trouves": 7,
+    "sur": 7,
+    "detail": {
+      "D1": {
+        "defaut": "bandeau de 600 px, défilement horizontal à 375 px",
+        "trouve": true,
+        "ligne_du_rapport": 25,
+        "citation": "Causes : `div[data-testid=\"bandeau\"]` fixé à 600 px (débord 241 px). `div#panneau` fixé à 700 px (débord 341 px)."
+      },
+      "D2": {
+        "defaut": "titre tronqué",
+        "trouve": true,
+        "ligne_du_rapport": 34,
+        "citation": "3. Titre tronqué : `p.titre` montre 120 px sur 291. On lit « Un titre beauc… » aux 4 largeurs."
+      },
+      "D3": {
+        "defaut": "mot coupé entre deux lettres",
+        "trouve": true,
+        "ligne_du_rapport": 40,
+        "citation": "4. Mot coupé sans trait d'union : « Anticonsti|tutionnell|ement » aux 4 largeurs."
+      },
+      "D4": {
+        "defaut": "valeur séparée de son unité",
+        "trouve": true,
+        "ligne_du_rapport": 42,
+        "citation": "5. Valeur séparée de son unité : « 12 » | « km/h », chacun sur sa ligne. Règle : Lexique de l'Imprimerie nationale."
+      },
+      "D5": {
+        "defaut": "libellé court sur deux lignes",
+        "trouve": true,
+        "ligne_du_rapport": 44,
+        "citation": "6. Libellé court sur 2 lignes : « Afficher tout » dans 60 px. Règle : Nielsen 4 et 8. Correction : `white-space: nowrap` ou largeur libre."
+      },
+      "D6": {
+        "defaut": "cible de 16 × 16 px",
+        "trouve": true,
+        "ligne_du_rapport": 28,
+        "citation": "2. Bouton « × » de 16 × 16 px, à environ 4 px de « Afficher tout ». L'exception d'espacement ne s'applique pas."
+      },
+      "D7": {
+        "defaut": "police de 10 px",
+        "trouve": true,
+        "ligne_du_rapport": 48,
+        "citation": "9. Police à 10 px pour « Source : démo ». Lecture difficile, surtout au téléphone. Correction : 12 px au moins."
+      }
+    }
+  },
+  "sources": {
+    "flux": "C2.out (stream-json de claude -p, événement result et blocs tool_use)",
+    "hook": "C2/hook.jsonl",
+    "rapport": "C2/rapport.md"
+  }
+}

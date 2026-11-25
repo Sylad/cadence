@@ -18,10 +18,6 @@ if (tool === 'run') {
   // Sondes d'interaction (L778) : un script sans dépendance, hors de la table des commandes du plan (ses options lui sont propres).
   const sondes = await import('../scripts/sondes-interaction.mjs');
   process.exitCode = await sondes.main(args, io);
-} else if (tool === 'mesures') {
-  // Mesures de mise en page (L839, D-34) : le mode script du ux-reviewer, un script sans dépendance comme les sondes.
-  const mesures = await import('../scripts/mesures-page.mjs');
-  process.exitCode = await mesures.main(args, io);
 } else if (tool === 'analyse') {
   // Analyse statique par techno (L801) : un script sans dépendance, comme les sondes ; la porte de cadence run le joue aussi (clé analyse: de cadence.yaml).
   const analyse = await import('../scripts/analyse.mjs');

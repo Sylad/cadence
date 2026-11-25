@@ -1,0 +1,84 @@
+{
+  "essai": "B1",
+  "bras": "B",
+  "bras_description": "Code Mode de Claude Code (CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1)",
+  "date": "2026-11-25",
+  "modele": "claude-opus-5-5",
+  "claude_code": "2.1.332",
+  "cout_usd": 0.8131,
+  "jetons": {
+    "entree": 22,
+    "ecriture_cache": 58670,
+    "lecture_cache": 440541,
+    "sortie": 12775,
+    "total": 512008
+  },
+  "duree_ms": 115146,
+  "tours": 19,
+  "requetes_modele": 9,
+  "appels_outils": {
+    "total": 16,
+    "par_outil": {
+      "Bash": 3,
+      "Edit": 1,
+      "Read": 9,
+      "Write": 1,
+      "mcp__playwright__browser_run_code_unsafe": 2
+    },
+    "code_mode": 16,
+    "journal_hook": 16
+  },
+  "defauts": {
+    "trouves": 7,
+    "sur": 7,
+    "detail": {
+      "D1": {
+        "defaut": "bandeau de 600 px, défilement horizontal à 375 px",
+        "trouve": true,
+        "ligne_du_rapport": 28,
+        "citation": "1. **Bloquant — défilement horizontal à 375 px (WCAG 1.4.10).** Le « Bandeau de largeur fixe » finit à 616 px. La page défile de 241 px. Panneau ouvert, le panneau de 700 px porte la page à 716 px. Capture : base-375.png, panneau-375.png. Correctif : bandeau en max-width: 100 %, panneau en width: min(700px, 100 %). Effort S."
+      },
+      "D2": {
+        "defaut": "titre tronqué",
+        "trouve": true,
+        "ligne_du_rapport": 18,
+        "citation": "- [ ] Texte tronqué : titre coupé par une ellipse, texte complet inaccessible à l'œil."
+      },
+      "D3": {
+        "defaut": "mot coupé entre deux lettres",
+        "trouve": true,
+        "ligne_du_rapport": 35,
+        "citation": "8. **Mineur — mot coupé sans trait d'union (Lexique de l'Imprimerie nationale).** « Anticonsti / tutionnell / ement » sur 3 lignes, boîte de 70 px, overflow-wrap: anywhere. Correctif : hyphens: auto avec lang=\"fr\", ou boîte plus large. Effort S."
+      },
+      "D4": {
+        "defaut": "valeur séparée de son unité",
+        "trouve": true,
+        "ligne_du_rapport": 34,
+        "citation": "7. **Mineur — valeur séparée de son unité (Lexique de l'Imprimerie nationale).** « vent 12 km/h » s'affiche sur 3 lignes : « vent / 12 / km/h ». Boîte de 48 px. Correctif : espace insécable entre 12 et km/h, boîte plus large. Effort S."
+      },
+      "D5": {
+        "defaut": "libellé court sur deux lignes",
+        "trouve": true,
+        "ligne_du_rapport": 19,
+        "citation": "- [ ] Typographie : mot coupé sans trait d'union, valeur séparée de son unité, libellé court sur 2 lignes."
+      },
+      "D6": {
+        "defaut": "cible de 16 × 16 px",
+        "trouve": true,
+        "ligne_du_rapport": 17,
+        "citation": "- [ ] Cibles ≥ 24 × 24 px (WCAG 2.5.8) : bouton « × » 16 × 16 px, sans l'exception d'espacement."
+      },
+      "D7": {
+        "defaut": "police de 10 px",
+        "trouve": true,
+        "ligne_du_rapport": 37,
+        "citation": "10. **Mineur — texte de 10 px.** « Source : démo » est en 10 px, difficile à lire. Correctif : 12 px au moins. Effort S."
+      }
+    }
+  },
+  "sources": {
+    "flux": "B1.out (stream-json de claude -p, événement result et blocs tool_use)",
+    "hook": "B1/hook.jsonl",
+    "rapport": "B1/rapport.md"
+  }
+}

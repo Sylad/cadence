@@ -3,13 +3,19 @@
 Étude du 25-11-2026. Question posée par la note du 25-11 sur L839 : le Code Mode de Claude Code (fonction expérimentale,
 `CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1`, [doc](https://code.claude.com/docs/en/code-mode.md)) fait-il baisser le coût d'une
 revue UX à défauts égaux, et les hooks `PreToolUse` voient-ils encore les commandes ? Le mode script maison
-(`Mode: script`, [`cadence mesures`](../mesures-page.md)) est comparé au même banc.
+(ligne `Mode: script` du brief et commande `cadence mesures`) est comparé au même banc.
+
+**Suite donnée le 25-11 (3e revue de L839).** Le mode script et tout ce qui le portait sont retirés du dépôt : la section
+« Script mode » de `agents/ux-reviewer.md`, la commande `cadence mesures` avec ses scripts, sa doc et ses pages de test, et
+le cas réduit sans modèle (`scripts/banc-ux-script.mjs`), dont l'estimation est démentie par ce banc. Ce qui en est cité plus
+bas se relit dans l'historique (`git show 36d77f79 --stat`). Les chiffres de chaque essai sont gardés en JSON dans
+[2026-11-25-code-mode-banc-court/](2026-11-25-code-mode-banc-court/) (section 3).
 
 ## Verdict
 
 | Mécanisme | Verdict | Raison mesurée |
 |---|---|---|
-| Code Mode de Claude Code | **ne pas garder** | mêmes défauts retrouvés (7 sur 7), coût +26 %, jetons +58 %, durée +22 % |
+| Code Mode de Claude Code | **ne pas garder** | mêmes défauts retrouvés (7 sur 7), coût +26 %, jetons +58 %, durée +23 % |
 | Mode script maison (`Mode: script`) | **ne pas garder** | mêmes défauts retrouvés (7 sur 7), coût +3 %, jetons +71 %, durée × 2,3 |
 
 Le critère fixé avant le banc ([page du banc](../mesures/ux-mode-script-l839.md)) était « autant de défauts connus pour moins
@@ -20,7 +26,7 @@ Ce que ce verdict ne couvre pas est dit en section 6.
 
 ## 1. Le banc
 
-- **Écran** : `test/fixtures/mesures/defauts.html`, la page de test de L839, petite et connue, avec ses 7 défauts semés
+- **Écran** : `test/fixtures/mesures/defauts.html` (retirée depuis, `git show 36d77f79:test/fixtures/mesures/defauts.html`), la page de test de L839, petite et connue, avec ses 7 défauts semés
   (D1 bandeau de 600 px qui fait défiler à 375 px, D2 titre tronqué, D3 mot coupé, D4 valeur séparée de son unité,
   D5 libellé court sur deux lignes, D6 cible de 16 × 16 px, D7 police de 10 px). Les commentaires CSS qui nomment les
   défauts sont retirés de la copie servie, et le brief interdit de lire le fichier : la revue juge la page rendue.
@@ -52,8 +58,8 @@ Conséquence pour cadence : un `cadence run` d'aujourd'hui (2.1.325, `claude -p`
 posée ou non. La note du 25-11 (« s'active par la variable dans l'env de la commande, marche avec `claude -p` ») est à
 corriger sur ces trois points.
 
-On reconnaît une session en Code Mode dans le flux `stream-json` à ses identifiants d'appel `toolu_cc_…` (50 et 57 dans
-les deux essais du bras B, 0 dans les bras A et C).
+On reconnaît une session en Code Mode dans le flux `stream-json` à ses identifiants d'appel `toolu_cc_…` (16 et 18 appels
+distincts dans les deux essais du bras B, 0 dans les bras A et C).
 
 ## 3. Résultats
 
@@ -69,12 +75,17 @@ les deux essais du bras B, 0 dans les bras A et C).
 | Bras | Défauts connus | Coût moyen | Jetons moyens | Durée moyenne |
 |---|---|---|---|---|
 | A sans la variable | 14 / 14 | 0,63 $ | 337 990 | 104 s |
-| B Code Mode | 14 / 14 | 0,80 $ (+26 %) | 535 560 (+58 %) | 127 s (+22 %) |
+| B Code Mode | 14 / 14 | 0,80 $ (+26 %) | 535 560 (+58 %) | 127 s (+23 %) |
 | C mode script | 14 / 14 | 0,65 $ (+3 %) | 579 255 (+71 %) | 237 s (× 2,3) |
 
 Les jetons sont la somme entrée + écriture de cache + lecture de cache + sortie ; la lecture de cache en fait plus de 80 %,
 d'où un écart de coût plus petit que l'écart de jetons. Les six rapports nomment aussi le débord du panneau ouvert (700 px
 à 375 px), qui n'est pas dans la liste des 7.
+
+Un fichier par essai garde ces chiffres : `2026-11-25-code-mode-banc-court/<essai>.json` (bras, coût, jetons par poste, durée,
+requêtes, appels d'outils par outil, appels en Code Mode, lignes du journal du hook, et pour chacun des 7 défauts la ligne du
+rapport qui le nomme). Ils sont tirés des sorties brutes du banc (flux `stream-json`, journal du hook, rapport de chaque
+essai, 4,1 Mo, non commitées). `test/banc-code-mode-l839.test.ts` compare les deux tableaux à ces fichiers.
 
 Lecture :
 
@@ -131,8 +142,9 @@ claude -p "$BRIEF" --model claude-opus-5-5 --append-system-prompt "$(corps de ag
 
 ## 6. Limites
 
-- **Un petit écran, 2 essais par bras.** Le cas réduit sans modèle de la [page du banc](../mesures/ux-mode-script-l839.md)
-  montre que le gain du mode script grandit avec la page ; ce banc ne dit rien d'un écran lourd comme maritime UXW-36.
+- **Un petit écran, 2 essais par bras.** Ce banc ne dit rien d'un écran lourd comme maritime UXW-36. Le cas réduit sans
+  modèle, qui estimait un gain grandissant avec la page, est démenti ici sur sa propre page de test (54 % estimés, +71 % de
+  jetons mesurés) : il ne prédit rien pour un écran lourd.
   L'écart de coût du bras C (+3 %) est dans le bruit de 2 essais ; celui du bras B (+26 %) et les écarts de jetons et de
   durée ne le sont pas (les deux essais de chaque bras sont du même côté).
 - **Le bras C a payé le brief du banc.** `cadence mesures` n'étant pas permis dans cette session, le brief renvoyait à
@@ -147,10 +159,8 @@ claude -p "$BRIEF" --model claude-opus-5-5 --append-system-prompt "$(corps de ag
 
 - **Code Mode** : rien à retirer, il n'a jamais été activé. La veille `veille/code-mode/` continue ; le banc se rejoue en
   20 minutes et 5 $ si une version annonce un gain sur les revues ou sur les lots.
-- **Mode script** : ne pas mettre `Mode: script` dans les briefs. Le retrait de la section « Script mode » de
-  `agents/ux-reviewer.md`, que le critère de la page du banc prévoit, est un geste du lead : il peut préférer le banc
-  complet (UXW-36 rejouée) avant de retirer. La commande `cadence mesures` reste utile sans modèle (mesures de mise en
-  page en un passage, test de non-régression d'un écran).
+- **Mode script** : retiré le 25-11 sur décision du lead, comme le critère de la page du banc le prévoyait (section
+  « Script mode » de l'agent, `cadence mesures`, cas réduit). Aucun usage de `cadence mesures` seul n'était mesuré.
 - **Le vécu du 24-11** (63,63 $ de `ux-reviewer` sur 24 h, 69 appels pour UXW-36) ne se reproduit pas ici : avant
   d'outiller, regarder dans les transcriptions de ces revues quels appels coûtent (instantanés, captures relues,
   sondes d'interaction).

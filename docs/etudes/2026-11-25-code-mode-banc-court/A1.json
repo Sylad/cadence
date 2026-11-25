@@ -1,0 +1,83 @@
+{
+  "essai": "A1",
+  "bras": "A",
+  "bras_description": "sans la variable (mode actuel)",
+  "date": "2026-11-25",
+  "modele": "claude-opus-5-5",
+  "claude_code": "2.1.332",
+  "cout_usd": 0.5871,
+  "jetons": {
+    "entree": 16,
+    "ecriture_cache": 40609,
+    "lecture_cache": 287063,
+    "sortie": 10236,
+    "total": 337924
+  },
+  "duree_ms": 93503,
+  "tours": 10,
+  "requetes_modele": 8,
+  "appels_outils": {
+    "total": 9,
+    "par_outil": {
+      "Bash": 2,
+      "Read": 3,
+      "ToolSearch": 1,
+      "mcp__playwright__browser_run_code_unsafe": 3
+    },
+    "code_mode": 0,
+    "journal_hook": 9
+  },
+  "defauts": {
+    "trouves": 7,
+    "sur": 7,
+    "detail": {
+      "D1": {
+        "defaut": "bandeau de 600 px, défilement horizontal à 375 px",
+        "trouve": true,
+        "ligne_du_rapport": 23,
+        "citation": "Le bandeau mesure 600 px et finit à x = 616. La page défile en largeur : scrollWidth 616 pour 375."
+      },
+      "D2": {
+        "defaut": "titre tronqué",
+        "trouve": true,
+        "ligne_du_rapport": 31,
+        "citation": "4. **Majeur — titre tronqué sans recours, toutes largeurs (base-*.png).**"
+      },
+      "D3": {
+        "defaut": "mot coupé entre deux lettres",
+        "trouve": true,
+        "ligne_du_rapport": 39,
+        "citation": "« Anticonstitutionnellement » se casse en « Anticonsti / tutionnell / ement », sans trait d'union. Boîte de 70 px, `overflow-wrap: anywhere`."
+      },
+      "D4": {
+        "defaut": "valeur séparée de son unité",
+        "trouve": true,
+        "ligne_du_rapport": 42,
+        "citation": "« vent 12 km/h » s'affiche sur trois lignes : « vent / 12 / km/h ». Boîte de 48 px."
+      },
+      "D5": {
+        "defaut": "libellé court sur deux lignes",
+        "trouve": true,
+        "ligne_du_rapport": 47,
+        "citation": "9. **Mineur — libellé court sur deux lignes.**"
+      },
+      "D6": {
+        "defaut": "cible de 16 × 16 px",
+        "trouve": true,
+        "ligne_du_rapport": 28,
+        "citation": "3. **Bloquant — bouton « × » (fermer) de 16 × 16 px, toutes largeurs.**"
+      },
+      "D7": {
+        "defaut": "police de 10 px",
+        "trouve": true,
+        "ligne_du_rapport": 50,
+        "citation": "10. **Mineur — mention « Source : démo » en 10 px.**"
+      }
+    }
+  },
+  "sources": {
+    "flux": "A1.out (stream-json de claude -p, événement result et blocs tool_use)",
+    "hook": "A1/hook.jsonl",
+    "rapport": "A1/rapport.md"
+  }
+}

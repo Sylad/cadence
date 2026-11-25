@@ -1,0 +1,83 @@
+{
+  "essai": "A2",
+  "bras": "A",
+  "bras_description": "sans la variable (mode actuel)",
+  "date": "2026-11-25",
+  "modele": "claude-opus-5-5",
+  "claude_code": "2.1.332",
+  "cout_usd": 0.6769,
+  "jetons": {
+    "entree": 14,
+    "ecriture_cache": 48441,
+    "lecture_cache": 277912,
+    "sortie": 11689,
+    "total": 338056
+  },
+  "duree_ms": 114051,
+  "tours": 10,
+  "requetes_modele": 7,
+  "appels_outils": {
+    "total": 9,
+    "par_outil": {
+      "Bash": 2,
+      "Read": 4,
+      "ToolSearch": 1,
+      "mcp__playwright__browser_run_code_unsafe": 2
+    },
+    "code_mode": 0,
+    "journal_hook": 9
+  },
+  "defauts": {
+    "trouves": 7,
+    "sur": 7,
+    "detail": {
+      "D1": {
+        "defaut": "bandeau de 600 px, défilement horizontal à 375 px",
+        "trouve": true,
+        "ligne_du_rapport": 10,
+        "citation": "- Mesure : scrollWidth 616 px pour une fenêtre de 375 px. Cause : le « Bandeau de largeur fixe » finit à x = 616 px (600 px de large)."
+      },
+      "D2": {
+        "defaut": "titre tronqué",
+        "trouve": true,
+        "ligne_du_rapport": 31,
+        "citation": "### M2 — majeur — titre tronqué sans moyen de le lire en entier"
+      },
+      "D3": {
+        "defaut": "mot coupé entre deux lettres",
+        "trouve": true,
+        "ligne_du_rapport": 39,
+        "citation": "- « Anticonsti / tutionnell / ement » sur trois lignes, sans trait d'union, aux quatre largeurs."
+      },
+      "D4": {
+        "defaut": "valeur séparée de son unité",
+        "trouve": true,
+        "ligne_du_rapport": 44,
+        "citation": "- « vent / 12 / km/h » sur trois lignes, aux quatre largeurs."
+      },
+      "D5": {
+        "defaut": "libellé court sur deux lignes",
+        "trouve": true,
+        "ligne_du_rapport": 48,
+        "citation": "### m3 — mineur — libellé court sur deux lignes"
+      },
+      "D6": {
+        "defaut": "cible de 16 × 16 px",
+        "trouve": true,
+        "ligne_du_rapport": 54,
+        "citation": "- Mesure : 16 × 16 px. Exception d'espacement de WCAG 2.5.8 tenue de 0,5 px (cercle de 24 px : bord gauche à 76,5 px, bouton voisin à 76 px)."
+      },
+      "D7": {
+        "defaut": "police de 10 px",
+        "trouve": true,
+        "ligne_du_rapport": 64,
+        "citation": "### m6 — mineur — « Source : démo » en 10 px"
+      }
+    }
+  },
+  "sources": {
+    "flux": "A2.out (stream-json de claude -p, événement result et blocs tool_use)",
+    "hook": "A2/hook.jsonl",
+    "rapport": "A2/rapport.md"
+  }
+}

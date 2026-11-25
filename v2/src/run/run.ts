@@ -165,13 +165,13 @@ const horsCommit = (cwd: string) => (fichiersNonCommites(cwd, { tous: true }) ??
 function jouerPorte(cmds: string[], e: Etat, out: (l: string) => void): { ok: boolean; sortie: string } {
   // L786 (revue r1, M2) : le sha lu AVANT la porte ; un verdict n'est noté que pour un arbre égal à ce commit avant et après, au même HEAD.
   const cwd = e.worktree, sha = git(cwd, 'rev-parse', 'HEAD'), avant = horsCommit(cwd);
-  const { p, dites } = jouerCommandes(cmds, e, out, PORTE_MS); // L842 : une commande de test rouge rejoue seuls ses rouges ; verts seuls, elle compte verte
+  const { p, dites, excuses } = jouerCommandes(cmds, e, out, PORTE_MS); // L842 : une commande de test rouge rejoue seuls ses rouges ; verts seuls, elle compte verte
   // Revue L801 r3 (M2) : une porte verte n'est pas muette — dit une fois par changement (comme porte_changee), gardé pour le détail de l'état integre.
   if (p.ok && cmds.length) { for (const l of dites) if (!e.analyse_dite?.includes(l)) out(l); e.analyse_dite = dites.length ? dites : undefined; }
   if (!cmds.length) return p; // --sans-porte : aucune porte n'a jugé, rien n'est noté
   const apres = horsCommit(cwd), tete = git(cwd, 'rev-parse', 'HEAD');
   const pourquoi = [...(avant ? [`avant la porte, l'arbre portait des fichiers hors du commit (${avant.split('\n').length})`] : []),
-    ...(apres ? [`après la porte, l'arbre porte des fichiers hors du commit (${apres.split('\n').length})`] : []), ...(tete !== sha ? [`HEAD est passé à ${tete.slice(0, 7)}`] : [])];
+    ...(apres ? [`après la porte, l'arbre porte des fichiers hors du commit (${apres.split('\n').length})`] : []), ...(tete !== sha ? [`HEAD est passé à ${tete.slice(0, 7)}`] : []), ...excuses];
   // L786 : le verdict du commit jugé, là où le hook pre-push le lit (même fichier que verify --gate).
   if (!pourquoi.length) noterVerdict(cwd, sha, p.ok ? 0 : 1, new Date());
   else out(`porte du run : aucun verdict noté pour ${sha.slice(0, 7)} — ${pourquoi.join(' ; ')} : la porte n'a pas jugé ce commit seul, le hook pre-push exigera une porte de verify à ce sha`);

@@ -47,13 +47,15 @@ function jouerCommande(c: string, e: Joueur, out: (l: string) => void, ms: numbe
   return { ok: seul.vert, sortie: `$ ${c}\n${tout.slice(-4000)}${r.error ? `\n${r.error.message}` : ''}${seul.dit}`, stdout };
 }
 
-/** Les commandes de la porte jusqu'à la première rouge (`p`) ; `dites` : ce que l'analyse d'une porte verte dit à relire (L801, scripts/analyse.mjs). */
-export function jouerCommandes(cmds: string[], e: Joueur, out: (l: string) => void, ms: number): { p: { ok: boolean; sortie: string }; dites: string[] } {
-  const dites: string[] = [];
+/** Les commandes de la porte jusqu'à la première rouge (`p`) ; `dites` : ce que l'analyse d'une porte verte dit à relire (L801, scripts/analyse.mjs) ; `excuses` (revue
+ * L842, B1) : pourquoi ne noter aucun verdict au sha — un rouge excusé ne vaut pas une suite verte, seule verify --gate en décide (le hook pre-push l'exigera). */
+export function jouerCommandes(cmds: string[], e: Joueur, out: (l: string) => void, ms: number): { p: { ok: boolean; sortie: string }; dites: string[]; excuses: string[] } {
+  const dites: string[] = [], avant = e.sensibles_charge?.length ?? 0;
+  const excuses = () => ((e.sensibles_charge?.length ?? 0) > avant ? ['des rouges de la suite ont été excusés, verts rejoués seuls (L842)'] : []);
   for (const c of cmds) {
     const r = jouerCommande(c, e, out, ms);
-    if (!r.ok) return { p: { ok: false, sortie: r.sortie }, dites };
+    if (!r.ok) return { p: { ok: false, sortie: r.sortie }, dites, excuses: excuses() };
     dites.push(...lignesARelire(r.stdout));
   }
-  return { p: { ok: true, sortie: '' }, dites };
+  return { p: { ok: true, sortie: '' }, dites, excuses: excuses() };
 }

@@ -54,8 +54,11 @@ function cibleDeduite(nom, sortie, lance) {
   }
   const fichier = lance.nom === 'jest' ? jestTestFiles(sortie).get(nom) ?? replayFile(nom) : replayFile(nom);
   if (!fichier) return null;
-  const seul = nom === fichier || nom.endsWith(` ${fichier}`); // « FAIL fichier » : le fichier entier est rouge
-  return { fichier, commande: lance.args(`${shellArg(fichier)}${seul ? '' : ` -t ${shellArg(echapperRegex(feuille(nom)))}`}`), filtre: !seul };
+  // Revue L842 (M1) : vitest rejoue le fichier ENTIER, jamais `-t` : un rouge qui dépend d'un test précédent du même fichier (cache, singleton, mock non
+  // restauré) passerait vert seul. Jest garde `-t` : sa ligne « FAIL fichier » est aussi un rouge nommé, qui rejoue le fichier entier.
+  const seul = lance.nom === 'vitest' || nom === fichier || nom.endsWith(` ${fichier}`); // « FAIL fichier » : le fichier entier est rouge
+  // `filtre` : la preuve exige un test réussi ; vitest aussi sur un fichier entier (un fichier dont tout est sauté sort en 0 et s'affiche)
+  return { fichier, commande: lance.args(`${shellArg(fichier)}${seul ? '' : ` -t ${shellArg(echapperRegex(feuille(nom)))}`}`), filtre: !seul || lance.nom === 'vitest' };
 }
 
 /** Ce que le replay déclaré ({files}) rejoue pour un rouge : son fichier, lu comme les vagues (node --test, puis le nom, puis jest). */
@@ -128,7 +131,7 @@ export function rougesDotnet(sortie) {
 
 /**
  * Le rejeu a-t-il prouvé le test vert ? Code 0, au moins un test joué, et : un titre node --test, sa ligne « ok » ; un fichier, son nom sur une ligne du
- * lanceur (hors écho de npm) ; un filtre sur le test, au moins un test RÉUSSI (vitest -t sans correspondance sort en 0, tous les tests sautés).
+ * lanceur (hors écho de npm) ; un filtre sur le test ou un fichier vitest, au moins un test RÉUSSI (vitest -t sans correspondance, ou un fichier tout sauté, sort en 0).
  */
 function prouveVert(r, nom, c) {
   if (r.code !== 0 || NO_TEST_RAN.test(r.sortie)) return false;
@@ -165,10 +168,11 @@ export function rejouerRouges(sortie, rejeu, jouer) {
   if (!rejeu) return sans('commande de test inconnue de la porte');
   if (rejeu.raison) return sans(rejeu.raison);
   if (noms.length > REJEUX_MAX) return sans(`${noms.length} tests rouges, plus de ${REJEUX_MAX} : ce n'est pas la charge`);
-  const sensibles = [], rouges = [];
+  const sensibles = [], rouges = [], joues = new Map(); // une même commande (plusieurs rouges d'un fichier rejoué entier) n'est jouée qu'une fois
   for (const nom of noms) {
     const c = rejeu.cible(nom, sortie);
-    const r = c ? jouer(c.commande) : null;
+    if (c && !joues.has(c.commande)) joues.set(c.commande, jouer(c.commande));
+    const r = c ? joues.get(c.commande) : null;
     if (r && prouveVert(r, nom, c)) sensibles.push({ test: nom, ms: r.ms });
     else rouges.push(nom);
   }

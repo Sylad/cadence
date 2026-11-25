@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { verdictPour } from '../../scripts/verdicts-porte.mjs';
 import { jouerRejeu, envRejeu, rejeuDeLaCommande, rejeuxDesTests, rejouerRouges, rougesDotnet, testsReussis, type Joue, type Rejeu } from '../../scripts/rejeu-rouges.mjs';
 import { fichierDeCode, lireEtats, mesurer, rendre } from '../../scripts/passes-porte-rouge.mjs';
 import { executerRun, type Etat } from '../src/run/run.js';
@@ -15,11 +16,11 @@ const cible = (r: Rejeu, nom: string, sortie = '') => r.cible?.(nom, sortie) ?? 
 const joue = (code: number, sortie: string): Joue => ({ code, sortie, ms: 1200 });
 
 describe('rejeu seul : la façon de filtrer un test, déclarée ou déduite (L842)', () => {
-  it('vitest : le fichier et -t sur le dernier segment du nom, échappé en expression régulière', () => {
+  it('vitest : le fichier ENTIER, jamais -t (revue L842, M1 : un rouge qui dépend d\'un test précédent du fichier) ; la preuve exige un test réussi', () => {
     const r = rejeuDeLaCommande('npx vitest run', undefined, '/nulle-part');
     expect(r.forme).toBe('vitest, déduit de « npx vitest run »');
-    expect(cible(r, 'test/a.test.ts > suite > cas (x) [y]')).toEqual({ fichier: 'test/a.test.ts', commande: "npx vitest run test/a.test.ts -t 'cas \\(x\\) \\[y\\]'", filtre: true });
-    expect(cible(r, '|v2|  test/b.test.ts > s > c')?.commande).toBe('npx vitest run test/b.test.ts -t c'); // espace de travail
+    expect(cible(r, 'test/a.test.ts > suite > cas (x) [y]')).toEqual({ fichier: 'test/a.test.ts', commande: 'npx vitest run test/a.test.ts', filtre: true });
+    expect(cible(r, '|v2|  test/b.test.ts > s > c')?.commande).toBe('npx vitest run test/b.test.ts'); // espace de travail
   });
   it('jest : le fichier de la ligne FAIL qui précède le test, -t sur « Suite › cas » ; un FAIL de fichier seul rejoue le fichier', () => {
     const sortie = 'FAIL src/a.spec.ts\n  ● Suite › cas lent\n';
@@ -36,7 +37,7 @@ describe('rejeu seul : la façon de filtrer un test, déclarée ou déduite (L84
   it('script npm : le lanceur est lu dans package.json et les arguments passent après --', () => {
     const d = dossierTemp('rejeu-npm-');
     writeFileSync(join(d, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run', e2e: 'node a.js && vitest run' } }));
-    expect(cible(rejeuDeLaCommande('npm test', undefined, d), 'a.test.ts > cas')?.commande).toBe('npm test -- a.test.ts -t cas');
+    expect(cible(rejeuDeLaCommande('npm test', undefined, d), 'a.test.ts > cas')?.commande).toBe('npm test -- a.test.ts');
     expect(rejeuDeLaCommande('npm run e2e', undefined, d).raison).toMatch(/lanceur non reconnu/);
   });
   it('rien à déduire : commande composée ou lanceur inconnu, la raison le dit et nomme la déclaration', () => {
@@ -50,7 +51,7 @@ describe('rejeu seul : la façon de filtrer un test, déclarée ou déduite (L84
     const parties = rejeuxDesTests({ test: [{ dir: 'back', run: 'npm test', replay: 'npx jest {files}' }, { dir: 'front', run: 'npx vitest run' }] }, '/r');
     expect([...parties.keys()]).toEqual(['cd back && npm test', 'cd front && npx vitest run']);
     expect(cible(parties.get('cd back && npm test')!, 'src/a.spec.ts')?.commande).toBe('cd back && npx jest src/a.spec.ts');
-    expect(cible(parties.get('cd front && npx vitest run')!, 'b.test.ts > s > c')?.commande).toBe('cd front && npx vitest run b.test.ts -t c');
+    expect(cible(parties.get('cd front && npx vitest run')!, 'b.test.ts > s > c')?.commande).toBe('cd front && npx vitest run b.test.ts');
   });
   it('CADENCE_TEST_WORKERS du rejeu : celui de l\'environnement, sinon cœurs ÷ CADENCE_MAX_SESSIONS (2 par défaut)', () => {
     expect(envRejeu({ CADENCE_TEST_WORKERS: '3' }, 32).CADENCE_TEST_WORKERS).toBe('3');
@@ -71,11 +72,12 @@ describe('rejeu seul : la preuve du vert et les rouges jamais rejoués (L842)', 
   });
   const r = rejeuDeLaCommande('npx vitest run', undefined, '/x');
   const rouge = ' FAIL  a.test.ts > s > lent\n FAIL  b.test.ts > s > vrai\n';
-  it('vert seul → sensible (avec sa durée) ; rouge seul → reste rouge ; un rejeu filtré sorti en 0 sans test réussi ne prouve rien', () => {
+  it('vert seul → sensible (avec sa durée) ; rouge seul → reste rouge ; un rejeu sorti en 0 sans test réussi ne prouve rien ; un fichier joué une fois', () => {
     const vus: string[] = [];
-    const j = rejouerRouges(rouge, r, (c) => { vus.push(c); return c.includes('a.test.ts') ? joue(0, ' ✓ a.test.ts (2 tests | 1 skipped)\n Tests  1 passed | 1 skipped (2)') : joue(1, ' FAIL  b.test.ts > s > vrai'); });
-    expect(vus).toEqual(['npx vitest run a.test.ts -t lent', 'npx vitest run b.test.ts -t vrai']); // un rejeu par test, seul
-    expect(j).toEqual({ sensibles: [{ test: 'a.test.ts > s > lent', ms: 1200 }], rouges: ['b.test.ts > s > vrai'] });
+    const deux = `${rouge} FAIL  b.test.ts > s > autre\n`;
+    const j = rejouerRouges(deux, r, (c) => { vus.push(c); return c.includes('a.test.ts') ? joue(0, ' ✓ a.test.ts (2 tests | 1 skipped)\n Tests  1 passed | 1 skipped (2)') : joue(1, ' FAIL  b.test.ts > s > vrai'); });
+    expect(vus).toEqual(['npx vitest run a.test.ts', 'npx vitest run b.test.ts']); // un rejeu par fichier, sans les autres fichiers
+    expect(j).toEqual({ sensibles: [{ test: 'a.test.ts > s > lent', ms: 1200 }], rouges: ['b.test.ts > s > autre', 'b.test.ts > s > vrai'] });
     const saute = rejouerRouges(rouge, r, () => joue(0, ' ↓ a.test.ts (2 tests | 2 skipped)\n Tests  2 skipped (2)'));
     expect(saute.sensibles).toEqual([]);
   });
@@ -90,22 +92,30 @@ describe('rejeu seul : la preuve du vert et les rouges jamais rejoués (L842)', 
 });
 
 describe('rejeu seul avec un vrai vitest (L842)', () => {
-  it('un test rouge dans la suite et vert seul est sensible ; un vrai rouge le reste ; la déduction -t retrouve le test', () => {
+  it('un test rouge dans la suite et vert seul est sensible ; un vrai rouge le reste ; un rouge dû au test précédent du fichier le reste (revue L842, M1)', () => {
     const d = dossierTemp('rejeu-vitest-');
     symlinkSync(join(import.meta.dirname, '..', '..', 'node_modules'), join(d, 'node_modules'));
     writeFileSync(join(d, 'vitest.config.mjs'), 'export default {};\n');
-    // « charge » : rouge à la première exécution (la suite), vert ensuite (le rejeu seul) ; « vrai » : toujours rouge
-    writeFileSync(join(d, 'a.test.ts'), `import { existsSync, writeFileSync } from 'node:fs';\nimport { describe, expect, it } from 'vitest';
-describe('s', () => {
+    const entete = `import { existsSync, writeFileSync } from 'node:fs';\nimport { describe, expect, it } from 'vitest';\n`;
+    // « charge » : rouge à la première exécution (la suite), vert ensuite (le rejeu) ; « vrai » : toujours rouge
+    writeFileSync(join(d, 'a.test.ts'), `${entete}describe('s', () => {
   it('charge (lente)', () => { const vu = existsSync('vu'); writeFileSync('vu', ''); expect(vu).toBe(true); });
-  it('vrai', () => expect(1).toBe(2));
   it('vert', () => expect(1).toBe(1));
 });\n`);
+    writeFileSync(join(d, 'b.test.ts'), `${entete}describe('s', () => { it('vrai', () => expect(1).toBe(2)); });\n`);
+    // « vide au depart » : rouge parce que le test qui le précède remplit le cache du module ; seul (-t), il serait vert
+    writeFileSync(join(d, 'c.test.ts'), `${entete}const cache: string[] = [];
+it('remplit', () => { cache.push('x'); expect(cache).toHaveLength(1); });
+it('vide au depart', () => expect(cache).toHaveLength(0));\n`);
     let suite = '';
     try { execFileSync('npx', ['vitest', 'run'], { cwd: d, encoding: 'utf8', stdio: 'pipe' }); } catch (e) { suite = `${(e as { stdout: string }).stdout}${(e as { stderr: string }).stderr}`; }
+    expect(suite).toMatch(/c\.test\.ts > vide au depart/); // le cas existe : rouge dans la suite
+    let seul = 0;
+    try { execFileSync('npx', ['vitest', 'run', 'c.test.ts', '-t', 'vide au depart'], { cwd: d, stdio: 'pipe' }); } catch { seul = 1; }
+    expect(seul).toBe(0); // et vert seul avec -t : ce que l'ancien rejeu aurait excusé
     const j = rejouerRouges(suite, rejeuDeLaCommande('npx vitest run', undefined, d), (c) => jouerRejeu(c, d));
     expect(j.sensibles.map((s) => s.test)).toEqual(['a.test.ts > s > charge (lente)']);
-    expect(j.rouges).toEqual(['a.test.ts > s > vrai']);
+    expect(j.rouges).toEqual(['b.test.ts > s > vrai', 'c.test.ts > vide au depart']);
   }, 60_000);
 });
 
@@ -134,6 +144,10 @@ describe('cadence run : la porte rejoue seul chaque rouge avant toute correction
     const ligne = /test sensible à la charge : a\.test\.ts > s > charge — rouge dans la suite, vert rejoué seul \(\d+\.\d s\) : compté vert, aucune correction pour lui \(L842\)/;
     expect(l.join('\n')).toMatch(ligne);
     expect(e.detail).toMatch(ligne);
+    // Revue L842 (B1) : un rouge excusé ne vaut pas une suite verte ; aucun verdict noté, le hook pre-push exigera verify --gate à ce sha
+    const integre = git(repo, 'rev-parse', 'main');
+    expect(verdictPour(repo, integre)).toBeNull();
+    expect(l.join('\n')).toContain(`porte du run : aucun verdict noté pour ${integre.slice(0, 7)} — des rouges de la suite ont été excusés, verts rejoués seuls (L842)`);
   });
 
   it('rouge seul : correction comme avant, la sortie rendue dit quels rouges le restent seuls ; la correction note ses commits et ses fichiers', () => {
@@ -145,6 +159,7 @@ describe('cadence run : la porte rejoue seul chaque rouge avant toute correction
     expect(e.corrections![0]).toMatchObject({ verte: true, commits: 1, fichiers: ['fait.txt'] });
     expect(e.corrections![0].rouge).toContain('rejeu seul des rouges (L842, bash lanceur.sh {files} (déclaré)) : encore rouge(s) seul(s) : a.test.ts > s > rouge');
     expect(l.join('\n')).toContain('porte rouge : reprise de la session pour corriger');
+    expect(verdictPour(repo, git(repo, 'rev-parse', 'main'))?.code).toBe(0); // la porte de la correction, verte sans excuse : son verdict est noté
   });
 
   it('sans façon de filtrer : pas de rejeu, la porte le dit, correction comme avant ; une correction sans commit compte 0', () => {

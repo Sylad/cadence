@@ -4342,17 +4342,21 @@ lots:
       - { date: 2026-11-25, text: "Précision du 25-11 (lead) : le « Code Mode » de la vidéo est une fonction expérimentale de Claude Code (doc https://code.claude.com/docs/en/code-mode.md, suivie dans veille/code-mode/) : Claude écrit du JavaScript qui enchaîne ses outils (Bash, Read, Edit, MCP) en une étape, seul le résultat lu revient au contexte. S'active par la variable CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1 (env de la commande, sans toucher settings.json), marche avec claude -p et les sous-agents (outil REPL dans leur liste tools). Banc révisé : un même lot ou une même revue UX déjà faite, rejoué avec et sans la variable ; mesures : tokens, coût, durée, défauts connus retrouvés. Limites à vérifier : auto mode juge le code et non chaque appel, hooks PreToolUse (arret-18h30, pipefail) qui doivent encore voir les commandes, exécution > 10 min." }
   - id: L840
     title: "Un cadence run d'adoption (D-31) peut lancer cadence analyse : ses runs s'arrêtent sinon sur une question"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-25
     notes:
       - { date: 2026-11-25, text: "Vécu 25-11 : finance L183, ol L270, jobmail L23/L24, evatosorus L54, discotheque L25 — la session du run s'est vu refuser cadence analyse --init (sauf finance, qui l'a pu) ; ~20 min d'arrêt par run au premier cas, puis le lead écrit la base dans le worktree et reprend par --reponse. Mesure : prochaines adoptions (avatar L75, codex L94, warhammer L254, maritime QA-AN1) sans arrêt." }
     started: 2026-11-25
+    review: { date: 2026-11-25, verdict: "compliant (2 notes mineures : une substitution $( ) / backticks / <( ) placée avant --ecrire passe le hook ; --contre $(…) refusé à tort)", commit: a065d266e0ba75dd35059d33f66572c308f458ae }
+    finished: 2026-11-25
   - id: L841
     title: "Issue 74 (compte pro) : raf demande new \"<texte>\" crée une entrée du registre (D-n suivant, texte mot pour mot, ouverte), mise en attente sur une branche tenue comme raf add ; aujourd'hui l'entrée s'écrit à la main et attend la fin du run pour être commitée"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-25
+    started: 2026-11-25
+    review: { date: 2026-11-25, verdict: "conforme : bloquant levé (écritures en attente renumérotées avec le D-n réservé), aucune régression sur les tests L695, L722, L779 et L841", commit: 9b50209c457ace6b098cbcf85ff8562f5c7f7e38 }
   - id: L842
     title: "(D-33, étude docs/etudes/2026-11-25-temps-lot-prod-et-tests.md §5 P3) Rejeu seul d'un test rouge avant toute correction dans cadence run, pour tous les projets (comme testReplay de cadence) : 22 corrections de porte sur 54 venaient de tests sensibles à la charge. Mesure : part des passes porte rouge sans commit de code"
     status: doing
@@ -4430,6 +4434,26 @@ lots:
     title: "Retrait des vagues R7, après R5 et R6 : docs porte.md et acceptation.md ; garder ux-reviewer (maquette et conformité), retirer acceptance-writer, spec-writer, precheck-reader (Q3 du pro) ; publier en 3.0.0 (docs/etudes/retrait-vagues.md §4, mesure de fin au tableau)"
     status: todo
     estimate: 0.5
+    created: 2026-11-25
+  - id: L857
+    title: "cadence run : vérifier ou installer les dépendances du worktree contre le lockfile avant la porte (vécu codex L98 le 25-11 : node_modules du 20-11, antérieur à L94, eslint et tsc absents, porte rouge et une passe de correction perdue). Mesure : aucune porte rouge due à une dépendance absente."
+    status: todo
+    estimate: 1
+    created: 2026-11-25
+  - id: L858
+    title: "Après l'intégration d'un cadence run sur cadence, reconstruire v2/dist (ignoré par git) : vécu 25-11, dist du 24-11 17 h 39 antérieur à L840 → la garde du banc de lead tour plantait sur un export absent (interditsPourSpec). Mesure : aucune ligne « garde du banc : statut illisible » après une intégration."
+    status: todo
+    estimate: 1
+    created: 2026-11-25
+  - id: L859
+    title: "Hook cadence-permise (suite de la revue L840 du 25-11) : refuser une substitution $( ), backticks ou <( ) placée avant --ecrire/--migrer (m2, trou antérieur) et accepter --contre $(git merge-base main HEAD) (m3, refus à tort), avec tests"
+    status: todo
+    estimate: 1
+    created: 2026-11-25
+  - id: L860
+    title: "Un commit de plan du lead (raf todo/start/done) laisse périmé le plan.json publié par le projet (warhammer frontend/public/plan-data/plan.json) : vécu 25-11, L259 rouvert → porte de L254 rouge (plan-data.test.mjs), une passe de correction et un refus d'intégration. Déclarer dans cadence.yaml la commande qui régénère les données dérivées du plan (plan: derive:) et la jouer à chaque écriture de raf, ou la vérifier au pre-commit. Mesure : aucune porte rouge pour un plan.json périmé."
+    status: todo
+    estimate: 1
     created: 2026-11-25
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

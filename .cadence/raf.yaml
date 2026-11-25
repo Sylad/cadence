@@ -4514,6 +4514,11 @@ lots:
     status: todo
     estimate: 1
     created: 2026-11-25
+  - id: L869
+    title: "ux-reviewer : ajouter à la liste des tics d'IA 4 signes d'unslop (heydamir/unslop, CC BY 4.0, testé le 25-11) qui ont une règle ou une mesure : nombres de même grandeur en formats mêlés (chiffres tabulaires, invariant 2), variation sans référence « +12 % » (Nielsen 1), emoji qui porte un statut ou une navigation (WCAG 1.1.1 et 1.4.1), animation en boucle sur un élément qui n'est pas en direct (WCAG 2.2.2, prefers-reduced-motion) ; crédit dans NOTICE ; refuser les signes de goût (capitales espacées, points finaux, « direction » et « monde ») ; mesure : sur les 10 revues UX suivantes, constats T des nouvelles règles confirmés contre écartés"
+    status: todo
+    estimate: 1
+    created: 2026-11-25
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

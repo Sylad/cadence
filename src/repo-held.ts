@@ -22,8 +22,8 @@ const PENDING_LOCK = 'plan-en-attente.lock';
 const DEFERRED_WRITES = 'raf add|note|start|done|review|ux|demande';
 
 /** `worktree` (L796) : le worktree d'un cadence run ; le run ne tient alors que les fichiers qu'il y touche. Sans lui (porte dans l'arbre principal), toute la branche. */
-interface Holder { pid: number; start?: string; kind: string; label: string; branch: string; since: string; worktree?: string }
-interface PendingWrite { date: string; tenu: string; argv: string[] }
+export interface Holder { pid: number; start?: string; kind: string; label: string; branch: string; since: string; worktree?: string }
+export interface PendingWrite { date: string; tenu: string; argv: string[] }
 
 const heldDir = (root: string) => join(sharedStateDir(root), HELD_DIR);
 
@@ -130,10 +130,16 @@ function withPendingLock<T>(root: string, fn: () => T): T {
 
 const PENDING_HEADER = `# Écritures du plan et du registre des demandes mises en attente pendant que le dépôt était tenu (L695, L722) : \`raf attente appliquer\` les joue dans l'ordre.\n`;
 
-/** Met une écriture de `raf` en attente ; rend la ligne qui le dit. */
-export function deferPlanWrite(root: string, h: Holder, argv: string[], now: Date): string {
+/**
+ * Met une écriture de `raf` en attente ; rend la ligne qui le dit. `argv` peut se lire sur l'attente déjà là, sous le même verrou (L841 : le D-n
+ * réservé par `raf demande new` ne peut pas être pris deux fois par deux mises en attente concurrentes).
+ */
+export function deferPlanWrite(root: string, h: Holder, argvOf: string[] | ((pending: PendingWrite[]) => string[]), now: Date): string {
+  let argv: string[] = [];
   const all = withPendingLock(root, () => {
-    const next = [...readPending(root), { date: now.toISOString(), tenu: h.label, argv }];
+    const pending = readPending(root);
+    argv = typeof argvOf === 'function' ? argvOf(pending) : argvOf;
+    const next = [...pending, { date: now.toISOString(), tenu: h.label, argv }];
     writeFileSync(pendingFile(root), `${PENDING_HEADER}${stringify(next)}`);
     return next;
   });

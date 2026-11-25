@@ -1,22 +1,45 @@
 // Le registre des demandes (L722) : raf demande lit .cadence/demandes/D-<n>.json et y écrit une précision datée, un état et sa preuve, ou un lot rattaché,
 // sans retoucher le texte d'origine. Sur une branche tenue par un programme, l'écriture va dans le plan en attente comme raf note (attente-commands.ts).
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+// L841 (issue 74 du compte pro) : raf demande new "<texte>" crée l'entrée D-<n suivant> ; en attente, le D-n est réservé tout de suite.
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { isDay } from '../dates.js';
 import { RafError } from '../plan.js';
+import { deferPlanWrite, type Holder, type PendingWrite, readPending } from '../repo-held.js';
 import type { EarlyCtx } from './context.js';
 
 const DEMANDES = join('.cadence', 'demandes');
 const STATES = ['ouverte', 'livrée', 'vérifiée', 'abandonnée'] as const;
 // Les états tapés sans accent sont acceptés : « livree » est « livrée ».
 const STATE_OF: Record<string, (typeof STATES)[number]> = Object.fromEntries(STATES.flatMap((s) => [[s, s], [s.normalize('NFD').replace(/\p{M}/gu, ''), s]]));
-const USAGE = 'usage : raf demande [<D-n> [precision "texte" | etat ouverte|livrée|vérifiée|abandonnée ["preuve ou raison"] | lot <id>]]';
+const USAGE = 'usage : raf demande [new "texte" | <D-n> [precision "texte" | etat ouverte|livrée|vérifiée|abandonnée ["preuve ou raison"] | lot <id>]]';
 
-interface Entry { id: string; texte: string; date?: string; etat: string; preuve?: string; lots?: string[]; precisions?: { date: string; texte: string }[]; [k: string]: unknown }
+interface Entry { id: string; texte: string; date?: string; etat: string; preuve?: string | null; lots?: string[]; precisions?: { date: string; texte: string }[]; [k: string]: unknown }
 
 const fileOf = (root: string, id: string) => join(root, DEMANDES, `${id}.json`);
+const isId = (id: string) => /^D-\d+$/.test(id);
+
+/** Le D-n qu'une `raf demande new` mise en attente a réservé (son `--id`), ou null. */
+const reservedBy = (w: PendingWrite): string | null => {
+  const at = w.argv.indexOf('--id');
+  return w.argv[0] === 'demande' && w.argv[1] === 'new' && at > 0 ? (w.argv[at + 1] ?? null) : null;
+};
+
+/** Les numéros des fichiers D-<n>.json d'un dossier du registre. */
+const numbersIn = (dir: string) => (existsSync(dir) ? readdirSync(dir).filter((f) => /^D-\d+\.json$/.test(f)).map((f) => Number(f.slice(2, -5))) : []);
+
+/**
+ * Le D-n suivant : après les entrées du registre, celles qu'un cadence run qui tient la branche a inscrites dans son worktree (--demande-humaine, pas
+ * encore intégrées) et celles que l'attente a réservées ; deux `new` de suite, même en attente, ne prennent jamais le même numéro.
+ */
+function nextId(root: string, pending: PendingWrite[], holder?: Holder | null): string {
+  const taken = [...numbersIn(join(root, DEMANDES)), ...(holder?.worktree ? numbersIn(join(holder.worktree, DEMANDES)) : []),
+    ...pending.flatMap((w) => { const id = reservedBy(w); return id && isId(id) ? [Number(id.slice(2))] : []; })];
+  return `D-${Math.max(0, ...taken) + 1}`;
+}
 
 function read(root: string, id: string): Entry {
-  if (!/^D-\d+$/.test(id)) throw new RafError(`${id} n'est pas un identifiant du registre (D-<n>) — ${USAGE}`);
+  if (!isId(id)) throw new RafError(`${id} n'est pas un identifiant du registre (D-<n>) — ${USAGE}`);
   const f = fileOf(root, id);
   if (!existsSync(f)) throw new RafError(`${id} absente du registre (${DEMANDES}/${id}.json)`);
   try {
@@ -81,8 +104,57 @@ const attachLot: Write = (e, args) => {
 
 const WRITERS: Record<string, Write> = { precision: addPrecision, 'précision': addPrecision, etat: setState, 'état': setState, lot: attachLot };
 
-/** `raf demande <D-n> precision|etat|lot …` écrit le registre : mis en attente sur une branche tenue ; la lecture (`raf demande [D-n]`) ne l'est pas. */
-export const isRegistryWrite = (rest: string[]): boolean => rest.length > 1 && Object.hasOwn(WRITERS, rest[1]!);
+/** `raf demande new …` et `raf demande <D-n> precision|etat|lot …` écrivent le registre : mis en attente sur une branche tenue ; la lecture ne l'est pas. */
+export const isRegistryWrite = (rest: string[]): boolean => rest[0] === 'new' || (rest.length > 1 && Object.hasOwn(WRITERS, rest[1]!));
+
+/** Le texte d'une demande, tel que tapé (plusieurs mots sans guillemets : joints d'une espace) ; vide refusé. */
+function newText(rest: string[]): string {
+  const text = rest.slice(1).join(' ');
+  if (!text.trim()) throw new RafError('texte vide — raf demande new "texte de la demande, mot pour mot"');
+  return text;
+}
+
+/** La ligne « Noté D-n : … » : la première ligne du texte, « … » quand il en a d'autres. */
+const noted = (id: string, text: string) => `Noté ${id} : ${text.split('\n')[0]}${text.includes('\n') ? ' …' : ''}`;
+
+/**
+ * Sur une branche tenue (L841) : le D-n est réservé tout de suite, sous le verrou de l'attente, et l'écriture jouée plus tard porte ce numéro et le jour
+ * de la demande (`--id`, `--jour`, internes) ; le texte passe après « -- », mot pour mot, même s'il commence par « - ».
+ */
+export function deferNewDemande(c: EarlyCtx, holder: Holder): string {
+  const text = newText(c.rest);
+  let id = '';
+  const line = deferPlanWrite(c.root, holder, (pending) => {
+    id = nextId(c.root, pending, holder);
+    return ['demande', 'new', '--id', id, '--jour', c.today, '--', text];
+  }, c.io.now());
+  return `${noted(id, text)} — ${line}`;
+}
+
+/**
+ * raf demande new : crée D-<n suivant> (même forme que les entrées écrites à la main : id, texte, date, etat, preuve, precisions). Jouée depuis l'attente,
+ * elle garde le D-n réservé et le jour de la demande ; un numéro pris entre-temps (un run qui l'a intégré) passe au suivant, et la ligne le dit.
+ */
+function createDemande(c: EarlyCtx): number {
+  const text = newText(c.rest);
+  const date = c.values.jour ?? c.today;
+  if (!isDay(date)) throw new RafError(`--jour invalide : ${date} (attendu AAAA-MM-JJ)`);
+  const reserved = c.values.id;
+  if (reserved !== undefined && !isId(reserved)) throw new RafError(`--id invalide : ${reserved} (attendu D-<n>)`);
+  mkdirSync(join(c.root, DEMANDES), { recursive: true });
+  for (let id = reserved ?? nextId(c.root, readPending(c.root)); ; id = nextId(c.root, readPending(c.root))) {
+    const e: Entry = { id, texte: text, date, etat: 'ouverte', preuve: null, precisions: [] };
+    try {
+      writeFileSync(fileOf(c.root, id), `${JSON.stringify(e, null, 1)}\n`, { flag: 'wx' });
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'EEXIST') continue;
+      throw err;
+    }
+    const moved = reserved && reserved !== id ? ` (${reserved}, réservée, a été prise entre-temps dans le registre)` : '';
+    c.io.out(`${noted(id, text)}${moved} — ${DEMANDES}/${id}.json créé, à commiter`);
+    return 0;
+  }
+}
 
 /** L'écriture appliquée à l'entrée lue (en mémoire) : ce qu'elle dit, null si rien ne change ; une écriture invalide est refusée. */
 function written(e: Entry, what: string, args: string[], today: string): string | null {
@@ -92,17 +164,24 @@ function written(e: Entry, what: string, args: string[], today: string): string 
 
 /** Valide une écriture sans rien écrire (revue L722 r1) : sur une branche tenue, une écriture invalide est refusée avant la mise en attente. */
 export function checkRegistryWrite(c: EarlyCtx): void {
+  if (c.rest[0] === 'new') {
+    newText(c.rest);
+    return;
+  }
   const [id, what, ...args] = c.rest as [string, string, ...string[]];
-  written(read(c.root, id), what, args, c.today);
+  // L841 : une demande réservée par un new encore en attente reçoit déjà ses précisions, son état, ses lots (jouées après lui).
+  const pendingNew = !existsSync(fileOf(c.root, id)) && readPending(c.root).some((w) => reservedBy(w) === id);
+  written(pendingNew ? { id, texte: '', etat: 'ouverte' } : read(c.root, id), what, args, c.today);
 }
 
-/** raf demande : liste les demandes ouvertes, montre une entrée, ou y écrit une précision, un état et sa preuve, un lot. */
+/** raf demande : liste les demandes ouvertes, en crée une, montre une entrée, ou y écrit une précision, un état et sa preuve, un lot. */
 export function cmdDemande(c: EarlyCtx): number {
   const { rest, root, io, today } = c;
   if (rest.length === 0) {
     list(root, io.out);
     return 0;
   }
+  if (rest[0] === 'new') return createDemande(c);
   const [id, what, ...args] = rest as [string, string | undefined, ...string[]];
   const e = read(root, id);
   if (what === undefined) {

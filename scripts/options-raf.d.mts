@@ -75,5 +75,6 @@ export declare const OPTIONS_RAF: {
   readonly until: { readonly type: 'string' };
   readonly vu: { readonly type: 'string' };
   readonly 'vu-depot': { readonly type: 'string'; readonly multiple: true };
+  readonly jour: { readonly type: 'string' };
   readonly help: { readonly type: 'boolean'; readonly short: 'h' };
 };

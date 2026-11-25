@@ -79,5 +79,7 @@ export const OPTIONS_RAF = Object.freeze({
     // Internes (L722) : ce qu'une revue mise en attente a relu, écrit par la mise en attente, refusé ailleurs (attente-commands.ts).
     vu: { type: 'string' },
     'vu-depot': { type: 'string', multiple: true },
+    // Interne (L841) : le jour d'une demande mise en attente par raf demande new, écrit par la mise en attente avec --id (le D-n réservé).
+    jour: { type: 'string' },
     help: { type: 'boolean', short: 'h' },
 });

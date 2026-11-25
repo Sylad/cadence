@@ -1,5 +1,5 @@
 // Le plan en attente (L695, D-9) : `raf add|note|start|done|review|ux|demande` (L722, L779 pour start) sur une branche tenue par un programme, puis `raf attente [appliquer]`.
-import { checkRegistryWrite, isRegistryWrite } from './demande-commands.js';
+import { checkRegistryWrite, deferNewDemande, isRegistryWrite } from './demande-commands.js';
 import { checkGateUsage, reviewedAt, seenArgs } from './gates.js';
 import { applyPending, deferPlanWrite, holderHere, PENDING_PLAN, readPending } from '../repo-held.js';
 import { RafError } from '../plan.js';
@@ -80,12 +80,25 @@ function checked(command: string, c: EarlyCtx): string[] {
   return seenArgs(at);
 }
 
+/** Les options que seule la mise en attente écrit : --vu et --vu-depot d'une revue (L722), --id et --jour d'un raf demande new (L841). */
+function refuseInternalOptions(command: string, c: EarlyCtx): void {
+  if (applying) return;
+  if (c.values.vu !== undefined || c.values['vu-depot']) throw new RafError('--vu et --vu-depot sont réservés au plan en attente : la mise en attente d\'une revue les écrit, raf attente appliquer les lit');
+  if (command === 'demande' && (c.values.jour !== undefined || c.values.id !== undefined)) {
+    throw new RafError('--id et --jour de raf demande new sont réservés au plan en attente : la mise en attente les écrit (le D-n réservé, le jour de la demande), raf attente appliquer les lit');
+  }
+}
+
+/** Met l'écriture en attente (L841 : raf demande new y réserve son D-n) ; rend la ligne qui le dit. */
+const deferred = (command: string, argv: string[], c: EarlyCtx, holder: NonNullable<ReturnType<typeof holderHere>>): string =>
+  (command === 'demande' && c.rest[0] === 'new' ? deferNewDemande(c, holder) : deferPlanWrite(c.root, holder, [...argv, ...checked(command, c)], c.io.now()));
+
 /**
  * Une écriture du plan sur une branche tenue va dans le plan en attente (rend 0) ; sur une branche libre, l'attente laissée par un programme
  * qui ne l'a pas appliquée (arrêté en route) passe d'abord, puis la commande suit (rend null).
  */
 export function heldPlanWrite(command: string, argv: string[], c: EarlyCtx, run: Run): number | null {
-  if ((c.values.vu !== undefined || c.values['vu-depot']) && !applying) throw new RafError('--vu et --vu-depot sont réservés au plan en attente : la mise en attente d\'une revue les écrit, raf attente appliquer les lit');
+  refuseInternalOptions(command, c);
   if (!DEFERRABLE.has(command) || applying || c.values.help || (command === 'demande' && !isRegistryWrite(c.rest))) return null;
   let holder;
   try {
@@ -94,7 +107,7 @@ export function heldPlanWrite(command: string, argv: string[], c: EarlyCtx, run:
     return null; // hors d'un dépôt git : rien ne peut le tenir
   }
   if (holder) {
-    c.io.out(deferPlanWrite(c.root, holder, [...argv, ...checked(command, c)], c.io.now()));
+    c.io.out(deferred(command, argv, c, holder));
     return 0;
   }
   if (readPending(c.root).length > 0) apply(c, run);

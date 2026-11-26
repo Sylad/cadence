@@ -4567,6 +4567,7 @@ lots:
     estimate: 1
     created: 2026-11-26
     started: 2026-11-26
+    review: { date: 2026-11-26, verdict: "conforme après 1 correction : 1 majeur (étude banc-b68-2026-11-25.md:54 et :93 : « 4 sur 4 » faux, le geste revient 5/7 chez cadence-run contre 3/7 chez A sur les 22 et 25-11), 1 mineur (test recopie le filtre de run.ts:510)", commit: 96bbfd95b557906e5f6bb8a0d3887e8a99b52ae2 }
   - id: L878
     title: "Mesurer le bruit de la pente de duplication par une séquence A contre A-bis et remplacer la borne écrite BRUIT_PENTE_DUPLICATION = 0,1 point (L876, v2/src/sequence/verdict.ts:12) par l'écart mesuré, comme MARGE_CACHES (banc.md:43-45). Vécu 26-11 : revue de L876, borne > tout le mouvement de A (0,07). Mesure : borne issue d'au moins 2 paires A/A-bis."
     status: todo
@@ -4587,6 +4588,12 @@ lots:
     created: 2026-11-26
   - id: L881
     title: "Rapport de séquence : signaler chaque sortie attendue tombée à une étape où les deux bras jouaient le même prompt (bras-A.md des deux côtés, aucune pièce ni référence) — écart de tirage, pas de cadence. Vécu 26-11 (L877) : S8 manquée 2 fois sur 3 par cadence-run avec le même prompt que A. Mesure : le rapport distingue les écarts « même prompt » des écarts « brief cadence »."
+    status: todo
+    estimate: 1
+    planned: { from: 2026-11-27, to: 2026-12-04 }
+    created: 2026-11-26
+  - id: L882
+    title: "Juge du banc : verdict constant sur une même sortie — le 22-11 court r1 le juge met « oui » à S1 (grand D/A au réglage par défaut) pour les deux bras alors que sa preuve dit « lettre ≈ 20 px au réglage par défaut », le 25-11 le même cas vaut « non ». Vu par la revue de L877 le 26-11 (revues/cadence-L877-code.md). Mesure : rejuger les 7 rapports des 22 et 25-11 donne le même verdict à preuve égale."
     status: todo
     estimate: 1
     planned: { from: 2026-11-27, to: 2026-12-04 }

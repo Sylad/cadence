@@ -4653,6 +4653,8 @@ lots:
     visible: true
     after: [ L888 ]
     created: 2026-11-26
+    notes:
+      - { date: 2026-11-26, text: "26-11 : maquette C (notifications) VALIDÉE par Sylvain (« Validée »). Pièces : ~/projects/developpeur/maquettes/cadence-L890/maquette-C.html et criteres.md (C1-C8). Après L888 (même pane)." }
   - id: L891
     title: "Revue UX de conformité qui converge : séparer « constat ou régression du lot » (bloque) de « défaut préexistant découvert » (proposé en lot à part, ne bloque pas), comme le code-reviewer. Vécu compte pro 26-11 : un lot d'écran à sa 4e revue de conformité, chaque tour trouvant un majeur antérieur au lot (« existing behaviour, not caused by <commits> »), ~1 h perdue par tour. Mesure : revues de conformité par lot visible (cible ≤ 2) et défauts préexistants versés en lots au lieu de bloquer."
     status: todo

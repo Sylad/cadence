@@ -73,7 +73,7 @@ describe('tests d\'origine hors compte (L798)', () => {
     const tests = `if ls *.cache-banc.test.sh >/dev/null 2>&1; then cat ${sortie}; else echo "Tests:       525 passed, 525 total"; fi`;
     const banc = (id: string) => ({ id, dir: r, secrets, projet: 'p', source: r, base: 'x', install: 'true', tests, visible: false, taille: 'fonction' as const, frais: false, reponses: false });
     expect(mesurerSansJuge(banc('3-ol-companion-L241'), clone)).toMatchObject({ caches_reussis: { jest: 30 }, caches_hors_compte: [expect.stringContaining('réussi')] });
-    expect(mesurerSansJuge(banc('1-ol-companion-L239'), clone)).toEqual({ suite_ok: true, caches_ok: true, caches_reussis: { jest: 31 } });
+    expect(mesurerSansJuge(banc('1-ol-companion-L239'), clone)).toEqual({ suite_ok: true, caches_ok: true, caches_reussis: { jest: 31 }, caches_rates: { jest: 3 } });
   });
 });
 

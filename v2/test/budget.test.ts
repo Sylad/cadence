@@ -123,6 +123,8 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // laisse sa cause (refus-complet.ts : distPerime, construireV2, relancerV2, complet-refus.txt) que bench statut montre en ⚠, sans ligne tassée.
   // L804 (revue r1) : bench 1868 (+13), mesure 2585 : les fichiers non commités refusent le banc avant toute construction (nonCommite, partagé avec
   // pretAPasser), et une relance qui ne démarre pas ou qu'un signal arrête note sa cause, sans ligne tassée.
+  // L905 : bench 1858 (+6), mesure 2591 : marge des tests d'origine proportionnée aux ratés de la référence sur chaque banc (caches_rates,
+  // RATES_PAR_TEST_DE_MARGE), écart pardonné signalé à part (ECART_DANS_LE_BRUIT), sans ligne tassée.
   // L808 : hooks 321 (+90) : cheminsCites et classer passent de bench/fuites.ts (-53) à hooks/lecture.mjs, partagés par le détecteur de fuites et le hook
   // lecture-obligatoire.mjs, qui refuse au banc toute lecture hors du clone (lectureHorsClone), sans ligne tassée.
   // L808 (revue r1) : hooks 376 (+55) : seul ce qui est LU est jugé (commandeLue retire d'une commande Bash les textes écrits : heredoc, message de commit,
@@ -142,9 +144,9 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // envoyé par cadence run, appelé par le test L877) détassé, son commentaire en JSDoc et une instruction par ligne, sans ligne tassée.
   // L899 : hooks 475 (+11), deliver 389 (-11, module absent de src/ : marge mesurée 389, total du noyau inchangé) : faux chemins des bancs du 26-11
   // (« / » de prose, commentaire suivi d'un chiffre, délimiteur de sed, import TS, nom de commande, « 2>/dev/null ») retirés, sans ligne tassée.
-  it('les totaux sont ceux de R29 : noyau 3000, mesure 2585 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742, L752, L756, L762, L775, L777, L798, L804)', () => {
+  it('les totaux sont ceux de R29 : noyau 3000, mesure 2591 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742, L752, L756, L762, L775, L777, L798, L804, L905)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
-    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2585]);
+    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2591]);
   });
   for (const [nom, g] of Object.entries(budget)) {
     it(`groupe ${nom} : la somme des budgets ne dépasse pas ${g.total}`, () =>

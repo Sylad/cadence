@@ -21,7 +21,8 @@ export function mesurerSansJuge(b: Banc, clone: string, delaiMs = 30 * 60_000, r
     const caches_ok = shell('tests d\'origine', b.tests, clone, `${clone}.tests-origine${j}.log`, delaiMs) === 0;
     const journal = lireJournal(`${clone}.tests-origine${j}.log`), brut = cachesReussis(journal, lireJournal(`${clone}.tests-bras${j}.log`));
     const n = brut && exclureTests(brut, journal, TESTS_HORS_COMPTE[b.id] ?? []);
-    return { suite_ok, caches_ok, ...(n && { caches_reussis: n.par_lanceur, ...(n.hors_compte.length > 0 && { caches_hors_compte: n.hors_compte }) }) };
+    return { suite_ok, caches_ok, ...(n && { caches_reussis: n.par_lanceur, ...(n.rates && { caches_rates: n.rates }), // L905 : ratés, pour la marge
+      ...(n.hors_compte.length > 0 && { caches_hors_compte: n.hors_compte }) }) };
   } finally { for (const p of poses) rmSync(p, { force: true }); }
 }
 
@@ -54,8 +55,9 @@ export function testsReussis(journal: string): Record<string, number> | null {
   return b && Object.fromEntries(Object.entries(b).map(([k, x]) => [k, x.reussis]));
 }
 
-/** L777 (revue r1) : tests d'origine réussis d'un bras, par lanceur comparable, et les lanceurs laissés hors du compte, avec leur raison. */
-export interface CompteCaches { par_lanceur: Record<string, number>; hors_compte: string[] }
+/** L777 (revue r1) : tests d'origine réussis d'un bras, par lanceur comparable, et les lanceurs laissés hors du compte, avec leur raison.
+ * `rates` (L905) : tests d'origine ratés par lanceur comparable, posé seulement s'il y en a ; la marge du critère se lit sur ceux de la référence. */
+export interface CompteCaches { par_lanceur: Record<string, number>; hors_compte: string[]; rates?: Record<string, number> }
 /**
  * L777 : tests d'origine réussis par un bras = tests réussis avec les tests d'origine posés, moins ceux de la suite seule, lanceur par lanceur.
  * Revue r1 : un lanceur ne compte que s'il a un bilan dans les DEUX journaux et aucun test raté dans la suite seule. Les bancs enchaînent leurs suites
@@ -65,12 +67,16 @@ export interface CompteCaches { par_lanceur: Record<string, number>; hors_compte
  */
 export function cachesReussis(origine: string, bras: string): CompteCaches | null {
   const o = bilans(origine) ?? {}, b = bilans(bras) ?? {}, par_lanceur: Record<string, number> = {}, hors_compte: string[] = [];
+  let rates: Record<string, number> | undefined;
   for (const k of [...new Set([...Object.keys(o), ...Object.keys(b)])].sort()) {
     if (!o[k] || !b[k]) hors_compte.push(`${k} : absent de la suite ${o[k] ? 'seule' : 'avec les tests d\'origine'}`);
     else if (b[k].rates) hors_compte.push(`${k} : ${b[k].rates} rouge(s) dans la suite seule`);
-    else par_lanceur[k] = Math.max(0, o[k].reussis - b[k].reussis);
+    else {
+      par_lanceur[k] = Math.max(0, o[k].reussis - b[k].reussis);
+      if (o[k].rates) rates = { ...rates, [k]: o[k].rates }; // L905 : la suite seule est verte, tous les ratés sont des tests d'origine
+    }
   }
-  return Object.keys(par_lanceur).length || hors_compte.length ? { par_lanceur, hors_compte } : null;
+  return Object.keys(par_lanceur).length || hors_compte.length ? { par_lanceur, hors_compte, ...(rates && { rates }) } : null;
 }
 
 /** L798 : un test d'origine laissé hors du compte des deux bras, avec sa raison (docs/v2/banc.md, « Tests d'origine hors compte »). `fichier` : son nom
@@ -108,14 +114,15 @@ export const testReussiJest = (journal: string, fichier: string, nom: string): b
 
 /** L798 : retire du compte d'un bras chaque test de `exclus` qu'il a réussi, et le nomme hors compte (réussi, raté ou inconnu) avec sa raison. */
 export function exclureTests(n: CompteCaches, journal: string, exclus: TestHorsCompte[]): CompteCaches {
-  const par_lanceur = { ...n.par_lanceur }, hors_compte = [...n.hors_compte];
+  const par_lanceur = { ...n.par_lanceur }, hors_compte = [...n.hors_compte], rates = n.rates && { ...n.rates };
   for (const x of exclus) {
     if (par_lanceur[x.lanceur] === undefined) continue;
     const etat = etatTestJest(journal, x.fichier, x.nom);
     if (etat === 'réussi') par_lanceur[x.lanceur] = Math.max(0, par_lanceur[x.lanceur] - 1);
+    if (etat === 'raté' && rates?.[x.lanceur]) rates[x.lanceur] -= 1; // L905 : hors compte aussi pour la marge
     hors_compte.push(`${x.lanceur} : « ${x.nom.split(' › ').pop()} » (${x.fichier}, ${etat}) : ${x.raison}`);
   }
-  return { par_lanceur, hors_compte };
+  return { par_lanceur, hors_compte, ...(rates && { rates }) };
 }
 
 /** L733 : chemins qui ne sont pas le travail d'un banc (plan, registre, docs, captures MCP, Markdown). */

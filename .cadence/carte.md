@@ -108,6 +108,7 @@
 - Critère « tests d'origine verts » (micro, mécanique, garde L730) : candidat ≥ A en tests d'origine réussis, somme des bancs, **sans marge**. La marge de 11 % (MARGE_CACHES) est retirée : elle venait d'écarts A/cadence-run (empreinte_bras différente aux bancs 3 et 7), pas de bras identiques.
 - `cachesReussis` (v2/src/bench/sans-juge.ts) rend `{ par_lanceur, hors_compte }` : un lanceur compte seulement s'il a un bilan dans les deux journaux et aucun rouge dans la suite seule. Un lanceur compté pour un seul des deux bras, ou aucun lanceur comptable : banc « compte par test non mesurable », retour au compte par banc, dit dans la valeur.
 - Décision : marge à mesurer plus tard sur des paires A contre A-bis (`bench bruit`, ≥ 5 paires par banc, banc 7 compris), proposée à Sylvain ; aucune paire au banc 7 au 18-11. Recalcul du 18-11 : 09:07 ROUGE 80/88, 10:08 ROUGE 82/84, 11:31 vert 83/81.
+- L905 (D-39) : marge par banc = ⌊ratés de A sur le banc / 6⌋ (`RATES_PAR_TEST_DE_MARGE`, `caches_rates`), mesurée sur A contre A au banc 7 (16 à 24 réussis, 12 passages, même empreinte_bras) ; ne pardonne que l'écart de son banc, pardon signalé à part (`ECART_DANS_LE_BRUIT`, non bloquant). 26-11 17:27 et 17:53 verts ; bancs 1 et 3 restent stricts. Test : v2/test/marge-caches-l905.test.ts.
 
 ## cadence sondes : lecture seule, navigation, rien de mesuré (L778, revue r1)
 

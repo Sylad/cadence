@@ -5,8 +5,10 @@ import { avisLu, type Jugement, type Meca } from './juges.js';
 /** L689 : mesure sans juge IA d'un bras (bancs micro et mécanique, sans-juge.ts). */
 /** `rejoue` (L734) : la mesure rouge du premier passage, sous la charge des autres bancs ; les champs sont alors ceux du rejeu seul.
  * `caches_reussis` (L777) : tests d'origine réussis par le bras, par lanceur comparable (`cachesReussis`, sans-juge.ts) ; absent si aucun journal n'a de bilan.
- * `caches_hors_compte` (L777, revue r1) : lanceurs laissés hors du compte, avec leur raison (absent d'un des deux journaux, suite seule rouge). */
-export interface MesureSansJuge { suite_ok: boolean; caches_ok: boolean | null; caches_reussis?: Record<string, number>; caches_hors_compte?: string[]; rejoue?: { suite_ok: boolean; caches_ok: boolean | null } }
+ * `caches_hors_compte` (L777, revue r1) : lanceurs laissés hors du compte, avec leur raison (absent d'un des deux journaux, suite seule rouge).
+ * `caches_rates` (L905) : tests d'origine ratés, par lanceur comparable ; absent s'il n'y en a aucun ou sur un relevé d'avant L905 (marge nulle). */
+export interface MesureSansJuge { suite_ok: boolean; caches_ok: boolean | null; caches_reussis?: Record<string, number>; caches_rates?: Record<string, number>;
+  caches_hors_compte?: string[]; rejoue?: { suite_ok: boolean; caches_ok: boolean | null } }
 export interface ResultatBanc { banc: string; taille: Taille; visible: boolean; reponses: boolean; frais: boolean;
   mesures: Record<string, Mesure>; jugement: Jugement | null; fuites: Record<string, string[]>; fuites_a_verifier?: Record<string, string[]>;
   /** L798 : fuites certaines de la référence sans effet possible sur le candidat (`fuiteSansEffet`, fuites.ts) : signalées, non bloquantes. */
@@ -155,17 +157,29 @@ function criteresTemps(res: ResultatBanc[], ref: string, cand: string, barre: Ba
 }
 
 /**
+ * L905 (D-39) : tests d'origine ratés par la référence sur un banc pour un test de marge sur ce banc. Mesure, bras A identiques (même empreinte_bras) :
+ * au banc 7, A réussit de 16 à 24 de ses 72 tests d'origine sur les 12 passages du 15 au 18-11 (d8fd9cf786d5), soit 8 tests d'écart pour 48 ratés,
+ * 1 pour 6 ; le 26-11, à la même empreinte de v2 (731ad45d5f4c), A en réussit 20 puis 17. Un banc que A réussit (bancs 1 et 3 : 0 à 2 ratés) a 0.
+ */
+export const RATES_PAR_TEST_DE_MARGE = 6;
+/** L905 : nom du critère indicatif qui signale un écart de tests d'origine laissé passer par la marge du bruit. */
+export const ECART_DANS_LE_BRUIT = 'tests d\'origine : écart dans le bruit de la référence';
+
+/**
  * L777 : critère « tests d'origine verts » des bancs sans juge. Sur les bancs mesurés qui ont des tests d'origine, il compte les tests d'origine RÉUSSIS
  * par bras (`caches_reussis`) et non plus les bancs entiers verts : un seul test d'un banc (L239, trait de la barre latérale) faisait basculer la garde.
- * Revue r1 : aucune marge de bruit. Vert si candidat ≥ référence, test par test, sur la somme des bancs : aucune paire A contre A ne porte encore le
- * compte des tests d'origine au banc 7 (docs/v2/banc.md, « la marge reste à mesurer »). Un lanceur hors du compte des deux bras (`caches_hors_compte`)
+ * Revue r1 : vert si candidat ≥ référence, test par test, sur la somme des bancs. Un lanceur hors du compte des deux bras (`caches_hors_compte`)
  * est nommé « hors compte ». Si un banc n'a pas de compte comparable (relevé d'avant L777, aucun lanceur comptable, un lanceur compté pour un seul des
  * deux bras : comparer le reste rendrait 0 contre 0 en silence), le critère le dit
  * (« compte par test non mesurable ») et revient au compte par banc d'avant (candidat ≥ référence en bancs verts).
+ * L905 (D-39) : marge par banc, proportionnée aux tests d'origine que la RÉFÉRENCE rate sur ce banc (`caches_rates`, 1 par `RATES_PAR_TEST_DE_MARGE`).
+ * Le 26-11, deux passages à la même empreinte ont rougi pour 17 contre 20 puis 16 contre 17 au banc 7, où A rate 52 à 55 tests : tirage du modèle.
+ * La marge d'un banc ne pardonne que l'écart de CE banc (un recul sur un banc que A réussit reste rouge, quelle que soit la marge des autres) ; un écart
+ * pardonné est signalé à part (`ECART_DANS_LE_BRUIT`), non bloquant. Relevé sans `caches_rates` (avant L905) : marge nulle, comme avant.
  */
-function critereCaches(mes: ResultatBanc[], ref: string, cand: string): Critere {
+function critereCaches(mes: ResultatBanc[], ref: string, cand: string): Critere[] {
   const avec = mes.filter((r) => r.sans_juge![ref].caches_ok !== null);
-  if (!avec.length) return c('tests d\'origine verts', 'aucun banc avec tests d\'origine', `≥ ${ref}`, true);
+  if (!avec.length) return [c('tests d\'origine verts', 'aucun banc avec tests d\'origine', `≥ ${ref}`, true)];
   const nonMesurables: string[] = [], hors: string[] = [];
   const comptes = avec.map((r) => {
     const sj = r.sans_juge!, manque = [ref, cand].filter((b) => !sj[b].caches_reussis);
@@ -175,15 +189,22 @@ function critereCaches(mes: ResultatBanc[], ref: string, cand: string): Critere 
     const seuls = [ref, cand].flatMap((b) => k(b).filter((x) => !communs.includes(x)).map((x) => `${x} compté pour ${b} seulement`));
     if (seuls.length || !communs.length) { nonMesurables.push(`${r.banc} : ${seuls.length ? seuls.join(', ') : 'aucun lanceur comptable'}`); return null; }
     const t = (b: string) => somme(communs.map((x) => sj[b].caches_reussis![x]));
-    return { banc: r.banc, ref: t(ref), cand: t(cand) };
+    const ratesRef = somme(communs.map((x) => sj[ref].caches_rates?.[x] ?? 0)), marge = Math.floor(ratesRef / RATES_PAR_TEST_DE_MARGE);
+    return { banc: r.banc, ref: t(ref), cand: t(cand), ratesRef, marge, pardon: Math.min(marge, Math.max(0, t(ref) - t(cand))) };
   });
   if (nonMesurables.length) {
     const n = (b: string) => avec.filter((r) => r.sans_juge![b].caches_ok === true).length;
-    return c('tests d\'origine verts', `${n(cand)} contre ${n(ref)} bancs sur ${avec.length} (compte par test non mesurable : ${nonMesurables.join(' ; ')})`, `≥ ${ref}`, n(cand) >= n(ref));
+    return [c('tests d\'origine verts', `${n(cand)} contre ${n(ref)} bancs sur ${avec.length} (compte par test non mesurable : ${nonMesurables.join(' ; ')})`,
+      `≥ ${ref}`, n(cand) >= n(ref))];
   }
-  const ok = comptes as { banc: string; ref: number; cand: number }[], t = (b: 'ref' | 'cand') => somme(ok.map((x) => x[b]));
-  return c('tests d\'origine verts', `${t('cand')} contre ${t('ref')} tests réussis (${ok.map((x) => `${x.banc} : ${x.cand} contre ${x.ref}`).join(' · ')})${hors.length ? ` ; hors compte : ${hors.join(' ; ')}` : ''}`,
-    `≥ ${ref} (test par test, sans marge, L777)`, t('cand') >= t('ref'));
+  const ok = comptes as { banc: string; ref: number; cand: number; ratesRef: number; marge: number; pardon: number }[];
+  const t = (b: 'ref' | 'cand' | 'pardon') => somme(ok.map((x) => x[b]));
+  const marge = (x: (typeof ok)[number]) => (x.marge && x.cand < x.ref ? ` (écart ${x.ref - x.cand}, marge ${x.marge} : ${ref} rate ${x.ratesRef} tests d'origine)` : '');
+  const valeur = `${t('cand')} contre ${t('ref')} tests réussis (${ok.map((x) => `${x.banc} : ${x.cand} contre ${x.ref}${marge(x)}`).join(' · ')})`;
+  const pardonnes = ok.filter((x) => x.pardon > 0).map((x) => `${x.banc} : ${x.cand} contre ${x.ref}, ${x.pardon} dans la marge de ${x.marge}`);
+  return [c('tests d\'origine verts', `${valeur}${hors.length ? ` ; hors compte : ${hors.join(' ; ')}` : ''}`,
+    `≥ ${ref} test par test, marge par banc : 1 par ${RATES_PAR_TEST_DE_MARGE} tests d'origine ratés par ${ref} (L777, L905)`, t('cand') + t('pardon') >= t('ref')),
+  ...(pardonnes.length ? [c(ECART_DANS_LE_BRUIT, pardonnes.join(' ; '), '0 (signalé)', false, false)] : [])];
 }
 
 /** Critères sans juge, communs à tous les passages (L689) : mesures, fuites et échecs (`avant`), temps et questions (`apres`). */
@@ -209,7 +230,7 @@ function communs(res: ResultatBanc[], ref: string, cand: string, barre: Barre): 
 
 /**
  * L689 : verdict d'un banc micro ou mécanique, sans juge IA : suite du projet verte sur au moins autant de bancs que la référence, et tests d'origine
- * réussis au moins autant que la référence, test par test (L777, `critereCaches`).
+ * réussis au moins autant que la référence, test par test, à la marge du bruit de la référence près (L777, L905, `critereCaches`).
  * Banc non livré : cinq règles (L733, deux revues ; tableau « Banc non livré » dans docs/v2/banc.md). Seule fonction qui les porte :
  * (a) un banc non livré (`non_livre`, posé par `sansLivrable`) sort de TOUS les critères, temps total et retouches compris ;
  * (b) temps total (≤ 1,5 × ref) et temps des retouches (≤ 1,2 × ref) se calculent sur les bancs mesurés restants et RESTENT BLOQUANTS ;
@@ -226,7 +247,7 @@ export function verdictSansJuge(tous: ResultatBanc[], ref: string, cand: string,
   const criteres = [...k.avant,
     c('bancs mesurés sans juge', `${mes.length}/${res.length}`, 'tous', mes.length === res.length),
     c('suite du projet verte', `${n(cand)} contre ${n(ref)} bancs`, `≥ ${ref}`, n(cand) >= n(ref)),
-    critereCaches(mes, ref, cand), // L777 : tests réussis par bras, sans marge (revue r1)
+    ...critereCaches(mes, ref, cand), // L777 : tests réussis par bras ; L905 : marge proportionnée aux ratés de la référence
     ...k.apres,
     ...(nonLivres.length ? [c('bras qui ont livré le travail', nonLivres.flatMap((r) => Object.entries(r.non_livre!).map(([b, x]) => `${r.banc}/${b} : ${x}`)).join(' ; '), 'tous', false, false)] : [])];
   const rouge = criteres.some((x) => x.bloquant && !x.ok); // (c)
@@ -283,7 +304,7 @@ export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdi
     ...(e.duree_s !== undefined ? [`Durée du passage : ${e.duree_s} s`] : []), ...(e.charge ?? []), '', // L762 : charge de la machine
     `| Banc | Temps ${ref} | Temps ${cand} | Tokens ${ref} | Tokens ${cand} | Préféré | Cachés ${ref} · ${cand} | Mutations ${ref} · ${cand} | Suite ${ref} · ${cand} | Attendu ${ref} · ${cand} | Taille déclarée ${ref} · ${cand} |`,
     '|---|---|---|---|---|---|---|---|---|---|---|', ...lignes, '', '| Critère | Valeur | Seuil | Résultat |', '|---|---|---|---|',
-    ...v.criteres.map((c) => `| ${c.nom} | ${c.valeur} | ${c.seuil} | ${c.ok ? 'ok' : c.bloquant ? '**ROUGE**' : c.nom === 'bras qui ont livré le travail' ? '**non livré**' : c.nom === FUITES_SIGNALEES ? '**signalé**' : 'en dessous (indicatif)'} |`), '',
+    ...v.criteres.map((c) => `| ${c.nom} | ${c.valeur} | ${c.seuil} | ${c.ok ? 'ok' : c.bloquant ? '**ROUGE**' : c.nom === 'bras qui ont livré le travail' ? '**non livré**' : [FUITES_SIGNALEES, ECART_DANS_LE_BRUIT].includes(c.nom) ? '**signalé**' : 'en dessous (indicatif)'} |`), '',
     ...(rejoues.length ? ['## Suites rejouées', '', 'Rouge pendant que les autres bancs tournaient, rejouée seule après eux : le rejeu compte (L734).', '', ...rejoues, ''] : []),
     ...(nonLivres.length ? ['## Bancs non mesurables', '', 'Un bras n\'a livré aucun fichier hors plan et doc : son temps ne compte pas, ni en victoire ni en défaite. Rejouer le passage.', '', ...nonLivres, ''] : []),
     ...(e.eclair ? ['## Contrôles éclair', '', ...e.eclair.map((l) => `- ${l}`), ''] : []),

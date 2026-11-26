@@ -26,7 +26,7 @@ describe('tests réussis lus dans le bilan d\'une suite (L777)', () => {
   });
   it('tests d\'origine réussis : suite avec les tests d\'origine moins suite seule, lanceur par lanceur', () => {
     // banc 1, 18-11 à 11:31 : c1 (cadence-run) rate 1 des 33 tests d'origine, c2 (A) les passe tous
-    expect(cachesReussis(`${JEST}\n${VITEST_ORIGINE_ROUGE}`, `${JEST}\n${VITEST_BRAS}`)).toEqual({ par_lanceur: { jest: 0, vitest: 32 }, hors_compte: [] });
+    expect(cachesReussis(`${JEST}\n${VITEST_ORIGINE_ROUGE}`, `${JEST}\n${VITEST_BRAS}`)).toEqual({ par_lanceur: { jest: 0, vitest: 32 }, hors_compte: [], rates: { vitest: 1 } }); // L905 : ratés relevés
     expect(cachesReussis(`${JEST}\n${VITEST_ORIGINE_VERT}`, `${JEST}\n${VITEST_BRAS}`)).toEqual({ par_lanceur: { jest: 0, vitest: 33 }, hors_compte: [] });
     expect(cachesReussis('aucun bilan', 'rien')).toBeNull();
   });
@@ -36,13 +36,14 @@ describe('tests réussis lus dans le bilan d\'une suite (L777)', () => {
     expect(cachesReussis(`${JEST}\n${VITEST_ORIGINE_VERT}`, JEST_ROUGE)).toEqual({ par_lanceur: {},
       hors_compte: ['jest : 3 rouge(s) dans la suite seule', 'vitest : absent de la suite seule'] });
     // backend rouge dans la suite avec les tests d'origine, suite seule verte : comptait 0 (les 33 tests d'origine frontend effacés)
-    expect(cachesReussis(JEST_ROUGE, `${JEST}\n${VITEST_BRAS}`)).toEqual({ par_lanceur: { jest: 0 }, hors_compte: ['vitest : absent de la suite avec les tests d\'origine'] });
+    expect(cachesReussis(JEST_ROUGE, `${JEST}\n${VITEST_BRAS}`)).toEqual({ par_lanceur: { jest: 0 }, hors_compte: ['vitest : absent de la suite avec les tests d\'origine'],
+      rates: { jest: 3 } });
     // suite seule rouge sous charge (15-11 16:04, 28 findBy expirés) : la différence aurait compté 61 tests d'origine sur 33
     expect(cachesReussis(`${JEST}\n${VITEST_ORIGINE_VERT}`, `${JEST}\n      Tests  28 failed | 1307 passed (1335)`)).toEqual({ par_lanceur: { jest: 0 },
       hors_compte: ['vitest : 28 rouge(s) dans la suite seule'] });
     // banc 3 : le backend rouge arrête la chaîne dans la suite avec les tests d'origine ; seul jest compte, vitest est nommé hors compte
     expect(cachesReussis('Tests:       3 failed, 546 passed, 549 total', `Tests:       514 passed, 514 total\n${VITEST_BRAS}`))
-      .toEqual({ par_lanceur: { jest: 32 }, hors_compte: ['vitest : absent de la suite avec les tests d\'origine'] });
+      .toEqual({ par_lanceur: { jest: 32 }, hors_compte: ['vitest : absent de la suite avec les tests d\'origine'], rates: { jest: 3 } });
   });
   it('la mesure sans juge relève le compte dans resultat.json, et l\'omet sans bilan lisible', () => {
     const r = dossierTemp('caches-l777-'), clone = join(r, 'c1'), secrets = join(r, 'secrets');
@@ -51,7 +52,7 @@ describe('tests réussis lus dans le bilan d\'une suite (L777)', () => {
     const banc = (tests: string): Banc => ({ id: '1-a', dir: r, secrets, projet: 'p', source: r, base: 'x', install: 'true', tests, visible: false, taille: 'fonction', frais: false, reponses: false });
     // un faux lanceur : chaque fichier de test passe, sauf c.cache-banc.test.sh qui échoue
     const lanceur = 'p=$(ls t/*.test.sh | grep -vc c.cache-banc); f=$(ls t/*.test.sh | grep -c c.cache-banc); echo "Tests:       $f failed, $p passed, $((p+f)) total"; test $f -eq 0';
-    expect(mesurerSansJuge(banc(lanceur), clone)).toEqual({ suite_ok: true, caches_ok: false, caches_reussis: { jest: 1 } });
+    expect(mesurerSansJuge(banc(lanceur), clone)).toEqual({ suite_ok: true, caches_ok: false, caches_reussis: { jest: 1 }, caches_rates: { jest: 1 } });
     expect(mesurerSansJuge(banc('true'), clone)).toEqual({ suite_ok: true, caches_ok: true });
   });
 });
@@ -74,7 +75,7 @@ describe('critère « tests d\'origine verts » : tests réussis par bras, sans 
     const p = (b1: [number, number], b3: [number, number], b7: [number, number]) => [banc('1-ol-companion-L239', [b1[0], b1[0] === 33], [b1[1], b1[1] === 33]),
       banc('3-ol-companion-L241', [{ jest: b3[0] }, false], [{ jest: b3[1] }, false]), banc('7-ol-companion-L160', [b7[0], false], [b7[1], false])];
     expect(caches(...p([33, 32], [31, 32], [24, 16]))).toMatchObject({ valeur: '80 contre 88 tests réussis (1-ol-companion-L239 : 32 contre 33 · 3-ol-companion-L241 : 32 contre 31 · 7-ol-companion-L160 : 16 contre 24)',
-      seuil: '≥ A (test par test, sans marge, L777)', ok: false, bloquant: true }); // 09:07
+      seuil: '≥ A test par test, marge par banc : 1 par 6 tests d\'origine ratés par A (L777, L905)', ok: false, bloquant: true }); // 09:07 (relevé sans ratés : marge nulle)
     expect(caches(...p([32, 33], [31, 31], [21, 18]))).toMatchObject({ valeur: expect.stringMatching(/^82 contre 84 tests réussis/), ok: false }); // 10:08
     expect(caches(...p([33, 32], [32, 32], [16, 19]))).toMatchObject({ valeur: expect.stringMatching(/^83 contre 81 tests réussis/), ok: true }); // 11:31
     expect(vert(...p([33, 32], [31, 32], [24, 16]))).toBe(false);

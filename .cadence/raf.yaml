@@ -4535,7 +4535,7 @@ lots:
     estimate: 1
     created: 2026-11-25
     started: 2026-11-26
-    review: { date: 2026-11-26, verdict: "non conforme : 1 majeur (la dérogation /* /** laisse passer des lectures récursives réelles de la racine : globstar, bash -O globstar, zsh -c, python glob recursive, for f in /**, echo /* | xargs grep -r), 3 mineurs (suffixe de regex sans test, ligne tassée à 161 colonnes contre budget.test.ts:23, hook sans test /* /**)", commit: 20a21c1a3237e5b59590bc7c374ac4d8b4cda643 }
+    review: { date: 2026-11-26, verdict: "non conforme : 1 majeur (un script shell cité, bash -c '… /* 2>/dev/null' ou heredoc à bash, lit récursivement la racine sans être refusé ni compté, v2/hooks/lecture.mjs:231-238) ; m1, m2, m3 corrigés", commit: 081e488c49b3f3a8365e1e70c24ec68f968b8491 }
   - id: L873
     title: "Sonde UX : mesurer la position et la largeur des contrôles voisins avant et après un clic (revue UX r2 de blue-fleet L6, 25-11 : la sonde a rendu « saut 0 px » alors que « Par mémoire » glisse de 32 px quand l'actif change de graisse). Mesure : la sonde voit ce saut sur la fixture rejouée"
     status: todo

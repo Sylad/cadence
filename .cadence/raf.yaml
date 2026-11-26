@@ -4767,6 +4767,11 @@ lots:
     status: todo
     estimate: 1
     created: 2026-11-26
+  - id: L909
+    title: "Un commit qui CITE un lot sans le servir (« registre: D-6 — UXW-41 vérifié, reste UXW-45 ») le compte comme commit du lot : maritime UXW-45 passé « en cours » (757cd114, premier commit 9da97ad) puis « livré : UXW-45 » par cadence deliver --constat 2eaf5f3 le 26-11 alors qu'aucun code ne le sert. Ne compter comme commit d'un lot que celui dont le préfixe le nomme (feat(LOT)/fix(LOT)/…) ou qui le cite en tête, pas une mention dans le corps d'un commit registre:/plan:. Mesure : aucun lot marqué en cours ou livré sans commit de code."
+    status: todo
+    estimate: 1
+    created: 2026-11-26
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -4535,6 +4535,7 @@ lots:
     estimate: 1
     created: 2026-11-25
     started: 2026-11-26
+    review: { date: 2026-11-26, verdict: "non conforme : 1 majeur (la dérogation /* /** laisse passer des lectures récursives réelles de la racine : globstar, bash -O globstar, zsh -c, python glob recursive, for f in /**, echo /* | xargs grep -r), 3 mineurs (suffixe de regex sans test, ligne tassée à 161 colonnes contre budget.test.ts:23, hook sans test /* /**)", commit: 20a21c1a3237e5b59590bc7c374ac4d8b4cda643 }
   - id: L873
     title: "Sonde UX : mesurer la position et la largeur des contrôles voisins avant et après un clic (revue UX r2 de blue-fleet L6, 25-11 : la sonde a rendu « saut 0 px » alors que « Par mémoire » glisse de 32 px quand l'actif change de graisse). Mesure : la sonde voit ce saut sur la fixture rejouée"
     status: todo
@@ -4553,13 +4554,21 @@ lots:
     created: 2026-11-25
   - id: L876
     title: "Banc de séquence : « pente de duplication -0.1 point contre -0.1 point » jugée ROUGE (séquence aether-b68 du 26-11) — v2/src/sequence/verdict.ts:43 compare les valeurs brutes (pc <= pr) mais affiche l'arrondi au dixième : afficher la précision qui départage, et juger contre un seuil de bruit mesuré (rejouer A contre A) plutôt qu'à l'égalité stricte ; même examen pour la pente des fichiers > 400. Test : deux pentes égales à l'arrondi, verdict et affichage cohérents. Mesure : plus aucun critère rouge dont les deux valeurs affichées sont identiques"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-26
+    started: 2026-11-26
+    review: { date: 2026-11-26, verdict: "non conforme : 1 majeur (code tassé pour tenir le budget de sequence, verdict.ts:12/41-43/67-68, règle L689), 2 mineurs (chiffre « 0,03 par étape » faux dans banc.md:239, c'est 0,02 ; borne de bruit sans lot pour la mesurer)", commit: bd460a3e8803486c01209d59fbcc3d5ed6e0c359 }
   - id: L877
     title: "Banc de séquence : cadence-run vérifie une sortie attendue de moins que A sur les deux séquences du 25-26-11 (aether-b68-court 3/8 contre 4/8, aether-b68 8/12 contre 9/12) — lire dans les rapports JSON quelles sorties manquent et à quelle étape, établir la cause (brief du run, lecture de la demande, porte) et proposer le correctif. Mesure : sorties attendues ≥ A sur les deux séquences rejouées"
     status: todo
     estimate: 1
+    created: 2026-11-26
+  - id: L878
+    title: "Mesurer le bruit de la pente de duplication par une séquence A contre A-bis et remplacer la borne écrite BRUIT_PENTE_DUPLICATION = 0,1 point (L876, v2/src/sequence/verdict.ts:12) par l'écart mesuré, comme MARGE_CACHES (banc.md:43-45). Vécu 26-11 : revue de L876, borne > tout le mouvement de A (0,07). Mesure : borne issue d'au moins 2 paires A/A-bis."
+    status: todo
+    estimate: 1
+    planned: { from: 2026-11-27, to: 2026-11-30 }
     created: 2026-11-26
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

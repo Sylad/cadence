@@ -4694,6 +4694,11 @@ lots:
     status: todo
     estimate: 1
     created: 2026-11-26
+  - id: L898
+    title: "cadence run : interdire dans le hook de run les commandes qui touchent l'état de la machine hôte hors du worktree — systemd-analyze --user verify (recrée /run/user/1000/systemd/private et casse le bus du gestionnaire utilisateur : vécu blue-fleet L7 le 26-11, node-exporter et process-exporter de Big-Blue non pilotables), systemctl --user enable/start, sudo ; mesure : aucun service de l'hôte cassé par un run (avec L897)"
+    status: todo
+    estimate: 1
+    created: 2026-11-26
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

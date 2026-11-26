@@ -4618,6 +4618,16 @@ lots:
     estimate: 1
     after: [ L884 ]
     created: 2026-11-26
+  - id: L886
+    title: "Taux de livraisons intégrées sans retouche, mesuré sur l'usage réel (veille outils #77, idée 5 ; besoin 3 non-régression, critère 7 de D-30). Seul indicateur que des tiers publient pour Codex (≈82 %), Cursor (≈68 %), Devin (43-63 %) : part des PR fusionnées sans retouche. Chez nous, depuis git et le plan : pour chaque lot livré, les commits fix/correctifs et lots de suite qui touchent la même zone dans les 30 jours ; par projet et par mode (cadence run léger / complet, vague v1). Script sans modèle, sortie CSV + résumé. Mesure : le chiffre existe pour la revue du 29-11 ; ensuite comparé aux verdicts du banc pour voir s'ils prédisent l'usage réel."
+    status: todo
+    estimate: 1
+    created: 2026-11-26
+  - id: L887
+    title: "Le brief et les pièces lues survivent-ils à la compaction ? (veille outils #77, idée 2 ; besoin 2). Superpowers v7.0.1 a mesuré qu'un skill tronqué à la compaction avait fait perdre une limite (18 rondes de correction pour 5). Test de banc : forcer une compaction sur une séquence longue de cadence run, compter les consignes du brief v2d respectées et les faits des pièces repris, avant et après. Pas un mécanisme : si une perte est mesurée, ouvrir un lot (raccourcir le brief ou le réinjecter)."
+    status: todo
+    estimate: 1
+    created: 2026-11-26
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -4644,6 +4644,8 @@ lots:
     screen: component
     after: [ L888 ]
     created: 2026-11-26
+    notes:
+      - { date: 2026-11-26, text: "26-11 : maquette B (onglet Registre) VALIDÉE par Sylvain (« Validée »). Pièces : ~/projects/developpeur/maquettes/cadence-L889/maquette-B.html et criteres.md (B1-B8 ; 3 chiffres illustratifs de la maquette corrigés : les compteurs sont calculés et testés). Après L888 (même pane, 2e onglet)." }
   - id: L890
     title: "Panneau cadence, partie C : notifications courtes (lot livré, question d'un run, banc rouge, veille à trier) (D-37). Maquette d'abord, validée par Sylvain avant le code (L875). Mesure : aucune question de run ni banc rouge découvert par Sylvain avant la notification."
     status: todo

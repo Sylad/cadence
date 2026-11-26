@@ -140,6 +140,8 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // précision affichée (Precision, arrondi, signe, une déclaration par ligne) détassée de verdict.ts, sans ligne tassée.
   // L877 (revue r2, M1) : run 1375 (+5), deliver 400 (-5, module absent de src/ : marge mesurée 400, total du noyau inchangé) : briefEnvoye (le brief
   // envoyé par cadence run, appelé par le test L877) détassé, son commentaire en JSDoc et une instruction par ligne, sans ligne tassée.
+  // L899 : hooks 475 (+11), deliver 389 (-11, module absent de src/ : marge mesurée 389, total du noyau inchangé) : faux chemins des bancs du 26-11
+  // (« / » de prose, commentaire suivi d'un chiffre, délimiteur de sed, import TS, nom de commande, « 2>/dev/null ») retirés, sans ligne tassée.
   it('les totaux sont ceux de R29 : noyau 3000, mesure 2585 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742, L752, L756, L762, L775, L777, L798, L804)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
     expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2585]);

@@ -138,7 +138,7 @@ const FLAGS_CLI: Record<string, string[]> = {
 const prefixe = (k: string) => (k.startsWith('src/bench/') || k === 'src/sequence/cli.ts' || k === 'src/cli.ts' ? 'bench' : 'cadence2'); // l'aide de cli.ts et le banc séquence décrivent les options de « bench »
 // Budgets de R29 : relever un total ou un module (même sous le total) est une violation ; le baisser est permis.
 const BUDGET_R29: Record<string, { total: number; modules: Record<string, number> }> = {
-  noyau: { total: 3000, modules: { plan: 350, accueil: 161, run: 1375, porte: 250, deliver: 400, hooks: 464 } }, // R32 : hooks, mécanisme du bras candidat ; issue #57 : run 455, run.ts détassé, messages gardés à toute fin ; L722 : run 466 (+11), le départ nomme les fichiers non commités de l'arbre principal (pas de ligne tassée)
+  noyau: { total: 3000, modules: { plan: 350, accueil: 161, run: 1375, porte: 250, deliver: 389, hooks: 475 } }, // R32 : hooks, mécanisme du bras candidat ; issue #57 : run 455, run.ts détassé, messages gardés à toute fin ; L722 : run 466 (+11), le départ nomme les fichiers non commités de l'arbre principal (pas de ligne tassée)
   // L723 : run 520, rebase seul quand la cible avance pendant la porte (conflit rendu à la session, porte rejouée, arbre principal sale nommé), sans ligne tassée
   // L723 (revue, M1) : run 539, un conflit de rebase résolu est ajouté à l'état (conflits, détail de fin) et au journal sans remplacer le rapport du travail, sans ligne tassée
   // L722 (revue r1) : run 532 (-7), la lecture des fichiers non commités vient de scripts/arbre-non-commite.mjs, partagée avec src (copie retirée de run.ts)
@@ -228,6 +228,8 @@ const BUDGET_R29: Record<string, { total: number; modules: Record<string, number
   // détassée de verdict.ts (une déclaration par ligne), sans ligne tassée.
   // L877 (revue r2, M1) : run 1375 (+5), deliver 400 (-5, module absent de src/ ; total du noyau inchangé) : briefEnvoye détassé (JSDoc, une instruction
   // par ligne) au lieu d'une ligne de 403 caractères, sans ligne tassée.
+  // L899 : hooks 475 (+11), deliver 389 (-11, module absent de src/ ; total du noyau inchangé) : dans un texte cité, « / », « /* », « /** » sans chemin
+  // et un import TS ne sont pas lus (BARRE, IMPORT, PARCOURT) ; nom de commande et descripteur de redirection ne sont pas des chemins, sans ligne tassée.
 };
 function reglesBudget(f: Fichiers): string[] {
   const b = JSON.parse(f['budget.json']) as Record<string, { total: number; modules: Record<string, number> }>;
@@ -326,8 +328,8 @@ const mutations: [string, string, string, (t: string) => string][] = [
   ['C4', 'total noyau relevé', 'budget.json', remplace('"total": 3000', '"total": 3500')],
   ['C4', 'budget sequence relevé', 'budget.json', remplace('"sequence": 733', '"sequence": 900')],
   ['C4', 'budget plan relevé sous le total', 'budget.json', remplace('"plan": 350', '"plan": 1000')],
-  ['C4', 'budget hooks relevé (R32)', 'budget.json', remplace('"hooks": 464', '"hooks": 470')],
-  ['C4', 'hooks déplacé dans la mesure', 'budget.json', (t) => t.replace('"deliver": 405, "hooks": 464', '"deliver": 405').replace('"sequence": 733', '"sequence": 733, "hooks": 464')],
+  ['C4', 'budget hooks relevé (R32)', 'budget.json', remplace('"hooks": 475', '"hooks": 480')],
+  ['C4', 'hooks déplacé dans la mesure', 'budget.json', (t) => t.replace('"deliver": 389, "hooks": 475', '"deliver": 389').replace('"sequence": 733', '"sequence": 733, "hooks": 475')],
   ['C4', 'module sans budget R29', 'budget.json', remplace('"bench": 1852', '"bench": 1852, "outil": 100')],
   ['C4', 'groupe de budget ajouté', 'budget.json', remplace(/\n}\s*$/, ',\n  "autre": { "total": 900, "modules": {} }\n}')],
   ['C4', "option(reste,'zzz') sans entrée", 'src/bench/cli.ts', remplace("option(reste, 'taille')", "option(reste, 'zzz')")],

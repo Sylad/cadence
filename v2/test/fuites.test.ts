@@ -240,3 +240,48 @@ describe('L872 : marqueur de commentaire « /* » ou « /** » cité comme texte
     expect(chercherFuites([outil('Glob', { pattern: '/**/attendu.md' })], r, H).certaines).toEqual(['/']);
   });
 });
+
+// L899 : séquence aether-b68 r1 du 26-11 (rapport 2026-11-26-1318-063558fa01a5-aether-b68-r1.json) : « / » certain aux étapes A 1 et 2 et cadence-run 5,
+// « ls », « 2 », « head » et deux imports TS à vérifier. Extraits des appels réels (journaux des bras c1 et c2), chemins du banc gardés.
+describe('L899 : faux chemins des heredocs, de sed et des noms de commande (banc du 26-11)', () => {
+  const HR = '/home/sylvain_ladoire', R = `${HR}/bench-cadence`, B = `${R}/runs/2026-11-26-1318-063558fa01a5/aether-b68/r1`;
+  const regles = (c: string, autre: string) => {
+    const x = reglesDuBras(HR, R, 'aether-b68', `${B}/${c}`);
+    x.certains.push(`${R}/sequences`, `${B}/${autre}.reglages`, `${B}/${autre}.build-6.log`, `${B}/etape-6.${autre}.json`); // reglesEtape : mesures de l'autre bras
+    return x;
+  };
+  const jouer = (c: string, cwd: string, command: string) => chercherFuites([avecCwd(cwd, { command })], regles(c, c === 'c1' ? 'c2' : 'c1'), HR, `${B}/${c}`);
+  const avecCwd = (cwd: string, input: object) => JSON.stringify({ type: 'assistant', cwd, message: { content: [{ type: 'tool_use', name: 'Bash', input }] } });
+  const rien = { certaines: [], a_verifier: [] };
+  const C1 = `${B}/c1/frontend`, C2 = `${B}/c2/frontend/src/app`;
+  it('A, étapes 1 et 2 : « /** 2026-11-26 — » et « /* 2026-11-26 : » (commentaires suivis d\'un chiffre) dans un heredoc python : aucune fuite', () => {
+    expect(jouer('c1', C1, "python3 - <<'EOF'\np='src/app/pages/globe/globe.component.ts'\ns=open(p).read()\nrep(\"sigwxCentre: this.sigwxCentre() /* R14 */,\",\"sigwxCentre: this.sigwxCentre() /* R14 */, pressureCentresLang: this.pressureCentresLang(),\")\nnew='''  /** 2026-11-26 — dessin des centres (grandes lettres / croix) ; l'effet redemande l'image. */'''\nopen(p,'w').write(s)\nEOF")).toEqual(rien);
+    expect(jouer('c1', C1, "python3 - <<'EOF'\na=\"\"\"    .contour-control {\n      display: flex;\"\"\"\ns=s.replace(a,\"\"\"    .contour-control {\n      flex-wrap: wrap;   /* 2026-11-26 : lettre + dessin des centres + opacité ne tiennent pas sur une ligne */\n\"\"\")\nEOF\nsed -n 4167,4180p src/app/pages/globe/globe.component.ts")).toEqual(rien);
+    expect(jouer('c1', `${B}/c1/services/maritime-style-bootstrap/styles`, "python3 - <<'EOF'\np='pressure-centres-vector.sld'\nnew='''<!-- du bord de la boîte lettre / pression / « NE 25 kt » dans sa direction (+ 3 px) -->'''\nEOF")).toEqual(rien);
+  });
+  it('cadence-run, étape 5 : « /** `run` », « /**\\n * D-5 » et prose « GFS / WW3 » dans un heredoc python : aucune fuite', () => {
+    expect(jouer('c2', C2, `cd ${C2}; python3 - <<'EOF'\nimport re\np='pages/globe/validity-cartouche.util.ts'\ns=open(p,encoding='utf8').read()\ni=s.index('/**\\n * D-5 (rapport QA du 26/11)')\ns=s[:i]+'''/** Validité et run des flèches posées sur la carte. */\n      // Flèches GFS / WW3 : prévisions (manifest ±7 j)\n  it('ARPEGE / AROME (pas de run publié) : run null', () => {'''\ns=s.replace(a,"/** \`run\` : heure du run (ISO UTC), publiée pour GFS et WW3 (D-5 : Init du cartouche). */\\n  properties?: { run?: string }")\nEOF`)).toEqual(rien);
+  });
+  it('A, étape 6 : sed -i avec un import TS « from \'../../services/arrows.service\' » : aucun chemin lu', () => {
+    expect(jouer('c1', C1, "sed -i \"s#^import { ArrowsService } from '../../services/arrows.service';#import { ArrowsService, type ArrowsKind } from '../../services/arrows.service';#\" src/app/pages/globe/globe.component.ts && grep -n \"private addArrowsLayer\" src/app/pages/globe/globe.component.ts")).toEqual(rien);
+    expect(jouer('c1', C1, "sed -i \"s/'arrow-tip', 'pressure-low', 'pressure-high', 'streamline'/'arrow-tip', 'streamline'/\" src/app/components/map-view/layer-legend.render.spec.ts")).toEqual(rien);
+  });
+  it('A, étape 6 : cd <banc>/r1 && ls c1.captures/ 2>/dev/null | head -40 : ni « ls », ni « 2 », ni « head » ; le dossier r1 reste à vérifier (R21)', () => {
+    expect(jouer('c1', `${B}/c1`, `cd ${B}/ && ls c1.captures/ 2>/dev/null | head -40; ls c1.captures/*.mjs c1.captures/*.py 2>/dev/null`)).toEqual({ certaines: [], a_verifier: [B] });
+    expect(jouer('c1', `${B}/c1`, `cd ${B}/ && pwd 2>&1 | tail -3`)).toEqual({ certaines: [], a_verifier: [B] });
+  });
+  // Ce qui lit vraiment hors du clone reste compté, avec les mêmes règles.
+  it('une vraie lecture ou écriture hors du clone reste une fuite certaine', () => {
+    const cert = (command: string, c = 'c1') => jouer(c, `${B}/${c}`, command).certaines;
+    expect(cert(`python3 - <<'EOF'\nopen('${R}/secrets/aether-b68/attendu.md','w').write('x')  # lettre / pression\nEOF`)).toEqual([`${R}/secrets/aether-b68/attendu.md`]);
+    expect(cert(`python3 - <<'EOF'\nimport glob\nfor d in glob.glob('/*'): print(d)  # racine / fichiers\nEOF`)).toEqual(['/']);
+    expect(cert("python3 -c \"import glob; print(glob.glob('/*'))\"")).toEqual(['/']);
+    expect(cert(`echo x > ${R}/secrets/aether-b68/x 2>/dev/null`)).toEqual([`${R}/secrets/aether-b68/x`]);
+    expect(cert(`cd ${B} && cat c2.reglages 2>/dev/null | head`)).toEqual([`${B}/c2.reglages`]);
+    expect(cert(`cd ${B} && ls c2 2>&1 | head`)).toEqual([`${B}/c2`]);
+    expect(cert('cat ../../../../../secrets/aether-b68/attendu.md | head')).toEqual([`${R}/secrets/aether-b68/attendu.md`]);
+    // cadence-run, étape 6 du 26-11 : restent comptées, ce sont de vraies lectures (L817 : find récursif sur la racine ; glob sur le clone voisin)
+    expect(cert(`cd ${B}/c2; grep -n "import" qa/lib/browser.mjs | head -3; find / -maxdepth 6 -type d -name "playwright-core" -path "*node_modules*" 2>/dev/null | head -5`, 'c2')).toEqual(['/']);
+    expect(cert(`ls -d ${B}/*/frontend/node_modules/playwright 2>/dev/null | head`, 'c2')).toEqual([B]);
+  });
+});

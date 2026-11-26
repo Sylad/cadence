@@ -248,10 +248,19 @@ const GARDE = /globstar|\bzsh\b|recursive\s*=\s*True|\|\s*(ba|da|k)?sh\b|\bsyste
 /** L872 : la commande sans les marqueurs de commentaire qu'elle cite comme TEXTE d'un interprète non shell ou de sed (`sed "s|… /* R14 *\/ …|"`,
  * heredoc python). Un « /* » ou « /** » argument du shell (`for f in /**`, `echo /* | xargs …`) ou cité dans un script shell (`bash -c 'grep -rl x /* Docs'`,
  * `eval`, heredoc donné à bash : revue r2) reste lu. Aux bancs du 25-11, les 47 appels relevés « / » étaient tous de ces marqueurs. */
+/** L899 : dans un texte cité, « / », « /* » ou « /** » qui n'ouvre aucun chemin (suivi d'une espace, d'un guillemet, d'un chiffre, d'une fin) : prose
+ * (« lettre / pression »), division, commentaire (« /* 2026-11-26 : … »), délimiteur de sed (« s/a/b/ »). Bancs du 26-11 : les 8 « / » certains. */
+const BARRE = /\/\**(?![\w.~$/*-])/g;
+/** L899 : spécificateur d'import TS ou JS cité comme texte (`from '../../services/x'`) : un nom de module, pas un fichier que la commande ouvre. */
+const IMPORT = /(?<=\bfrom\s+|\bimport\s*\(\s*|\brequire\s*\(\s*)(['"])[^'"\n]*\1/g;
+/** L899 : « '/' » seul dans une ligne qui parcourt des dossiers (os.walk('/'), glob('/*'), Path('/').iterdir()) reste lu. */
+const PARCOURT = /\b(walk|listdir|scandir|iterdir|r?glob|iglob|readdirSync|readdir|opendir|chdir|Path)\s*\(/;
+const ligneDe = (t, i) => t.slice(t.lastIndexOf('\n', i - 1) + 1, (t.indexOf('\n', i) + 1 || t.length + 1) - 1);
 function sansCommentaires(t) {
   if (GARDE.test(t)) return t;
-  const dans = cites(t);
-  return t.replace(COMMENTAIRE, (m, _q, i) => (dans[i] ? ' '.repeat(m.length) : m));
+  const dans = cites(t), blanc = (m) => ' '.repeat(m.length);
+  return t.replace(COMMENTAIRE, (m, _q, i) => (dans[i] ? blanc(m) : m)).replace(IMPORT, (m, _q, i) => (dans[i] ? blanc(m) : m))
+    .replace(BARRE, (m, i) => (dans[i] && !(/['"]/.test(t[i - 1] ?? '') && t[i - 1] === t[i + m.length] && PARCOURT.test(ligneDe(t, i))) ? blanc(m) : m));
 }
 
 /** Chemins absolus (globs gardés) que LIT un appel d'outil : ses champs de chemin (file_path, path, notebook_path ; le motif d'un Glob, depuis son
@@ -275,10 +284,12 @@ export function* cheminsCites(name, input, cwd, depart, home, certains = []) {
       const cd = /^\s*cd(?:\s+(\S+)|\s*$)/.exec(v), nu = certains.some((z) => z.startsWith(dir === '/' ? '/' : `${dir}/`));
       const cible = cd ? (cd[1] ? resoudre(cd[1].replace(/^['"]|['"]$/g, ''), dir, home, true, true) : home) : null;
       for (const etape of v.split('|')) {
-        const nom = /^\s*(?:\w+=\S*\s+)*(\S+)/.exec(etape)?.[1].replace(/^.*\//, '') ?? '', rec = recursive(nom, etape);
+        const brut = /^\s*(?:\w+=\S*\s+)*(\S+)/.exec(etape)?.[1] ?? '', nom = brut.replace(/^.*\//, ''), rec = recursive(nom, etape);
         let explicite = false;
-        for (const tok of etape.split(/[\s'"`&<>(){}=]+/)) {
-          const e = resoudre(tok, dir, home, true), p = e ?? (nu && /^[^-$]/.test(tok) ? resolve(dir, tok) : null);
+        // L899 : depuis un dossier qui contient une zone, le nom de la commande (« ls », « head ») et le descripteur d'une redirection (« 2>/dev/null »,
+        // « 2>&1 ») ne sont pas des chemins relatifs (banc du 26-11, cd <banc>/r1 && ls c1.captures/ 2>/dev/null | head -40).
+        for (const tok of etape.replace(/(?<=^|\s)\d+(?=>)|(?<=>)&\d+/g, ' ').split(/[\s'"`&<>(){}=]+/)) {
+          const e = resoudre(tok, dir, home, true), p = e ?? (nu && /^[^-$]/.test(tok) && tok !== brut ? resolve(dir, tok) : null);
           if (!p) continue;
           explicite ||= !!e;
           yield p;

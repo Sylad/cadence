@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { briefRegistre } from '../src/registre.js';
+import { briefEnvoye } from '../src/run/run.js';
 
 const brief = (b: string) => readFileSync(join(import.meta.dirname, '..', 'briefs', b), 'utf8');
 const LIGNE = /^- La demande fixe le résultat ; les pièces et les références disent comment bien le faire, elles ne le réduisent pas\./m;
@@ -28,10 +28,11 @@ describe('L877 — brief v2d : la demande se voit au réglage par défaut', () =
   });
 
   it('cadence run la garde dans le brief envoyé, quel que soit le choix du registre', () => {
-    // mêmes filtres que executerRun (run.ts) : registre, puis ligne « Taille » retirée
-    for (const choix of [undefined, 'humaine', 'D-3']) {
-      const envoye = briefRegistre(choix)(brief('bras-sequence-v2d.md')).split('\n').filter((l) => !l.startsWith('- Taille fixée par le gardien')).join('\n');
-      expect(envoye, String(choix)).toMatch(LIGNE);
+    // la fonction même qu'appelle executerRun (run.ts) : registre, commandes cadence permises, ligne « Taille » retirée
+    for (const choix of [undefined, 'humaine', 'D-3']) for (const o of [{}, { specCheck: true, analyse: true }]) {
+      const envoye = briefEnvoye(brief('bras-sequence-v2d.md'), choix, o);
+      expect(envoye, `${String(choix)} ${JSON.stringify(o)}`).toMatch(LIGNE);
+      expect(envoye).not.toMatch(/^- Taille fixée par le gardien/m);
     }
   });
 

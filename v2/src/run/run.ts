@@ -441,7 +441,12 @@ function noterNouveautes(e: Etat): void {
   e.nouveautes = { entrees, manquante: entrees?.length === 0 };
 }
 
-export const briefEnvoye = (brut: string, registre: string | undefined, o: { specCheck?: boolean; analyse?: boolean } = {}) => briefRegistre(registre)(leverPourCadence(brut, o)).split('\n').filter((l) => !l.startsWith('- Taille fixée par le gardien')).join('\n'); // L877 : brief envoyé par cadence run (registre, commandes cadence permises, ligne « Taille » du banc retirée : elle casserait commitlint)
+/** L877 : le brief envoyé par cadence run. Le registre choisi, les commandes cadence permises, puis la ligne « Taille » du banc
+ * retirée (elle casserait commitlint). */
+export function briefEnvoye(brut: string, registre: string | undefined, o: { specCheck?: boolean; analyse?: boolean } = {}): string {
+  const lignes = briefRegistre(registre)(leverPourCadence(brut, o)).split('\n');
+  return lignes.filter((l) => !l.startsWith('- Taille fixée par le gardien')).join('\n');
+}
 /** Les réglages de session d'un worktree retiré (aussi par --clore, clore.ts). */
 export const oublierReglages = (worktree: string) => { libererReglages(worktree); rmSync(`${worktree}.reglages`, { recursive: true, force: true }); };
 /** Retire le worktree, la branche et les réglages d'un run intégré : tout son travail est sur la cible. */

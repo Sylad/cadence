@@ -138,6 +138,8 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // un texte lu par sed ou un interprète non shell (texteSeul) ; un script shell cité (bash -c, eval, heredoc à sh) et os.system gardent tout, sans ligne tassée.
   // L876 (revue M1) : sequence 733 (+16), bench 1852 (-16, marge mesurée : 1822 lignes ; même groupe, total de la mesure inchangé) : la pente jugée à la
   // précision affichée (Precision, arrondi, signe, une déclaration par ligne) détassée de verdict.ts, sans ligne tassée.
+  // L877 (revue r2, M1) : run 1375 (+5), deliver 400 (-5, module absent de src/ : marge mesurée 400, total du noyau inchangé) : briefEnvoye (le brief
+  // envoyé par cadence run, appelé par le test L877) détassé, son commentaire en JSDoc et une instruction par ligne, sans ligne tassée.
   it('les totaux sont ceux de R29 : noyau 3000, mesure 2585 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742, L752, L756, L762, L775, L777, L798, L804)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
     expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2585]);

@@ -138,7 +138,7 @@ const FLAGS_CLI: Record<string, string[]> = {
 const prefixe = (k: string) => (k.startsWith('src/bench/') || k === 'src/sequence/cli.ts' || k === 'src/cli.ts' ? 'bench' : 'cadence2'); // l'aide de cli.ts et le banc séquence décrivent les options de « bench »
 // Budgets de R29 : relever un total ou un module (même sous le total) est une violation ; le baisser est permis.
 const BUDGET_R29: Record<string, { total: number; modules: Record<string, number> }> = {
-  noyau: { total: 3000, modules: { plan: 350, accueil: 161, run: 1370, porte: 250, deliver: 405, hooks: 464 } }, // R32 : hooks, mécanisme du bras candidat ; issue #57 : run 455, run.ts détassé, messages gardés à toute fin ; L722 : run 466 (+11), le départ nomme les fichiers non commités de l'arbre principal (pas de ligne tassée)
+  noyau: { total: 3000, modules: { plan: 350, accueil: 161, run: 1375, porte: 250, deliver: 400, hooks: 464 } }, // R32 : hooks, mécanisme du bras candidat ; issue #57 : run 455, run.ts détassé, messages gardés à toute fin ; L722 : run 466 (+11), le départ nomme les fichiers non commités de l'arbre principal (pas de ligne tassée)
   // L723 : run 520, rebase seul quand la cible avance pendant la porte (conflit rendu à la session, porte rejouée, arbre principal sale nommé), sans ligne tassée
   // L723 (revue, M1) : run 539, un conflit de rebase résolu est ajouté à l'état (conflits, détail de fin) et au journal sans remplacer le rapport du travail, sans ligne tassée
   // L722 (revue r1) : run 532 (-7), la lecture des fichiers non commités vient de scripts/arbre-non-commite.mjs, partagée avec src (copie retirée de run.ts)
@@ -226,6 +226,8 @@ const BUDGET_R29: Record<string, { total: number; modules: Record<string, number
   // L804 (revue r1) : bench 1868 (+13), mesure 2585 : contrôle des fichiers non commités avant toute construction (nonCommite), cause d'une relance arrêtée.
   // L876 (revue M1) : sequence 733 (+16), bench 1852 (-16, marge mesurée : 1822 lignes ; total de la mesure inchangé) : pente jugée à la précision affichée,
   // détassée de verdict.ts (une déclaration par ligne), sans ligne tassée.
+  // L877 (revue r2, M1) : run 1375 (+5), deliver 400 (-5, module absent de src/ ; total du noyau inchangé) : briefEnvoye détassé (JSDoc, une instruction
+  // par ligne) au lieu d'une ligne de 403 caractères, sans ligne tassée.
 };
 function reglesBudget(f: Fichiers): string[] {
   const b = JSON.parse(f['budget.json']) as Record<string, { total: number; modules: Record<string, number> }>;

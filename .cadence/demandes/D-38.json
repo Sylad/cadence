@@ -6,6 +6,14 @@
   "preuve": null,
   "lots": [
     "L865",
-    "L892"
+    "L892",
+    "L893",
+    "L894"
+  ],
+  "precisions": [
+    {
+      "date": "2026-11-26",
+      "texte": "Sylvain : « ok je pense que pro va attendre cette modification aussi, car il ne gère que 3 projets ». Mesure du compte pro (11 h 55) : deux runs du même dépôt sur fichiers disjoints intégrés sans refus ; frictions → L893 (fermer un lot pendant un run), L894 (attente appliquée lot par lot)."
+    }
   ]
 }

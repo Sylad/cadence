@@ -4663,6 +4663,18 @@ lots:
     estimate: 1
     after: [ L865 ]
     created: 2026-11-26
+  - id: L893
+    title: "Fermer un lot intégré pendant qu'un autre run tient le dépôt (D-38) : aujourd'hui raf review / raf done du lot fini vont dans plan-en-attente.yaml jusqu'à la fin du run suivant (~45 min, vécu compte pro 26-11) ; les permettre tout de suite quand le run en cours ne touche pas raf.yaml dans son worktree. Préalable de L892 (plus de runs en parallèle allongeraient l'attente). Mesure : délai entre intégration d'un lot et son raf done (cible < 5 min)."
+    status: todo
+    estimate: 1
+    after: [ L865 ]
+    created: 2026-11-26
+  - id: L894
+    title: "Appliquer plan-en-attente.yaml lot par lot : à la fin d'un run, l'attente s'applique en un seul diff non commité mêlant plusieurs lots (vécu compte pro 26-11 : revue + done d'un lot, deux notes d'un autre) ; le lead doit tout rejouer à la main et la revue rejouée perd son --vu <sha>. Attendu : un commit de plan par lot (« plan: L225 code review recorded ») ou un arrêt entre deux lots, --vu conservé. Mesure : aucun diff de plan mêlé après un run, aucune revue rejouée à la main."
+    status: todo
+    estimate: 1
+    after: [ L865 ]
+    created: 2026-11-26
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

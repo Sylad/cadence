@@ -4743,10 +4743,12 @@ lots:
       - { date: 2026-11-26, text: "26-11, remarque du compte pro : une échéance à 00:00 (règle pro : arrêt à minuit) doit valoir la fin du jour (1440), pas 0 — à tester dans lead.arret." }
   - id: L905
     title: "Banc mécanique : le critère « tests d'origine verts » (≥ A test par test, sans marge, L777) bascule au hasard sur 7-ol-companion-L160 — rouge puis vert à la même empreinte le 19-11 (11 h 46 / 12 h 57), rouge le 20-11 et le 26-11 (17 contre 20 sur ~680 tests, les deux bras ratant 52 à 55 tests de la page FM). Un écart de 3 tests entre deux tirages du modèle n'est pas un recul de cadence : comparer sur plusieurs tirages, ou exclure du critère un cas où A lui-même rate plus de N % des tests d'origine. Vécu 26-11 (D-39) : 2.0.19 retardée d'un banc de 25 min. Mesure : sur 4 semaines, aucun banc rouge sur ce seul critère qui repasse vert à la même empreinte."
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-26
     started: 2026-11-26
+    review: { date: 2026-11-26, verdict: "conforme après correctif 1bba005c (doc : le critère compare des sommes ; titres sans marge nuancés ; tests exclureTests et compensation, 9/9)", commit: 1bba005c3688a4f4672f34e1a57d34a4ad636afc }
+    finished: 2026-11-26
   - id: L906
     title: "Environnement périmé : remettre à niveau tout seul au lieu de rendre la main. Quand la porte (cadence run, verify --gate) trouve un node_modules en retard sur son package-lock, elle lance elle-même la remise à niveau qu'elle imprime déjà (npm ci dans le dossier concerné, sans réseau douteux : lockfile seul), puis joue la porte ; elle ne rend la main que si npm ci échoue. Vécu 26-11, deux fois dans la même heure sur maritime : le run SEC-D32/maplibre6 rendu « environnement-perime » (services/api, 489 écarts, lot qui ne touchait que le frontend) et verify --gate du lead refusé pour la même raison dans l'arbre principal — ~20 min de livraison perdues avant l'arrêt de 20 h. Mesure : aucun run ni verify rendu pour un environnement périmé que npm ci répare."
     status: todo

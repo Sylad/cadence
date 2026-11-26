@@ -156,8 +156,9 @@ const INTERPRETE = /(^|[\s;&|(])(python[\d.]*|node|bash|sh|zsh|perl|ruby|deno|bu
  * python, node, bash… est du code, gardé), message de `git commit|tag|merge|revert|notes|stash -m`, arguments entre guillemets de echo et printf dont la sortie
  * va à un fichier ou à un filtre qui ne lit pas (FILTRE ; L817 : sh, while read, xargs, parallel les lisent, et rien n'est effacé dans $(…) ni dans un sous-shell),
  * motif de grep et rg (premier nom qui n'est pas l'argument d'une option ; aucun avec --files ou --type-list). Un mot qui porte `$(` ou un accent grave est gardé. Dans le doute : gardé. */
+const MARQUE = /<<-?\s*['"]?\w+['"]?/g; // « <<'EOF' » d'un heredoc au corps retiré : sans lui, ce marqueur ouvrirait un faux heredoc jusqu'au « EOF » suivant (cites, L872)
 export function commandeLue(cmd) {
-  const t = String(cmd).replace(/^([^\n]*<<-?\s*['"]?(\w+)['"]?[^\n]*)\n[\s\S]*?\n\s*\2(?=\n|$)/gm, (tout, tete) => (INTERPRETE.test(tete) ? tout : tete));
+  const t = String(cmd).replace(/^([^\n]*<<-?\s*['"]?(\w+)['"]?[^\n]*)\n[\s\S]*?\n\s*\2(?=\n|$)/gm, (tout, tete) => (INTERPRETE.test(tete) ? tout : tete.replace(MARQUE, ' ')));
   const effaces = [], effacer = (m) => { if (m && !/\$\(|`/.test(m.s)) effaces.push(m); };
   let mots = [], echos = [], lu = false, prof = 0; // echos : arguments d'echo et de printf du tube, effacés à sa fin si rien ne les lit (lu) ; prof : ( et $( ouverts
   const finir = (tube) => {
@@ -209,31 +210,46 @@ function peutViser(p, pre, z) {
   return true;
 }
 
-/** L872 : positions de `t` que le shell ne développe pas en chemins : corps d'un heredoc et texte entre guillemets. */
+/** L872 (revue r2) : ce qui lit un texte cité. Un interprète non shell ou sed le lit sans le développer ; un shell (`bash -c`, `eval`, heredoc donné
+ * à sh) développe « /* » en chemins. Un nom de shell sur la même commande (`bash -c 'sed "…"'`) l'emporte : dans le doute, le texte reste lu. */
+const NON_SHELL = /(^|[\s;&|(/])(python[\d.]*|node|perl|ruby|deno|bun|tsx|ts-node|awk|sed)(?![\w.-])/;
+const SHELL = /(^|[\s;&|(/])((ba|z|da|k)?sh|eval|source)(?![\w.-])|(^|[\s;&|(])\.\s/;
+const texteSeul = (tete) => NON_SHELL.test(tete) && !SHELL.test(tete);
+
+/** L872 : positions de `t` lues comme TEXTE, que rien ne développe en chemins : corps d'un heredoc et texte entre guillemets dont la commande
+ * (la ligne du heredoc, ou ce qui précède le guillemet depuis le dernier séparateur) est celle d'un interprète non shell ou de sed (texteSeul). */
 function cites(t) {
   const dans = new Uint8Array(t.length);
-  for (const m of t.matchAll(/<<-?\s*['"]?(\w+)['"]?[^\n]*\n[\s\S]*?\n\s*\1(?=\n|$)/g)) {
-    dans.fill(1, m.index + m[0].indexOf('\n') + 1, m.index + m[0].length);
+  for (const m of t.matchAll(/^([^\n]*<<-?\s*['"]?(\w+)['"]?[^\n]*)\n[\s\S]*?\n\s*\2(?=\n|$)/gm)) {
+    if (texteSeul(m[1])) dans.fill(1, m.index + m[1].length + 1, m.index + m[0].length);
   }
+  let debut = 0; // début de la commande simple en cours
+  let texte = false; // le guillemet ouvert est-il lu comme texte ?
   for (let i = 0, q = ''; i < t.length; i++) {
-    if (dans[i] && !q) continue; // corps d'un heredoc : ses guillemets sont ceux du script
+    if (dans[i] && !q) continue; // corps d'un heredoc de texte : ses guillemets sont ceux du script
     if (q && t[i] === q) q = '';
     else if (q) {
-      dans[i] = 1;
-      if (q === '"' && t[i] === '\\') dans[++i] = 1;
+      if (texte) dans[i] = 1;
+      if (q === '"' && t[i] === '\\') { i++; if (texte) dans[i] = 1; }
     } else if (t[i] === '\\') i++;
-    else if (t[i] === "'" || t[i] === '"') q = t[i];
+    else if (t[i] === "'" || t[i] === '"') {
+      q = t[i];
+      texte = texteSeul(t.slice(debut, i));
+    } else if (/[\n;|&(]/.test(t[i])) debut = i + 1;
   }
   return dans;
 }
 /** L872 : ouverture d'un commentaire C, JS, TS, Java ou CSS : « /* R14 », « /** Texte », « /**\n * … » (saut réel ou « \n » écrit), ou « /** » seul
- * entre guillemets après une indentation (« "  /**" », ancre d'un script python). Un « /* » suivi d'un « ; », d'un « | » ou d'un chemin n'en est pas un. */
-const COMMENTAIRE = /\/\*\*?(?=[ \t]+[\p{L}\p{N}«]|(?:\n|\\n)[ \t]*\*(?!\/))|(?<=(['"])[ \t]+)\/\*\*?(?=\1)/gu;
-/** L872 : la commande sans les marqueurs de commentaire qu'elle cite comme TEXTE (heredoc, guillemets : `sed "s|… /* R14 *\/ …|"`, script python) ; un
- * « /* » ou « /** » argument du shell (`for f in /**`, `echo /* | xargs …`, `bash -c 'cat /**'`) reste lu. Rien n'est retiré quand globstar, zsh ou
- * `recursive=True` peuvent faire de « /** » une lecture de toute la racine. Aux bancs du 25-11, les 47 appels relevés « / » étaient tous de ces marqueurs. */
+ * entre guillemets après une indentation (« "  /**" », ancre d'un script python). Un « /* » suivi d'un « ; », d'un « | », d'un chiffre (« /* 2>/dev/null »,
+ * revue r2) ou d'un chemin n'en est pas un. */
+const COMMENTAIRE = /\/\*\*?(?=[ \t]+[\p{L}«]|(?:\n|\\n)[ \t]*\*(?!\/))|(?<=(['"])[ \t]+)\/\*\*?(?=\1)/gu;
+/** Ce qui garde tout : « /** » récursif (globstar, zsh, recursive=True), ou un texte qui redevient du shell (tube vers sh, system, subprocess…). */
+const GARDE = /globstar|\bzsh\b|recursive\s*=\s*True|\|\s*(ba|da|k)?sh\b|\bsystem\s*\(|subprocess|popen|child_process|execSync|spawn/;
+/** L872 : la commande sans les marqueurs de commentaire qu'elle cite comme TEXTE d'un interprète non shell ou de sed (`sed "s|… /* R14 *\/ …|"`,
+ * heredoc python). Un « /* » ou « /** » argument du shell (`for f in /**`, `echo /* | xargs …`) ou cité dans un script shell (`bash -c 'grep -rl x /* Docs'`,
+ * `eval`, heredoc donné à bash : revue r2) reste lu. Aux bancs du 25-11, les 47 appels relevés « / » étaient tous de ces marqueurs. */
 function sansCommentaires(t) {
-  if (/globstar|\bzsh\b|recursive\s*=\s*True/.test(t)) return t;
+  if (GARDE.test(t)) return t;
   const dans = cites(t);
   return t.replace(COMMENTAIRE, (m, _q, i) => (dans[i] ? ' '.repeat(m.length) : m));
 }

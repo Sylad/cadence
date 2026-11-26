@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { chercherFuites, fuitesDuBras, dossierTranscripts, reglesDuBras } from '../src/bench/fuites.js';
 import { dossierTemp } from './temp.js';
+import { LUES_PAR_UN_SHELL, TEXTES_NON_SHELL } from './l872-cas.js';
 
 const H = '/home/u';
 const appel = (input: object) => JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input }] } });
@@ -224,6 +225,14 @@ describe('L872 : marqueur de commentaire « /* » ou « /** » cité comme texte
       // garde : la forme d'un commentaire ne suffit pas sous globstar, zsh ou recursive=True, ni hors guillemets
       'shopt -s globstar; grep secret "$x" /** Lettres', "zsh -c 'cat /** Lettres'", 'cat /** Lettres', "python3 - <<'EOF'\nglob.glob('/** x', recursive=True)\nEOF"])
       expect([command, chercherFuites([appel({ command })], r, H).certaines]).toEqual([command, ['/']]);
+  });
+  // Revue L872 r2 (M1) : un script SHELL cité (bash -c, sh -c, eval, heredoc ou tube donné à un shell) développe « /* » : rien n'y est retiré, quelle
+  // que soit la suite du marqueur (« 2>/dev/null », un mot). Même chose quand un interprète rend la main à un shell (os.system, subprocess, execSync).
+  it('revue r2 : « /* » ou « /** » dans un script shell cité lit la racine : certaine', () => {
+    for (const command of LUES_PAR_UN_SHELL) expect([command, chercherFuites([appel({ command })], r, H).certaines]).toEqual([command, ['/']]);
+  });
+  it('revue r2 : le même marqueur lu par sed ou par un interprète non shell reste un texte, même après un heredoc effacé', () => {
+    for (const command of TEXTES_NON_SHELL) expect([command, chercherFuites([appel({ command })], r, H).certaines]).toEqual([command, []]);
   });
   it('une commande récursive sur /* lit tout : toujours certaine ; un chemin sous / aussi', () => {
     expect(chercherFuites([appel({ command: 'grep -r secret /*' })], r, H).certaines).toEqual(['/']);

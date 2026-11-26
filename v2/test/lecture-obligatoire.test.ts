@@ -7,6 +7,7 @@ import { chercherFuites, reglesDuBras } from '../src/bench/fuites.js';
 import { lectureReferences } from '../src/sequence/mesures.js';
 import { commandeLue, ecritureBash } from '../hooks/lecture.mjs';
 import { dossierTemp } from './temp.js';
+import { LUES_PAR_UN_SHELL, TEXTES_NON_SHELL } from './l872-cas.js';
 
 // Le vrai script du hook, lancé comme Claude Code le lance : JSON sur stdin, liste des pièces dans l'environnement (R31),
 // refus = code 2 + raison sur stderr + décision JSON sur stdout.
@@ -409,6 +410,23 @@ describe('L872 : « /* » et « /** » au banc, côté hook', () => {
       const r = hook(bashE(m, command), borne(m));
       expect([command, r.code]).toEqual([command, 2]); expect(r.stderr).toMatch(/hors de ton dépôt/);
       expect([command, chercherFuites([appel('Bash', { command })], regles, home, m.clone).certaines]).toEqual([command, ['/']]);
+    }
+  });
+  it('revue r2 : script shell cité (bash -c, sh -c, eval, heredoc ou tube donné à un shell, os.system…) : refusé et compté « / »', () => {
+    const m = monde(); m.ecrire([]);
+    const home = join(m.r, 'home'), regles = reglesDuBras(home, m.r, 'b', m.clone);
+    for (const command of LUES_PAR_UN_SHELL) {
+      const r = hook(bashE(m, command), borne(m));
+      expect([command, r.code]).toEqual([command, 2]); expect(r.stderr).toMatch(/hors de ton dépôt/);
+      expect([command, chercherFuites([appel('Bash', { command })], regles, home, m.clone).certaines]).toEqual([command, ['/']]);
+    }
+  });
+  it('revue r2 : le même marqueur lu par sed ou par un interprète non shell : permis et non compté', () => {
+    const m = monde(); m.ecrire([]);
+    const home = join(m.r, 'home'), regles = reglesDuBras(home, m.r, 'b', m.clone);
+    for (const command of TEXTES_NON_SHELL) {
+      expect([command, hook(bashE(m, command), borne(m)).code]).toEqual([command, 0]);
+      expect([command, chercherFuites([appel('Bash', { command })], regles, home, m.clone).certaines]).toEqual([command, []]);
     }
   });
 });

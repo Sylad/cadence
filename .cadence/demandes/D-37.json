@@ -1,0 +1,16 @@
+{
+ "id": "D-37",
+ "texte": "et pour l'interface de cadence, il n'y aurais pas moyend e faire quelque chose de cool dans claude code pur ça? on a déjà notre barree et le panneau de gauche.",
+ "date": "2026-11-26",
+ "etat": "ouverte",
+ "preuve": "",
+ "precisions": [
+  {
+   "date": "2026-11-26",
+   "texte": "Contexte (lead) : la veille outils #77 reproche à cadence l'absence d'interface (T3 Code : un écran pour les fils parallèles). Proposition : un panneau de l'application de bureau (mod Claude Code) qui montre l'état vivant de cadence, maquette validée par Sylvain avant le code."
+  }
+ ],
+ "lots": [
+  "L888"
+ ]
+}

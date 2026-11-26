@@ -103,12 +103,12 @@
 - Un lot `config: true` (L586) écrit SON fragment `changelog.d/<lot>.md` (id à « / » : `<id>.md` en sous-dossier ou `/` → `__`), rien d'autre de `changelog.d/` (`horsConfig(ids)` de scripts/qualite.mjs). Sur la branche du lot, l'id vient du nom de branche (`ref.lotConfig` porte désormais l'id) ; à la porte d'intégration, des lots cités par le scope du commit (`lotsCites`).
 - c384e01 (exemption large, écrite sous L769) et 71b787f (délai 30 s de plugins/cadence-hud/tests/kit.ts) sont rattachés à L770 : leurs entrées de changelog passent de changelog.d/L769.md à changelog.d/L770.md. Tests : test/qualite-l586.test.ts, test/qualite-l613.test.ts (R1/R3 L770).
 
-## Banc sans juge : tests d'origine comptés par test, sans marge (L777, revue r1)
+## Banc sans juge : tests d'origine comptés par test, sans marge fixe (L777, revue r1), marge proportionnée depuis L905
 
-- Critère « tests d'origine verts » (micro, mécanique, garde L730) : candidat ≥ A en tests d'origine réussis, somme des bancs, **sans marge**. La marge de 11 % (MARGE_CACHES) est retirée : elle venait d'écarts A/cadence-run (empreinte_bras différente aux bancs 3 et 7), pas de bras identiques.
+- Critère « tests d'origine verts » (micro, mécanique, garde L730) : candidat ≥ A en tests d'origine réussis, somme des bancs, **sans marge fixe** (depuis L905 : marge par banc proportionnée aux ratés de A, dernière puce). La marge de 11 % (MARGE_CACHES) est retirée : elle venait d'écarts A/cadence-run (empreinte_bras différente aux bancs 3 et 7), pas de bras identiques.
 - `cachesReussis` (v2/src/bench/sans-juge.ts) rend `{ par_lanceur, hors_compte }` : un lanceur compte seulement s'il a un bilan dans les deux journaux et aucun rouge dans la suite seule. Un lanceur compté pour un seul des deux bras, ou aucun lanceur comptable : banc « compte par test non mesurable », retour au compte par banc, dit dans la valeur.
 - Décision : marge à mesurer plus tard sur des paires A contre A-bis (`bench bruit`, ≥ 5 paires par banc, banc 7 compris), proposée à Sylvain ; aucune paire au banc 7 au 18-11. Recalcul du 18-11 : 09:07 ROUGE 80/88, 10:08 ROUGE 82/84, 11:31 vert 83/81.
-- L905 (D-39) : marge par banc = ⌊ratés de A sur le banc / 6⌋ (`RATES_PAR_TEST_DE_MARGE`, `caches_rates`), mesurée sur A contre A au banc 7 (16 à 24 réussis, 12 passages, même empreinte_bras) ; ne pardonne que l'écart de son banc, pardon signalé à part (`ECART_DANS_LE_BRUIT`, non bloquant). 26-11 17:27 et 17:53 verts ; bancs 1 et 3 restent stricts. Test : v2/test/marge-caches-l905.test.ts.
+- L905 (D-39) : marge par banc = ⌊ratés de A sur le banc / 6⌋ (`RATES_PAR_TEST_DE_MARGE`, `caches_rates`), mesurée sur A contre A au banc 7 (16 à 24 réussis, 12 passages, même empreinte_bras) ; ne pardonne que l'écart de son banc, pardon signalé à part (`ECART_DANS_LE_BRUIT`, non bloquant). Le critère compare des sommes : un test perdu au banc 1 reste couvert par un surplus du candidat au banc 7 (déjà vrai avant L905). 26-11 17:27 et 17:53 verts ; bancs 1 et 3 restent stricts. Test : v2/test/marge-caches-l905.test.ts.
 
 ## cadence sondes : lecture seule, navigation, rien de mesuré (L778, revue r1)
 

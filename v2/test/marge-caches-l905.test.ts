@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cachesReussis } from '../src/bench/sans-juge.js';
+import { cachesReussis, exclureTests, TESTS_HORS_COMPTE } from '../src/bench/sans-juge.js';
 import { BARRE_SPEC, ECART_DANS_LE_BRUIT, RATES_PAR_TEST_DE_MARGE, rapport, verdictSansJuge, type MesureSansJuge, type ResultatBanc } from '../src/bench/verdict.js';
 
 // L905 (D-39) : « tests d'origine verts » (≥ A test par test, L777) basculait au hasard sur 7-ol-companion-L160, où les deux bras ratent 52 à 55 de leurs
@@ -55,6 +55,25 @@ describe('marge des tests d\'origine proportionnée aux ratés de A (L905)', () 
     // le même test raté à chaque passage : chaque passage est rouge, la marge du banc 7 ne le couvre jamais
     for (const b7 of [[vi(20, 52), vi(17, 55)], [vi(17, 55), vi(16, 55)]] as [Bras, Bras][])
       expect(verdictDe(passage([vi(33, 0), vi(32, 1)], b7)).vert).toBe(false);
+  });
+
+  it('le critère compare des sommes : un test perdu au banc 1 est couvert par un test gagné au banc 7 (déjà vrai avant L905)', () => {
+    // revue L905 : la marge du banc 7 ne pardonne pas le banc 1, mais un SURPLUS du candidat ailleurs compense (forme du 18-11 à 11:31)
+    const rs = passage([vi(33, 0), vi(32, 1)], [vi(20, 52), vi(21, 51)]);
+    expect(critere(rs)).toMatchObject({ ok: true, valeur: expect.stringMatching(/^84 contre 84 /) });
+    expect(critere(rs, ECART_DANS_LE_BRUIT)).toBeUndefined(); // rien n'est pardonné : la somme suffit
+    expect(verdictDe(rs).vert).toBe(true);
+  });
+
+  it('un test hors compte L798 raté sort aussi des ratés de la marge ; réussi ou sans ratés relevés, les ratés ne bougent pas', () => {
+    const hors = TESTS_HORS_COMPTE['3-ol-companion-L241'][0], x = [hors];
+    const rate = `FAIL src/modules/standings/${hors.fichier}\n  ● ${hors.nom}\nTests:       1 failed, 3 passed, 4 total`;
+    const reussi = `PASS src/modules/standings/${hors.fichier}\nTests:       4 passed, 4 total`;
+    const r = exclureTests({ par_lanceur: { jest: 3 }, hors_compte: [], rates: { jest: 2 } }, rate, x);
+    expect(r).toMatchObject({ par_lanceur: { jest: 3 }, rates: { jest: 1 } });
+    expect(r.hors_compte).toEqual([expect.stringContaining(', raté) : ')]);
+    expect(exclureTests({ par_lanceur: { jest: 4 }, hors_compte: [], rates: { jest: 2 } }, reussi, x)).toMatchObject({ par_lanceur: { jest: 3 }, rates: { jest: 2 } });
+    expect(exclureTests({ par_lanceur: { jest: 3 }, hors_compte: [] }, rate, x)).not.toHaveProperty('rates');
   });
 
   it('un vrai recul reste ROUGE : un écart net au-delà de la marge, même sur un banc que A rate largement', () => {

@@ -4756,9 +4756,10 @@ lots:
     created: 2026-11-26
   - id: L907
     title: "Contrôle d'environnement de la porte : il n'a pas vu frontend/node_modules de maritime en retard (maplibre-gl 5.24.0 installé, 6.19.0 au package-lock) alors qu'il a vu services/api ; la porte a donc tourné et rendu des rouges trompeurs (« version installée : 6.4.1 ou plus », spec qui ne se charge pas). Vécu 26-11, verify --gate fbc8dd08. Comparer chaque package-lock du dépôt à son node_modules (version installée de chaque dépendance directe au moins). Mesure : aucun rouge de porte dû à un node_modules en retard non signalé."
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-26
+    started: 2026-11-26
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

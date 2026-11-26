@@ -4651,6 +4651,12 @@ lots:
     visible: true
     after: [ L888 ]
     created: 2026-11-26
+  - id: L891
+    title: "Revue UX de conformité qui converge : séparer « constat ou régression du lot » (bloque) de « défaut préexistant découvert » (proposé en lot à part, ne bloque pas), comme le code-reviewer. Vécu compte pro 26-11 : un lot d'écran à sa 4e revue de conformité, chaque tour trouvant un majeur antérieur au lot (« existing behaviour, not caused by <commits> »), ~1 h perdue par tour. Mesure : revues de conformité par lot visible (cible ≤ 2) et défauts préexistants versés en lots au lieu de bloquer."
+    status: todo
+    estimate: 1
+    after: [ L874 ]
+    created: 2026-11-26
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

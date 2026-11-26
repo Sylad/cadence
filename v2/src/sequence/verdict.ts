@@ -9,7 +9,7 @@ type ModelesExacts = ReturnType<typeof modelesExacts>;
 
 type Maint = NonNullable<MesureEtape['maintenabilite']>;
 const somme = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
-const signe = (x: number) => `${x >= 0 ? '+' : ''}${+x.toFixed(1)}`;
+export const BRUIT_PENTE_DUPLICATION = 0.1; // L876 : borne écrite le 2026-11-26, À MESURER par une séquence A contre A ; justification dans docs/v2/banc.md
 const pieces = (e: MesureEtape) => (e.lecture ? e.lecture.ouvertes.length + e.lecture.manquantes.length + e.lecture.apres_ecriture.length : 0);
 
 /** Barre du banc séquence (spec §4), échec fermé : une donnée absente ne rend jamais un critère vert. Tous bloquants ; avec des sorties attendues, les tests cachés sont affichés (R35, R37). */
@@ -38,9 +38,9 @@ export function verdictSequence(r: ResultatSequence, ref: string, cand: string):
     const x = a && f(a), y = z && f(z);
     return typeof x === 'number' && typeof y === 'number' ? y - x : null;
   };
-  const penteCritere = (nom: string, f: (m: Maint) => number | null, unite: string): Critere => {
-    const pc = pente(cand, f), pr = pente(ref, f);
-    return pc === null || pr === null ? c(nom, 'non mesuré', `≤ ${ref}`, false) : c(nom, `${signe(pc)}${unite} contre ${signe(pr)}${unite}`, `≤ ${ref}`, pc <= pr);
+  const penteCritere = (nom: string, f: (m: Maint) => number | null, unite: string, p: { decimales: number; bruit: number }): Critere => { // L876 : jugé et affiché à la précision de la mesure, à `bruit` près
+    const ar = (x: number) => +x.toFixed(p.decimales), sg = (x: number) => `${x >= 0 ? '+' : ''}${x}`, [pc, pr] = [pente(cand, f), pente(ref, f)].map((x) => (x === null ? null : ar(x)));
+    return pc === null || pr === null ? c(nom, 'non mesuré', `≤ ${ref}`, false) : c(nom, `${sg(pc)}${unite} contre ${sg(pr)}${unite}`, p.bruit ? `≤ ${ref} + ${p.bruit}${unite} (bruit)` : `≤ ${ref}`, ar(pc - pr) <= p.bruit);
   };
   const t = (b: string) => somme(et(b).map((e) => e.mesure.duree_s));
   const n = (x: number | null) => (x === null ? 'non mesuré' : `${x}`);
@@ -64,8 +64,8 @@ export function verdictSequence(r: ResultatSequence, ref: string, cand: string):
     c('questions inutiles', `${inutiles}`, '0', inutiles === 0),
     c('pièces lues avant le code', `${lus(lc)}${lc.absents.length ? `, non mesurée aux étapes ${lc.absents.join(', ')}` : ''} (${ref} : ${lus(lr)})`, '100 % en entier',
       lc.absents.length === 0 && lc.entieres === lc.t),
-    penteCritere('pente de duplication', (m) => m.duplication_pct, ' point'),
-    penteCritere('pente des fichiers > 400 lignes', (m) => m.fichiers_400, ''),
+    penteCritere('pente de duplication', (m) => m.duplication_pct, ' point', { decimales: 2, bruit: BRUIT_PENTE_DUPLICATION }),
+    penteCritere('pente des fichiers > 400 lignes', (m) => m.fichiers_400, '', { decimales: 0, bruit: 0 }),
     c('temps total', `${t(cand)} s contre ${t(ref)} s`, `≤ ${BARRE_SPEC.temps_max} × ${ref}`, t(cand) <= BARRE_SPEC.temps_max * t(ref)),
     c('build à la dernière étape', `${et(ref).at(-1)?.build_ok ? 'ok' : 'ko'} · ${derniere?.build_ok ? 'ok' : 'ko'}`, 'ok', derniere?.build_ok === true),
   ];

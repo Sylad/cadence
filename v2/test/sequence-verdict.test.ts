@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { Meca } from '../src/bench/juges.js';
 import { statut } from '../src/bench/verdict.js';
 import type { Base, MesureEtape, ResultatSequence } from '../src/sequence/passage.js';
-import { conclureSequence, ligneSequence, rapportSequence, verdictSequence } from '../src/sequence/verdict.js';
+import { BRUIT_PENTE_DUPLICATION, conclureSequence, ligneSequence, rapportSequence, verdictSequence } from '../src/sequence/verdict.js';
 import { dossierTemp } from './temp.js';
 
 const maint = (dup: number | null, f400: number) => ({ duplication_pct: dup, plus_gros: [], fichiers_400: f400 });
@@ -115,7 +115,26 @@ describe('verdictSequence : un critère par ligne, vert puis rouge', () => {
     for (const f of [(r: ResultatSequence) => { r.base.A.maintenabilite = maint(null, 1); }, (r: ResultatSequence) => { r.etapes.C[1].maintenabilite = maint(null, 1); }])
       expect(crit(seq(f), 'pente de duplication')).toMatchObject({ valeur: 'non mesuré', ok: false, bloquant: true });
   });
-  it('pente des fichiers de plus de 400 lignes ≤ référence', () => {
+  it('L876 : pentes égales à l\'arrondi et écart sous le bruit : vert ; écart au-dessus du bruit : rouge, valeurs affichées différentes', () => {
+    const nom = 'pente de duplication';
+    // cas réel aether-b68 du 26-11 : base 10.85, A finit à 10.78 (−0.07), le candidat à 10.79 (−0.06) ; l'ancien affichage disait « −0.1 contre −0.1 » et ROUGE
+    const reel = seq((r) => { r.base.A.maintenabilite = maint(10.85, 54); r.base.C.maintenabilite = maint(10.85, 54); r.etapes.A[1].maintenabilite = maint(10.78, 54); r.etapes.C[1].maintenabilite = maint(10.79, 54); });
+    expect(crit(reel, nom)).toMatchObject({ valeur: '-0.06 point contre -0.07 point', seuil: `≤ A + ${BRUIT_PENTE_DUPLICATION} point (bruit)`, ok: true });
+    expect(rouges(reel)).toEqual([]);
+    const ecart = (dc: number) => crit(seq((r) => { r.etapes.C[1].maintenabilite = maint(2 + dc, 1); }), nom);
+    expect(ecart(BRUIT_PENTE_DUPLICATION)).toMatchObject({ ok: true }); // à la borne : vert
+    const rouge = ecart(BRUIT_PENTE_DUPLICATION + 0.01);
+    expect(rouge).toMatchObject({ valeur: '+0.11 point contre +0 point', ok: false });
+    const [vc, vr] = rouge.valeur.split(' contre ');
+    expect(vc).not.toBe(vr);
+    // jamais un rouge dont l'écart affiché reste sous le bruit, quelle que soit l'erreur de la virgule flottante
+    for (let i = 0; i <= 300; i++) {
+      const x = crit(seq((r) => { r.etapes.C[1].maintenabilite = maint(2 + i / 1000, 1); }), nom);
+      expect(x.ok).toBe(Number(x.valeur.split(' ')[0]) <= BRUIT_PENTE_DUPLICATION);
+    }
+  });
+  it('pente des fichiers de plus de 400 lignes ≤ référence, sans tolérance (entiers)', () => {
+    expect(crit(seq((r) => { r.etapes.C[1].maintenabilite = maint(2, 2); }), 'pente des fichiers > 400 lignes')).toMatchObject({ valeur: '+1 contre +0', seuil: '≤ A', ok: false });
     expect(crit(seq((r) => { r.etapes.C[1].maintenabilite = maint(2, 3); }), 'pente des fichiers > 400 lignes')).toMatchObject({ valeur: '+2 contre +0', ok: false });
     expect(crit(seq((r) => { r.base.C.maintenabilite = maint(2, 3); r.etapes.C[1].maintenabilite = maint(2, 3); }), 'pente des fichiers > 400 lignes')).toMatchObject({ ok: true });
   });

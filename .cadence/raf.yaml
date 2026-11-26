@@ -4531,9 +4531,10 @@ lots:
     created: 2026-11-25
   - id: L872
     title: "Banc : fuite « / » comptée sur les deux bras (banc court du 25-11 rouge, 4 fuites au chemin « / », 3 du bras A) — établir ce que lit « / » (outil, commande), puis soit la règle de fuites l'ignore si elle n'a pas d'effet, soit le hook la bloque ; test sur une ligne de journal réelle. Mesure : banc court sans fuite « / » sur deux passages"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-25
+    started: 2026-11-26
   - id: L873
     title: "Sonde UX : mesurer la position et la largeur des contrôles voisins avant et après un clic (revue UX r2 de blue-fleet L6, 25-11 : la sonde a rendu « saut 0 px » alors que « Par mémoire » glisse de 32 px quand l'actif change de graisse). Mesure : la sonde voit ce saut sur la fixture rejouée"
     status: todo

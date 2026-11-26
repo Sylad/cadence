@@ -1,0 +1,20 @@
+{
+ "id": "D-36",
+ "texte": "faudra attendre les tests de samedi je suppose, mais je me demande si cadence méritereais d'êtree connu, et si oui commeent?",
+ "date": "2026-11-26",
+ "etat": "ouverte",
+ "preuve": "",
+ "precisions": [
+  {
+   "date": "2026-11-26",
+   "texte": "Contexte (lead) : à trancher après la revue D-30 du 29-11. Proposition du lead : faire connaître d'abord les mesures (étude de cas chiffrée), puis l'outil seulement si des conditions sont remplies (verdict « garder », un second utilisateur, installation par un inconnu en moins de 10 min, README en anglais)."
+  },
+  {
+   "date": "2026-11-26",
+   "texte": "Décision de Sylvain : « ok pour l'étude chiffrée en anglais après samedi. quand au cout à accepter, franchement par rapport à la fierté d'avoir fait un outil utiliser par des gens, moi ca me va ». Donc : étape 1 (étude chiffrée en anglais) après la revue du 29-11 ; étape 2 (rendre l'outil utilisable par d'autres : README anglais, installation < 10 min par un inconnu, généricité) acceptée sur le principe, coût de support compris, si la revue dit « garder »."
+  }
+ ],
+ "lots": [
+  "L885"
+ ]
+}

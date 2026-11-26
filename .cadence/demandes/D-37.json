@@ -12,9 +12,15 @@
     {
       "date": "2026-11-26",
       "texte": "Maquette A validée par Sylvain (« Validée, code-la ») ; pièces dans maquettes/cadence-L888/ ; code par cadence run après le banc."
+    },
+    {
+      "date": "2026-11-26",
+      "texte": "Sylvain : « et faudra pas oublier tes points B et C » → B = L889 (onglet registre), C = L890 (notifications), chacun maquette validée avant le code."
     }
   ],
   "lots": [
-    "L888"
+    "L888",
+    "L889",
+    "L890"
   ]
 }

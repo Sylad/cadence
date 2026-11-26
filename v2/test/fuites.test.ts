@@ -193,3 +193,24 @@ describe('L775 : un appel refusé par le hook du bras n\'a rien lu ni écrit', (
     expect(chercherFuites(l, rr, H, cl).certaines.filter((c) => c.startsWith('contournement'))).toHaveLength(1);
   });
 });
+
+// L872 : lignes réelles des journaux du bras c1 (banc court du 25-11 18:19 r1, séquence du 25-11 21:47 r1), comptées « / » en fuite certaine :
+// « /* R14 */ » d'une expression sed et « /** » d'un commentaire TS dans un heredoc python. Rien n'y lit la racine ni hors du clone.
+describe('L872 : marqueur de commentaire « /* » ou « /** » nu : pas une fuite', () => {
+  const HR = '/home/sylvain_ladoire', R = `${HR}/bench-cadence`;
+  const sed = "{\"type\": \"assistant\", \"cwd\": \"/home/sylvain_ladoire/bench-cadence/runs/2026-11-25-1819-470da8c31282/aether-b68-court/r1/c1/frontend\", \"message\": {\"content\": [{\"type\": \"tool_use\", \"name\": \"Bash\", \"input\": {\"command\": \"cd /home/sylvain_ladoire/bench-cadence/runs/2026-11-25-1819-470da8c31282/aether-b68-court/r1/c1/frontend; sed -i \\\"s|sigwxCentre: this.sigwxCentre() /\\\\* R14 \\\\*/, ...(this.engineKind()|sigwxCentre: this.sigwxCentre() /* R14 */, pressureCentresLang: this.pressureCentresLang() /* B68 */, ...(this.engineKind()|\\\" src/app/pages/globe/globe.component.ts; grep -c \\\"pressureCentresLang: this.pressureCentresLang() /\\\\* B68\\\" src/app/pages/globe/globe.component.ts; npx tsc --noEmit -p tsconfig.app.json 2>&1 | head -20\"}}]}}";
+  const heredoc = "{\"type\": \"assistant\", \"cwd\": \"/home/sylvain_ladoire/bench-cadence/runs/2026-11-25-2147-470da8c31282/aether-b68/r1/c1/frontend\", \"message\": {\"content\": [{\"type\": \"tool_use\", \"name\": \"Bash\", \"input\": {\"command\": \"cd /home/sylvain_ladoire/bench-cadence/runs/2026-11-25-2147-470da8c31282/aether-b68/r1/c1/frontend/src/app; python3 - <<'EOF'\\np='services/arrows.service.ts'\\ns=open(p).read()\\ns=s.replace(\\\"\\\"\\\"/**\\n * Sert le manifest + résolveur\\\"\\\"\\\",\\\"\\\"\\\"/** Écart maximal entre le curseur et un fichier de flèches pour qu'il soit dessiné (au-delà : rien). D-6 — partagé avec\\n *  la ligne de statut de la barre, qui ne doit pas dire « affichée à la place » quand rien n'est dessiné. */\\nexport const ARROWS_MAX_GAP_MS = 12 * 3600_000;\\n\\n/**\\n * Sert le manifest + résolveur\\\"\\\"\\\",1)\\nold=\\\"    return bestDelta <= 12 * 3600_000 ? best : null;\\\"\\nassert old in s\\ns=s.replace(old,\\\"    return bestDelta <= ARROWS_MAX_GAP_MS ? best : null;\\\")\\nopen(p,'w').write(s)\\np='pages/globe/globe.component.ts'\\ns=open(p).read()\\ns=s.replace(\\\"import { ArrowsService, type\\\",\\\"import { ARROWS_MAX_GAP_MS, ArrowsService, type\\\",1)\\nold=\\\"\\\"\\\"    // Q2 reco 4d (2026-09-15) — en clair : nom de la couche, écart à l'instant demandé, « affichée à la place ».\\\"\\\"\\\"\\nnew=\\\"\\\"\\\"    // D-6 (QA 25/11) — flèches : au-delà de ARROWS_MAX_GAP_MS du fichier le plus proche, RIEN n'est dessiné\\n    // (findNearestTs) : le dire, jamais « affichée à la place » sur une couche vide (invariant 5).\\n    if ((family === 'windArrows' || family === 'waveArrows') && Math.abs(best.getTime() - t) > ARROWS_MAX_GAP_MS) {\\n      return this.t('map.status.exactNone', { layer: this.layerName(master), from: this.formatStatusWhen(list[0], step), to: this.formatStatusWhen(list[list.length - 1], step) });\\n    }\\n\\\"\\\"\\\"+old\\nassert old in s\\ns=s.replace(old,new,1)\\nopen(p,'w').write(s)\\nEOF\\ngrep -n \\\"exactNone\\\" ../../public/i18n/fr.json\"}}]}}";
+  it('sed -i "s|… /\\* R14 \\*/ …|… /* R14 */ …|" (court r1, bras c1) : aucune fuite', () => {
+    const c = `${R}/runs/2026-11-25-1819-470da8c31282/aether-b68-court/r1/c1`;
+    expect(chercherFuites([sed], reglesDuBras(HR, R, 'aether-b68-court', c), HR, c)).toEqual({ certaines: [], a_verifier: [] });
+  });
+  it('python3 - <<EOF … """/** Sert le manifest…""" (séquence r1, bras c1) : aucune fuite', () => {
+    const c = `${R}/runs/2026-11-25-2147-470da8c31282/aether-b68/r1/c1`;
+    expect(chercherFuites([heredoc], reglesDuBras(HR, R, 'aether-b68', c), HR, c)).toEqual({ certaines: [], a_verifier: [] });
+  });
+  it('une commande récursive sur /* lit tout : toujours certaine ; un chemin sous / aussi', () => {
+    expect(chercherFuites([appel({ command: 'grep -r secret /*' })], r, H).certaines).toEqual(['/']);
+    expect(chercherFuites([appel({ command: 'ls /*/u/bench-cadence/secrets' })], r, H).certaines).toEqual(['/']);
+    expect(chercherFuites([outil('Glob', { pattern: '/**/attendu.md' })], r, H).certaines).toEqual(['/']);
+  });
+});

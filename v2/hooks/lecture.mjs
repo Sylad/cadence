@@ -213,7 +213,7 @@ function peutViser(p, pre, z) {
  * `path`), relatifs au dossier courant, et pour Bash le dossier courant et la commande sans ses textes écrits (commandeLue), avec ses chemins relatifs,
  * ses `cd` et ses accolades. Jamais un contenu écrit ni un motif de recherche. `cwd` : dossier courant de l'appel ; `depart` : à défaut de cwd.
  * L817 : Grep et une commande récursive lisent aussi tout sous leurs dossiers (`<d>/**`) ; `cd` seul va dans ~ ; depuis un dossier qui contient une zone
- * de `certains` (après `cd ~`), tout nom est un chemin relatif (« ls projects »). */
+ * de `certains` (après `cd ~`), tout nom est un chemin relatif (« ls projects »). L872 : « /* » ou « /** » nu, non récursif, n'est que « / ». */
 export function* cheminsCites(name, input, cwd, depart, home, certains = []) {
   const abs = typeof cwd === 'string' && isAbsolute(cwd), base = abs ? cwd : depart;
   const absolu = (v, d) => (/^(~|\$HOME)(\/|$)/.test(v) ? resolve(home, v.replace(/^(~|\$HOME)\/?/, '')) : resolve(d, v));
@@ -233,7 +233,7 @@ export function* cheminsCites(name, input, cwd, depart, home, certains = []) {
         const nom = /^\s*(?:\w+=\S*\s+)*(\S+)/.exec(etape)?.[1].replace(/^.*\//, '') ?? '', rec = recursive(nom, etape);
         let explicite = false;
         for (const tok of etape.split(/[\s'"`&<>(){}=]+/)) {
-          const e = resoudre(tok, dir, home, true), p = e ?? (nu && /^[^-$]/.test(tok) ? resolve(dir, tok) : null);
+          const e = !rec && /^\/\*+(\\[a-z])*$/.test(tok) ? '/' : resoudre(tok, dir, home, true), p = e ?? (nu && /^[^-$]/.test(tok) ? resolve(dir, tok) : null);
           if (!p) continue;
           explicite ||= !!e;
           yield p;

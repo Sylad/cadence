@@ -4734,6 +4734,29 @@ lots:
     notes:
       - { date: 2026-11-26, text: "revue du lead 26-11 conforme ; choix accepté : un banc complet rouge après le mécanique vert ne retire plus la publication (sinon le cas samedi rouge resterait bloquant, contraire à D-39). Vérifié sur le vrai historique après build de v2 : refus faute de mécanique sur 731ad45d5f4c, ligne ⚠ « ne bloque pas la publication (L903) » avec les bancs du week-end." }
     finished: 2026-11-26
+  - id: L904
+    title: "Heure et échéance du soir dans lead tour et lead release : clé lead.arret (ex. « 19:30/20:00 ») ; quand elle est posée, la ligne des créneaux dit l'heure et le temps restant avant chaque échéance, et « ⚠ trop tard pour un run de ~30 min » quand il reste moins que la durée médiane d'un run (cadence perf). Vécu 26-11 (D-34 du registre parent) : le lead avait lu 17:23 sans en tenir compte et Sylvain a dû le lui rappeler. Mesure : aucun rappel de l'heure par l'humain sur 2 semaines ; aucun run lancé qui finit après l'échéance."
+    status: todo
+    estimate: 1
+    created: 2026-11-26
+    notes:
+      - { date: 2026-11-26, text: "26-11, remarque du compte pro : une échéance à 00:00 (règle pro : arrêt à minuit) doit valoir la fin du jour (1440), pas 0 — à tester dans lead.arret." }
+  - id: L905
+    title: "Banc mécanique : le critère « tests d'origine verts » (≥ A test par test, sans marge, L777) bascule au hasard sur 7-ol-companion-L160 — rouge puis vert à la même empreinte le 19-11 (11 h 46 / 12 h 57), rouge le 20-11 et le 26-11 (17 contre 20 sur ~680 tests, les deux bras ratant 52 à 55 tests de la page FM). Un écart de 3 tests entre deux tirages du modèle n'est pas un recul de cadence : comparer sur plusieurs tirages, ou exclure du critère un cas où A lui-même rate plus de N % des tests d'origine. Vécu 26-11 (D-39) : 2.0.19 retardée d'un banc de 25 min. Mesure : sur 4 semaines, aucun banc rouge sur ce seul critère qui repasse vert à la même empreinte."
+    status: doing
+    estimate: 1
+    created: 2026-11-26
+    started: 2026-11-26
+  - id: L906
+    title: "Environnement périmé : remettre à niveau tout seul au lieu de rendre la main. Quand la porte (cadence run, verify --gate) trouve un node_modules en retard sur son package-lock, elle lance elle-même la remise à niveau qu'elle imprime déjà (npm ci dans le dossier concerné, sans réseau douteux : lockfile seul), puis joue la porte ; elle ne rend la main que si npm ci échoue. Vécu 26-11, deux fois dans la même heure sur maritime : le run SEC-D32/maplibre6 rendu « environnement-perime » (services/api, 489 écarts, lot qui ne touchait que le frontend) et verify --gate du lead refusé pour la même raison dans l'arbre principal — ~20 min de livraison perdues avant l'arrêt de 20 h. Mesure : aucun run ni verify rendu pour un environnement périmé que npm ci répare."
+    status: todo
+    estimate: 1
+    created: 2026-11-26
+  - id: L907
+    title: "Contrôle d'environnement de la porte : il n'a pas vu frontend/node_modules de maritime en retard (maplibre-gl 5.24.0 installé, 6.19.0 au package-lock) alors qu'il a vu services/api ; la porte a donc tourné et rendu des rouges trompeurs (« version installée : 6.4.1 ou plus », spec qui ne se charge pas). Vécu 26-11, verify --gate fbc8dd08. Comparer chaque package-lock du dépôt à son node_modules (version installée de chaque dépendance directe au moins). Mesure : aucun rouge de porte dû à un node_modules en retard non signalé."
+    status: todo
+    estimate: 1
+    created: 2026-11-26
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

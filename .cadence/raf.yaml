@@ -4675,6 +4675,11 @@ lots:
     estimate: 1
     after: [ L865 ]
     created: 2026-11-26
+  - id: L895
+    title: "Délai entre un lot fini et sa publication, visible au tour : cadence lead tour affiche, par dépôt publié (npm), le nombre de lots done non publiés et l'âge du plus ancien, avec ⚠ au-delà de 3 jours ; les issues GitHub dont tous les lots sont done mais pas publiés sont comptées à part (« en attente de publication ») et non comme du retard. Vécu 26-11 : 10 issues ouvertes dont 7 aux lots finis, bloquées par 2.0.19 (dernière publication 21-11, banc court rouge le 25-11) ; Sylvain y a vu un problème d'avancement. Mesure : aucun lot done non publié depuis plus de 3 jours sans ⚠ au tour, et l'âge médian done → publié."
+    status: todo
+    estimate: 1
+    created: 2026-11-26
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

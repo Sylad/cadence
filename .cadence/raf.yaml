@@ -4555,11 +4555,12 @@ lots:
     created: 2026-11-25
   - id: L876
     title: "Banc de séquence : « pente de duplication -0.1 point contre -0.1 point » jugée ROUGE (séquence aether-b68 du 26-11) — v2/src/sequence/verdict.ts:43 compare les valeurs brutes (pc <= pr) mais affiche l'arrondi au dixième : afficher la précision qui départage, et juger contre un seuil de bruit mesuré (rejouer A contre A) plutôt qu'à l'égalité stricte ; même examen pour la pente des fichiers > 400. Test : deux pentes égales à l'arrondi, verdict et affichage cohérents. Mesure : plus aucun critère rouge dont les deux valeurs affichées sont identiques"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-26
     started: 2026-11-26
-    review: { date: 2026-11-26, verdict: "non conforme : 1 majeur (code tassé pour tenir le budget de sequence, verdict.ts:12/41-43/67-68, règle L689), 2 mineurs (chiffre « 0,03 par étape » faux dans banc.md:239, c'est 0,02 ; borne de bruit sans lot pour la mesurer)", commit: bd460a3e8803486c01209d59fbcc3d5ed6e0c359 }
+    review: { date: 2026-11-26, verdict: "conforme (M1 détassé, comportement et tests inchangés, budget de sequence relevé sur une marge de bench réelle, m1 corrigé, m2 porté par L878)", commit: 0500c0e057aa3d77b4afd8e57ec1e49ec4379a42 }
+    finished: 2026-11-26
   - id: L877
     title: "Banc de séquence : cadence-run vérifie une sortie attendue de moins que A sur les deux séquences du 25-26-11 (aether-b68-court 3/8 contre 4/8, aether-b68 8/12 contre 9/12) — lire dans les rapports JSON quelles sorties manquent et à quelle étape, établir la cause (brief du run, lecture de la demande, porte) et proposer le correctif. Mesure : sorties attendues ≥ A sur les deux séquences rejouées"
     status: todo

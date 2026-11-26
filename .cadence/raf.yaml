@@ -4567,7 +4567,7 @@ lots:
     estimate: 1
     created: 2026-11-26
     started: 2026-11-26
-    review: { date: 2026-11-26, verdict: "conforme après 1 correction : 1 majeur (étude banc-b68-2026-11-25.md:54 et :93 : « 4 sur 4 » faux, le geste revient 5/7 chez cadence-run contre 3/7 chez A sur les 22 et 25-11), 1 mineur (test recopie le filtre de run.ts:510)", commit: 96bbfd95b557906e5f6bb8a0d3887e8a99b52ae2 }
+    review: { date: 2026-11-26, verdict: "not compliant: 1 major (run.ts:444 briefEnvoye tassé sur une ligne de 403 car. pour tenir le budget, contre L689), m1 not fixed (test L877 ne l'appelle toujours pas) ; étude recomptée exacte", commit: dba3e37c0b2eece1ae456a81acf26cb8d83f0b20 }
   - id: L878
     title: "Mesurer le bruit de la pente de duplication par une séquence A contre A-bis et remplacer la borne écrite BRUIT_PENTE_DUPLICATION = 0,1 point (L876, v2/src/sequence/verdict.ts:12) par l'écart mesuré, comme MARGE_CACHES (banc.md:43-45). Vécu 26-11 : revue de L876, borne > tout le mouvement de A (0,07). Mesure : borne issue d'au moins 2 paires A/A-bis."
     status: todo

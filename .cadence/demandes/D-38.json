@@ -1,0 +1,11 @@
+{
+  "id": "D-38",
+  "texte": "Il me semble que l'on avait parlé hier aussi avec pro d'être plus souple avec le lock par dépôt (travailler avec des worktree et git branche devrait permettre de faire plusieurs choses en même temps sur le même dépôt, surtout si on bosse pas sur les mêmes fichiers), on a toujours ce ticket de prévu dans cadence ?",
+  "date": "2026-11-26",
+  "etat": "ouverte",
+  "preuve": null,
+  "lots": [
+    "L865",
+    "L892"
+  ]
+}

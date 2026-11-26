@@ -4657,6 +4657,12 @@ lots:
     estimate: 1
     after: [ L874 ]
     created: 2026-11-26
+  - id: L892
+    title: "Plusieurs lots en même temps dans un dépôt (D-38) : la skill lead interdit encore deux sessions dans un même dépôt (« Never two subagents in the same repository ») et le lead applique « un run maritime à la fois », alors que cadence run a déjà un worktree par lot. Le tour propose deux lots d'un même dépôt quand les fichiers qu'ils toucheront ne se recoupent pas (fichiers prévus par le plan ou par une lecture rapide), et le lead les lance ensemble ; un conflit à l'intégration reste rendu par refus-integration. Après L865 (#76, index.lock). Mesure : lots livrés par jour sur maritime et cadence avant et après, et nombre de refus-integration par conflit (cible : ≤ 1 sur 10 paires)."
+    status: todo
+    estimate: 1
+    after: [ L865 ]
+    created: 2026-11-26
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

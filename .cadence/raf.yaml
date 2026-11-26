@@ -4550,6 +4550,16 @@ lots:
     estimate: 1
     planned: { from: 2026-11-26, to: 2026-11-28 }
     created: 2026-11-25
+  - id: L876
+    title: "Banc de séquence : « pente de duplication -0.1 point contre -0.1 point » jugée ROUGE (séquence aether-b68 du 26-11) — v2/src/sequence/verdict.ts:43 compare les valeurs brutes (pc <= pr) mais affiche l'arrondi au dixième : afficher la précision qui départage, et juger contre un seuil de bruit mesuré (rejouer A contre A) plutôt qu'à l'égalité stricte ; même examen pour la pente des fichiers > 400. Test : deux pentes égales à l'arrondi, verdict et affichage cohérents. Mesure : plus aucun critère rouge dont les deux valeurs affichées sont identiques"
+    status: todo
+    estimate: 1
+    created: 2026-11-26
+  - id: L877
+    title: "Banc de séquence : cadence-run vérifie une sortie attendue de moins que A sur les deux séquences du 25-26-11 (aether-b68-court 3/8 contre 4/8, aether-b68 8/12 contre 9/12) — lire dans les rapports JSON quelles sorties manquent et à quelle étape, établir la cause (brief du run, lecture de la demande, porte) et proposer le correctif. Mesure : sorties attendues ≥ A sur les deux séquences rejouées"
+    status: todo
+    estimate: 1
+    created: 2026-11-26
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

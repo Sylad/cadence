@@ -4580,6 +4580,8 @@ lots:
     estimate: 1
     planned: { from: 2026-11-27, to: 2026-11-30 }
     created: 2026-11-26
+    notes:
+      - { date: 2026-11-26, text: "26-11 10:16 : 2e cas le même jour — porte du correctif L877 rouge sur un test à délai (orchestrate-add-lot-rendu-l563 R13, 30 s dépassées) pendant que la porte de warhammer tournait en parallèle ; rejoué seul : 71/71 vert en 28 s. Étendre L879 aux délais dépassés : rejouer seuls les tests en échec avant de rendre ou de corriger." }
   - id: L880
     title: 'Fuites « / » (suite de L872) : un « /* Mot » reste retiré quand le shell exécute lui-même le texte cité (sed "…$(grep -rl x /* Docs)…", accent grave, heredoc non cité), puis perl/ruby system sans parenthèse, awk getline, sed e, tube vers /bin/sh ou xargs sh ; faux positifs neufs (ligne de tête avec bash x.sh && python3 - <<EOF, /* 2 colonnes */, mot de garde dans le texte) ; cas eval/source/. et règle du chiffre sans test mordant ; corriger « Tout autre /* reste lu » de banc.md et du changelog. Vu par la revue r3 du 26-11 (revues/cadence-L872-code-r3.md). Mesure : sonde de contournement à 0 « rien » sans faux positif sur le rejeu du 25-11.'
     status: todo
@@ -4594,6 +4596,12 @@ lots:
     created: 2026-11-26
   - id: L882
     title: "Juge du banc : verdict constant sur une même sortie — le 22-11 court r1 le juge met « oui » à S1 (grand D/A au réglage par défaut) pour les deux bras alors que sa preuve dit « lettre ≈ 20 px au réglage par défaut », le 25-11 le même cas vaut « non ». Vu par la revue de L877 le 26-11 (revues/cadence-L877-code.md). Mesure : rejuger les 7 rapports des 22 et 25-11 donne le même verdict à preuve égale."
+    status: todo
+    estimate: 1
+    planned: { from: 2026-11-27, to: 2026-12-04 }
+    created: 2026-11-26
+  - id: L883
+    title: 'Parité porte ↔ CI (signalé par le compte pro le 26-11, cadence 2.0.18) : faux « la CI joue npx ng test --no-watch que orchestrate.test ne joue pas » alors que orchestrate.test = npm run gate et package.json gate = "npm run lint && npm run format:check && npm run build && ng test --no-watch". Le dépliage de src/orchestrate/ci-parity.ts existe (L564, L780) : reproduire ce cas exact (script npm qui enchaîne plusieurs npm run puis ng test), trouver où il rate, corriger, test sur cette fixture. Mesure : le tour ne signale plus ce dépôt, et un vrai écart reste signalé.'
     status: todo
     estimate: 1
     planned: { from: 2026-11-27, to: 2026-12-04 }

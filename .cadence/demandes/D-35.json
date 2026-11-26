@@ -1,0 +1,16 @@
+{
+ "id": "D-35",
+ "texte": "tient, pour améliorer cadence j'aimerais aussi que l'on rajoute un veille qui recherche quels outils sont utilisé par les vibee codeur pour faire l'équivalent de cadence, voir les pour et les contre, et peut-être s'inspirer pour de futur améliorations. Pour l'instant on là fait essentiellement sur nos besoin et ma volonté de reproduire le taf d'une partie d'une équipe de dev humaine",
+ "date": "2026-11-26",
+ "etat": "ouverte",
+ "preuve": "",
+ "precisions": [
+  {
+   "date": "2026-11-26",
+   "texte": "Validé par Sylvain (« Oui, planifie »), besoin et mesure : veille mensuelle, une issue triée par mois, au moins une idée passée au banc en 3 mois sinon retirée. Mécanisme (lead) : routine cloud trig_0155jXkPvzpfWgQfY6kgaBof « Veille outils équivalents à cadence », le 25 de chaque mois à 08 h (Paris), issue « Veille outils — AAAA-MM » label veille-outils ; première édition lancée le 26-11 (avant la revue D-30 du 29-11) ; rappel de tri dans scripts/rappels-revue.sh."
+  }
+ ],
+ "lots": [
+  "L884"
+ ]
+}

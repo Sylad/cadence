@@ -4563,11 +4563,12 @@ lots:
     finished: 2026-11-26
   - id: L877
     title: "Banc de séquence : cadence-run vérifie une sortie attendue de moins que A sur les deux séquences du 25-26-11 (aether-b68-court 3/8 contre 4/8, aether-b68 8/12 contre 9/12) — lire dans les rapports JSON quelles sorties manquent et à quelle étape, établir la cause (brief du run, lecture de la demande, porte) et proposer le correctif. Mesure : sorties attendues ≥ A sur les deux séquences rejouées"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-26
     started: 2026-11-26
-    review: { date: 2026-11-26, verdict: "not compliant: 1 major (run.ts:444 briefEnvoye tassé sur une ligne de 403 car. pour tenir le budget, contre L689), m1 not fixed (test L877 ne l'appelle toujours pas) ; étude recomptée exacte", commit: dba3e37c0b2eece1ae456a81acf26cb8d83f0b20 }
+    review: { date: 2026-11-26, verdict: "compliant: aec1edff détasse briefEnvoye (fonction de 6 lignes, budget run 1375 pris à deliver, module absent de src/, justifié), le test appelle la vraie fonction (vu rouge avec un filtre) ; relu par le lead", commit: aec1edff5fd50d9ca72814e1b840d859a38b9aaf }
+    finished: 2026-11-26
   - id: L878
     title: "Mesurer le bruit de la pente de duplication par une séquence A contre A-bis et remplacer la borne écrite BRUIT_PENTE_DUPLICATION = 0,1 point (L876, v2/src/sequence/verdict.ts:12) par l'écart mesuré, comme MARGE_CACHES (banc.md:43-45). Vécu 26-11 : revue de L876, borne > tout le mouvement de A (0,07). Mesure : borne issue d'au moins 2 paires A/A-bis."
     status: todo
@@ -4605,6 +4606,11 @@ lots:
     status: todo
     estimate: 1
     planned: { from: 2026-11-27, to: 2026-12-04 }
+    created: 2026-11-26
+  - id: L884
+    title: "Veille des outils équivalents à cadence (D-35) : chaque mois, avant la revue D-30, une recherche des outils que les développeurs qui codent avec l'IA utilisent pour la même chose que cadence (orchestration de lots, spec, revue, tests, mémoire des demandes : BMAD, spec-kit, superpowers, ECC, Taskmaster, Kiro, agents de Cursor ou de Codex…). Pour chacun : ce qu'il fait, son usage réel (étoiles, activité, retours publics), ses pour et contre sourcés, et ce qu'on pourrait reprendre. Résultat en une issue « Veille outils » triée comme la veille Claude (D-29) : chaque idée devient « à faire » (un lot avec sa mesure, au banc avant adoption), « à surveiller » ou « sans effet », et sa raison. Mécanisme : routine planifiée mensuelle (comme la veille Claude hebdomadaire), sans code dans cadence. Première édition avant la revue du 29-11. Mesure : une issue triée par mois ; sur 3 mois, au moins une idée passée au banc ; sinon la veille est retirée."
+    status: todo
+    estimate: 1
     created: 2026-11-26
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

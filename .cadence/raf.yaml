@@ -4756,11 +4756,12 @@ lots:
     created: 2026-11-26
   - id: L907
     title: "Contrôle d'environnement de la porte : il n'a pas vu frontend/node_modules de maritime en retard (maplibre-gl 5.24.0 installé, 6.19.0 au package-lock) alors qu'il a vu services/api ; la porte a donc tourné et rendu des rouges trompeurs (« version installée : 6.4.1 ou plus », spec qui ne se charge pas). Vécu 26-11, verify --gate fbc8dd08. Comparer chaque package-lock du dépôt à son node_modules (version installée de chaque dépendance directe au moins). Mesure : aucun rouge de porte dû à un node_modules en retard non signalé."
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-26
     started: 2026-11-26
     review: { date: 2026-11-26, verdict: "compliant (3 notes mineures : workspaces membres, remontée hors dépôt, dossiers ignorés par git lus)", commit: 4be1c849eeb6c707d0b512350fc55a471d32d6dd }
+    finished: 2026-11-26
   - id: L908
     title: "Contrôle d'environnement de la porte (suite de L907, notes de revue du 26-11) : ne lire que les package-lock suivis par git (un dossier ignoré, ex. une copie dans tmp/, bloque la porte en code 2), arrêter la résolution Node à la racine du dépôt (~/projects/developpeur/node_modules masque un retard), relire sur disque les dépendances directes des membres de workspaces npm. Mesure : aucun blocage de porte par un dossier non suivi, aucun retard masqué par un node_modules parent."
     status: todo

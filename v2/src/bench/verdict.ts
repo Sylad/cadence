@@ -339,8 +339,11 @@ export const GARDE_DEPUIS = '2026-11-15T00:00:00+01:00';
  *     seulement à partir de GARDE_DEPUIS (les rouges d'avant sont déjà arbitrés) ;
  * (2) elle tombe lorsque CE banc (le court, ou CETTE séquence) est rejoué vert après elle (ordre de l'historique), sur la version corrigée ou une
  *     suivante ; levée, elle le reste pour toutes les empreintes suivantes (revue 3 : sinon chaque publication après un rouge redemanderait le complet) ;
- * (3) tant qu'une alerte tient, la publication est refusée, quel que soit le reste (mécanique vert, banc complet vert sans le banc rouge) ;
- * (4) hors alerte, le banc mécanique vert de l'empreinte suffit, et un banc complet vert aussi.
+ * (3) L903 (D-39, Sylvain du 26-11 : le rejeu d'un rouge bloquait 5 à 6 h, « presque une journée de taf ») : une alerte ne bloque plus la
+ *     publication ; elle reste affichée (⚠ de statut, de verifier-publication, de cadence release et du tour) jusqu'au rejeu vert de la règle 2,
+ *     au banc complet du week-end ;
+ * (4) le banc mécanique vert de l'empreinte suffit, et un banc complet vert aussi ; un rouge du banc complet (court avec juges, séquence) qui
+ *     suit le mécanique ne le retire pas (c'est l'alerte de la règle 3), un micro, un mécanique ou un éclair rouges, si.
  */
 function gardeEnQuatreRegles(h: Ligne[], empreinte: string, reel: (m: Ligne | undefined) => m is Ligne, publie?: { candidat: string; reference: string }) {
   const miennes = h.filter((x) => x.empreinte === empreinte);
@@ -353,9 +356,10 @@ function gardeEnQuatreRegles(h: Ligne[], empreinte: string, reel: (m: Ligne | un
   const completOk = reel(m) && !courts.slice(i).some((x) => !x.vert || x.eclair_ok === false)
     && seqOk(seqs, (s) => reel(s) && s.vert && s.candidat === m.candidat && s.modele_candidat === m.modele_candidat);
   // Banc mécanique : le DERNIER passage mécanique de l'empreinte couvrant 1, 3 et 7 est vert et réel, et aucun passage rouge de cette
-  // empreinte, quel qu'il soit (micro, mécanique, court, éclair, séquence), ne le suit.
+  // empreinte ne le suit (micro, mécanique, éclair) ; un rouge du banc complet (court avec juges, séquence) ne le retire pas : il lève
+  // l'alerte, qui ne bloque plus (règle 3, L903).
   const j = miennes.map((x) => x.niveau === 'mecanique' && couvreCourt(x)).lastIndexOf(true);
-  const mecaOk = reel(miennes[j]) && !miennes.slice(j).some((x) => !x.vert || x.eclair_ok === false);
+  const mecaOk = reel(miennes[j]) && !miennes.slice(j).some((x) => (!x.vert && !duComplet(x)) || x.eclair_ok === false);
   // (1) chaque rouge du banc complet ; (2) rejoué : un court vert et réel écrit après lui, ou un run complet et vert de la MÊME séquence écrit après
   // lui, sur n'importe quelle empreinte ; un vert d'avant le rouge ne compte pas, ni un court et une séquence X verts pour une séquence Y (revues L730).
   const rouges = h.filter((x) => duComplet(x) && !x.vert && Date.parse(x.date) >= Date.parse(GARDE_DEPUIS) && (!publie || (x.candidat === publie.candidat && x.reference === publie.reference)));
@@ -366,8 +370,8 @@ function gardeEnQuatreRegles(h: Ligne[], empreinte: string, reel: (m: Ligne | un
       : apres.some((y) => y.type !== 'sequence' && reel(y) && y.vert);
   };
   const enAttente = rouges.filter((rg) => !rejoue(rg));
-  // (3) et (4)
-  return { enAttente, publication_ok: empreinte !== 'inconnue' && enAttente.length === 0 && (mecaOk || completOk) };
+  // (3) et (4) : l'alerte ne compte plus dans la publication (L903)
+  return { enAttente, publication_ok: empreinte !== 'inconnue' && (mecaOk || completOk) };
 }
 
 /** Ce qu'une alerte demande de rejouer : « court », ou « sequence <id> ». */
@@ -377,8 +381,9 @@ const quoi = (x: Ligne) => (x.type === 'sequence' ? `séquence ${x.sequence ?? '
  * Garde de publication. `modeles` : nom du bras -> modèle, lus dans le bras.yaml courant (le modèle n'est pas dans l'empreinte). `publie` (L689) :
  * candidat et référence exigés (la CLI passe PUBLIE) ; sans lui, tout candidat distinct de sa référence.
  * L730 (D-22, Sylvain du 14-11 : 3 h de banc avant chaque publication, « complètement dingue ») : la garde est proportionnée, selon `gardeEnQuatreRegles`.
- * `alerte` (signalée par `statut` et le tour) nomme le dernier rouge en attente et les autres ; `a_rejouer` dit quoi rejouer (sur la version corrigée) ;
- * `mode` vaut `complet` tant qu'une alerte tient.
+ * `alerte` (signalée par `statut`, `verifier-publication`, `cadence release` et le tour) nomme le dernier rouge en attente et les autres ;
+ * `a_rejouer` dit quoi rejouer au banc complet du week-end (sur la version corrigée). L903 : l'alerte ne bloque plus la publication, le champ
+ * `mode` (`complet` pendant une alerte) a disparu avec ce blocage.
  */
 export function statut(historique: string[], maintenant: Date, empreinte: string, modeles: Record<string, string> = {}, publie?: { candidat: string; reference: string }) {
   const lues = historique.flatMap((l) => { // une ligne illisible ou sans date valide est sautée, jamais levée
@@ -398,7 +403,6 @@ export function statut(historique: string[], maintenant: Date, empreinte: string
   const dernierComplet = h.filter((x) => duComplet(x) && (!publie || (x.candidat === publie.candidat && x.reference === publie.reference))).at(-1);
   return {
     dernier: dernier ? `${dernier.date} ${dernier.type === 'sequence' ? 'séquence ' : ''}${dernier.niveau ? `${dernier.niveau} ` : ''}${dernier.non_mesurable?.length ? 'non mesurable' : dernier.vert ? 'vert' : 'rouge'} (${dernier.empreinte})` : undefined,
-    mode: (alerte ? 'complet' : 'mecanique') as 'complet' | 'mecanique',
     alerte,
     /** Bancs à rejouer verts, après le rouge (version corrigée ou suivante), pour lever l'alerte : `court`, ou `sequence <id>`, dans l'ordre des rouges. */
     a_rejouer: [...new Set(enAttente.map((x) => (x.type === 'sequence' ? `sequence ${x.sequence ?? ''}` : 'court')))],

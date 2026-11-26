@@ -196,11 +196,13 @@ describe('publication : la dernière mesure réelle de l\'empreinte (C-1, I-7)',
   });
   // L730, garde en quatre règles (docs/v2/banc.md, règles 2 et 3) : avant, un rouge d'une autre empreinte après le vert ne comptait pas ;
   // c'est une alerte, qui tient tant que le banc rouge n'est pas rejoué vert après lui (revue 3 : sur la version corrigée, ou une suivante).
-  it('un rouge puis un vert : permise ; un rouge d\'une autre empreinte après le vert refuse, jusqu\'à ce banc rejoué vert après lui', () => {
+  // L903 (D-39) : l'alerte ne bloque plus la publication ; elle reste dans le statut.
+  it('un rouge puis un vert : permise ; un rouge d\'une autre empreinte après le vert lève une alerte, qui ne refuse plus (L903), jusqu\'à ce banc rejoué vert', () => {
     expect(ok([l({ vert: false }), l()])).toBe(true);
     const r2 = l({ vert: false, empreinte: 'e2', date: '2026-11-15T10:00:00Z' }); // après GARDE_DEPUIS : un rouge d'avant ne lève pas d'alerte
-    expect(ok([l(), r2])).toBe(false);
-    expect(ok([l(), r2, l()])).toBe(true);
+    const st = (h: string[]) => statut([...h, seq], now, 'e1', modeles);
+    expect(st([l(), r2])).toMatchObject({ publication_ok: true, a_rejouer: ['court'] });
+    expect(st([l(), r2, l()])).toMatchObject({ publication_ok: true, a_rejouer: [], alerte: undefined });
   });
   it('modèle du candidat différent de bras.yaml, ou bras.yaml illisible : refusée', () => {
     expect(ok([l()], { C: 'fable' })).toBe(false);

@@ -111,7 +111,8 @@ describe('garde de publication : cadence run contre A, sur la version à publier
     const rc = await bench(['statut'], { cwd: r, env: { BENCH_ROOT: r, HOME: r }, now: () => lundi, out: (x) => sortie.push(x), err: (x) => sortie.push(x) }, '/depot/a-publier');
     expect(rc).toBe(0);
     expect(sortie.join('\n')).not.toMatch(/WEEKEND|hebdo/i);
-    expect(sortie[0]).toMatch(/publication refusée sur l'empreinte inconnue : rejouer vert, depuis la version à publier : « node \/depot\/a-publier\/v2\/bin\/cadence2\.js bench court »/); // banc court rouge : alerte, le court à rejouer (L730, garde en quatre règles)
+    expect(sortie[0]).toMatch(/publication refusée sur l'empreinte inconnue : lancer, depuis la version à publier : « node \/depot\/a-publier\/v2\/bin\/cadence2\.js bench mecanique »/); // L903 : le mécanique publie, même pendant une alerte
+    expect(sortie).toContainEqual(expect.stringMatching(/^⚠ banc complet rouge .*« node \/depot\/a-publier\/v2\/bin\/cadence2\.js bench court »/)); // banc court rouge : alerte, le court à rejouer au week-end
   });
   it('sans --candidat, le banc mesure cadence-run (refus net si bras.yaml ne le déclare pas)', async () => {
     const r = racine([]), err: string[] = []; writeFileSync(join(r, 'bras.yaml'), `A:\n  modele: opus\n  brief: ${BRIEF}\nequipe-legere:\n  modele: opus\n  brief: ${BRIEF}\n`);

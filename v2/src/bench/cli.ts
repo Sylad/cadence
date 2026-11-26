@@ -368,19 +368,23 @@ export const commandeBanc = (repo: string, sous: string) => `node ${join(repo, '
 /** Les bras qu'exige la garde, écrits dans la commande : `bench sequence` a ses propres défauts (candidat sequence-v2). */
 const BRAS_PUBLIES = `--candidat ${PUBLIE.candidat} --reference ${PUBLIE.reference}`;
 
-/** Ce qu'il faut lancer, depuis la version à publier, pour que la garde accepte : le banc mécanique ; pendant une alerte (L730, garde en quatre règles),
- * chaque banc rouge en attente rejoué (`a_rejouer` du statut : le court, ou la séquence de cet id ; un rejeu vert lève l'alerte pour les versions suivantes aussi), puis le banc mécanique s'il manque. */
-export const pourPublier = (repo: string, aRejouer: string[] = []) => {
-  const meca = `« ${commandeBanc(repo, 'mecanique')} » (${PUBLIE.candidat} contre ${PUBLIE.reference}, sans juge, ≈ 30 min)`;
-  if (!aRejouer.length) return `lancer, depuis la version à publier : ${meca}`;
-  const cmd = (b: string) => `« ${commandeBanc(repo, b === 'court' ? 'court' : `${b} --repetitions 2 ${BRAS_PUBLIES}`)} »`;
-  return `rejouer vert, depuis la version à publier : ${aRejouer.map(cmd).join(', ')} ; puis, si la garde le demande encore, ${meca}`;
-};
+/** Ce qu'il faut lancer, depuis la version à publier, pour que la garde accepte : le banc mécanique (L903 : une alerte du banc complet ne bloque
+ * plus, ses bancs rouges se rejouent au banc complet du week-end, `rejouerAuComplet`). */
+export const pourPublier = (repo: string) => `lancer, depuis la version à publier : « ${commandeBanc(repo, 'mecanique')} » (${PUBLIE.candidat} contre ${PUBLIE.reference}, sans juge, ≈ 30 min)`;
 
-/** Les lignes ⚠ de la garde (L730) : banc complet rouge (la garde exige les bancs rouges rejoués), banc complet absent ou trop ancien. */
-export function alertesGarde(s: ReturnType<typeof statut>): string[] {
+/** Les commandes qui rejouent les bancs rouges d'une alerte (`a_rejouer` du statut : le court, ou la séquence de cet id), sur la version corrigée. */
+export const rejouerAuComplet = (repo: string, aRejouer: string[]) =>
+  aRejouer.map((b) => `« ${commandeBanc(repo, b === 'court' ? 'court' : `${b} --repetitions 2 ${BRAS_PUBLIES}`)} »`).join(', ');
+
+/** Les lignes ⚠ de la garde (L730) : banc complet rouge, absent ou trop ancien. L903 (D-39) : l'alerte ne bloque plus la publication, elle dit
+ * quels bancs rejouer au banc complet du week-end ; le hook de démarrage et le tour la reprennent (lignes qui nomment « banc complet »). */
+export const ligneAlerte = (s: ReturnType<typeof statut>, repo = REPO): string[] => (s.alerte
+  ? [`⚠ ${s.alerte} : ne bloque pas la publication (L903) ; à rejouer vert au banc complet du week-end, sur la version corrigée ou une suivante : ${s.a_rejouer.join(', ')} (${rejouerAuComplet(repo, s.a_rejouer)}) ; corriger le défaut, et revenir sur une version publiée depuis qu'il est apparu`]
+  : []);
+
+export function alertesGarde(s: ReturnType<typeof statut>, repo = REPO): string[] {
   return [
-    ...(s.alerte ? [`⚠ ${s.alerte} : la publication exige de nouveau le banc complet ; elle reste refusée tant que chaque banc rouge (${s.a_rejouer.join(', ')}) n'est pas rejoué vert après lui, sur la version corrigée ou une suivante ; corriger le défaut, et revenir sur une version publiée depuis qu'il est apparu`] : []),
+    ...ligneAlerte(s, repo),
     ...(s.jours_depuis_complet === null ? ['⚠ aucun banc complet dans l\'historique : le minuteur du samedi le lance (cadence2 bench complet, docs/v2/banc.md)']
       : s.jours_depuis_complet > COMPLET_MAX_JOURS ? [`⚠ dernier banc complet il y a ${s.jours_depuis_complet} jours : le minuteur du samedi n'a pas tourné (systemctl list-timers cadence-banc.timer)`] : []),
   ];
@@ -410,17 +414,17 @@ export async function bench(args: string[], io: Io, repo = REPO): Promise<number
   const modeles = (): Record<string, string> => { try { return Object.fromEntries(Object.values(chargerBras(racine)).map((d) => [d.nom, d.modele])); } catch { return {}; } };
   if (sous === 'statut') { // L730 : la garde est proportionnée ; une alerte du banc complet se lit ici (⚠, reprise par le hook de démarrage et le tour)
     const s = statut(hist, io.now(), emp, modeles(), PUBLIE);
-    io.out(`banc : dernier passage ${s.dernier ?? 'aucun'} ; garde : banc ${s.mode} ; publication ${s.publication_ok ? 'permise' : 'refusée'} sur l'empreinte ${emp}${s.publication_ok ? '' : ` : ${pourPublier(repo, s.a_rejouer)}`}`);
-    for (const l of alertesGarde(s)) io.out(l);
+    io.out(`banc : dernier passage ${s.dernier ?? 'aucun'} ; garde : banc mécanique ; publication ${s.publication_ok ? 'permise' : 'refusée'} sur l'empreinte ${emp}${s.publication_ok ? '' : ` : ${pourPublier(repo)}`}`);
+    for (const l of alertesGarde(s, repo)) io.out(l);
     const refus = ligneRefus(racine); if (refus) io.out(refus); // L804 : un banc complet qui n'a pas mesuré se voit au tour du lead, avec sa cause
     if (s.frais_semaine === 0) io.out('⚠ aucun banc frais cette semaine : en ajouter avec « cadence2 bench ajouter »');
     return 0;
   }
-  if (sous === 'verifier-publication') {
+  if (sous === 'verifier-publication') { // L903 : l'alerte du banc complet ne bloque plus ; elle suit la ligne du verdict, en ⚠ (cadence release la reprend)
     const s = statut(hist, io.now(), emp, modeles(), PUBLIE);
-    io.out(s.publication_ok ? `banc mécanique ou complet vert sur l'empreinte ${emp}` // permise : aucune alerte ne tient (le mode est alors mécanique)
-      : s.mode === 'complet' ? `publication refusée sur l'empreinte ${emp} : ${s.alerte} ; tant qu'une alerte tient, rien ne publie : chaque banc rouge (${s.a_rejouer.join(', ')}) doit être rejoué vert après lui (version corrigée ou suivante), ${PUBLIE.candidat} contre ${PUBLIE.reference}, même modèle ; ${pourPublier(repo, s.a_rejouer)}`
-        : `publication refusée sur l'empreinte ${emp} : il faut le dernier banc mécanique (${LIBELLE_COURT}) vert, ${PUBLIE.candidat} contre ${PUBLIE.reference}, même modèle, sans passage rouge après lui ; ${pourPublier(repo)}`);
+    io.out(s.publication_ok ? `banc mécanique ou complet vert sur l'empreinte ${emp}`
+      : `publication refusée sur l'empreinte ${emp} : il faut le dernier banc mécanique (${LIBELLE_COURT}) vert, ${PUBLIE.candidat} contre ${PUBLIE.reference}, même modèle, sans passage rouge (micro, mécanique, éclair) après lui ; ${pourPublier(repo)}`);
+    for (const l of ligneAlerte(s, repo)) io.out(l);
     return s.publication_ok ? 0 : 1;
   }
   if (sous === 'ajouter') {

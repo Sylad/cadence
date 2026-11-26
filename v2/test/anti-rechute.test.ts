@@ -273,8 +273,10 @@ function reglesC5(f: Fichiers): string[] {
   if (!/m\.candidat !== m\.reference/.test(t)) v.push('C5 : la publication accepte un candidat égal à la référence (A contre A)');
   if (!/\n\s*&& seqOk\(seqs, \(s\) => reel\(s\) && s\.vert && s\.candidat === m\.candidat && s\.modele_candidat === m\.modele_candidat\)[,;]/.test(t))
     v.push('C5 : la publication ne demande plus une séquence verte (R30)');
-  // L730 (D-22, garde en quatre règles, docs/v2/banc.md) : tant qu'une alerte tient, rien ne publie, ni le mécanique ni un banc complet vert
-  if (!/enAttente\.length === 0 && \(mecaOk \|\| completOk\)/.test(t)) v.push('C5 : une alerte du banc complet n\'empêche plus la publication (L730)');
+  // L903 (D-39, décision de Sylvain du 26-11, docs/v2/banc.md règle 3) : une alerte du banc complet ne bloque plus la publication ; le mécanique
+  // vert (ou le banc complet vert) de l'empreinte reste exigé, et un rouge micro, mécanique ou éclair après lui refuse toujours
+  if (!/publication_ok: empreinte !== 'inconnue' && \(mecaOk \|\| completOk\) \}/.test(t)) v.push('C5 : la publication ne suit plus le seul banc mécanique ou complet vert (une alerte la bloque de nouveau, ou plus rien ne l\'exige) (L903)');
+  if (!/\(!x\.vert && !duComplet\(x\)\) \|\| x\.eclair_ok === false/.test(t)) v.push('C5 : un rouge micro, mécanique ou éclair après le mécanique vert ne refuse plus la publication (L903)');
   // L730 (revues) : une alerte ne tombe que si CE banc est rejoué vert : la même séquence (même id), écrite APRÈS le rouge (revue 3 : sur toute
   // empreinte postérieure, pas seulement celle à publier)
   if (!/y\.type === 'sequence' && \(y\.sequence \?\? ''\) === \(rg\.sequence \?\? ''\)/.test(t)) v.push('C5 : une séquence rouge est levée par une autre séquence (L730, revue)');
@@ -365,8 +367,9 @@ const mutations: [string, string, string, (t: string) => string][] = [
   ['C5', 'séquence : pièces lues neutralisé', 'src/sequence/verdict.ts', remplace('lc.entieres === lc.t)', 'lc.entieres >= 0)')],
   ['C5', 'séquence : pente non mesurée verte', 'src/sequence/verdict.ts', remplace("'non mesuré', `≤ ${ref}`, false)", "'non mesuré', `≤ ${ref}`, true)")],
   ['C5', 'publication sans séquence', 'src/bench/verdict.ts', remplace(/\n\s*&& seqOk\([^\n]*\);/, ';')],
-  ['C5', 'alerte du banc complet ignorée (L730)', 'src/bench/verdict.ts', remplace('enAttente.length === 0 && (mecaOk || completOk)', '(mecaOk || completOk)')],
-  ['C5', 'banc complet vert sans le banc rouge pendant une alerte (L730, revue 2)', 'src/bench/verdict.ts', remplace('enAttente.length === 0 && (mecaOk || completOk)', '(enAttente.length === 0 && mecaOk) || completOk')],
+  ['C5', 'alerte du banc complet de nouveau bloquante (L903)', 'src/bench/verdict.ts', remplace("empreinte !== 'inconnue' && (mecaOk || completOk)", "empreinte !== 'inconnue' && enAttente.length === 0 && (mecaOk || completOk)")],
+  ['C5', 'publication sans banc mécanique ni complet vert (L903)', 'src/bench/verdict.ts', remplace("empreinte !== 'inconnue' && (mecaOk || completOk)", "empreinte !== 'inconnue'")],
+  ['C5', 'mécanique rouge après le vert ignoré (L903)', 'src/bench/verdict.ts', remplace('(!x.vert && !duComplet(x)) || x.eclair_ok === false', 'x.eclair_ok === false')],
   ['C5', 'séquence rouge levée par une autre séquence (L730, revue)', 'src/bench/verdict.ts', remplace(" && (y.sequence ?? '') === (rg.sequence ?? '')", '')],
   ['C5', 'banc rouge levé par un vert d\'avant lui (L730, revue 3)', 'src/bench/verdict.ts', remplace('h.slice(h.indexOf(rg) + 1).filter(duComplet)', 'h.filter(duComplet)')],
   ['C5', 'séquence : || true sur le every final', 'src/sequence/verdict.ts', remplace('x.ok || !x.bloquant)', 'x.ok || !x.bloquant || true)')],

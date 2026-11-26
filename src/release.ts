@@ -322,16 +322,19 @@ function steps(p: Planned, files: string[], branch: string): string[] {
  * 10-11 (décision de Sylvain) : le dernier passage seul ne distingue pas deux bras identiques (banc court A contre A rouge à ×2,2) ;
  * à défaut de banc vert, un dossier de publication versionné (`docs/v2/publications/<version>.md`) qui cite l'empreinte exacte
  * et les mesures bras par bras (critères du candidat, cumul sur ≥ 3 comparaisons) vaut décision. Le cumul automatique viendra avec L689.
- * L730 (D-22) : la garde est proportionnée ; `verifier-publication` se contente du banc mécanique (≈ 30 min) ; après un banc complet rouge,
- * il refuse tout tant que ce banc n'est pas rejoué vert après le rouge, sur la version corrigée ou une suivante (quatre règles, docs/v2/banc.md).
+ * L730 (D-22) : la garde est proportionnée ; `verifier-publication` se contente du banc mécanique (≈ 30 min).
+ * L903 (D-39, Sylvain du 26-11) : un banc complet rouge ne bloque plus ; son alerte (lignes ⚠ de `verifier-publication`) est rendue pour que
+ * `cadence release` l'affiche avec les bancs à rejouer au banc complet du week-end (quatre règles, docs/v2/banc.md).
+ * Rend les lignes ⚠ de la garde quand la publication est permise ; lève sinon.
  */
-export function gardeBancV2(version: string, verifier: () => { code: number; sortie: string }, dossier?: (version: string) => string | undefined): void {
-  if (Number(version.split('.')[0]) < 2) return;
+export function gardeBancV2(version: string, verifier: () => { code: number; sortie: string }, dossier?: (version: string) => string | undefined): string[] {
+  if (Number(version.split('.')[0]) < 2) return [];
   const r = verifier();
-  if (r.code === 0) return;
+  const alertes = r.sortie.split('\n').map((l) => l.trim()).filter((l) => l.startsWith('⚠'));
+  if (r.code === 0) return alertes;
   const emp = /empreinte ([0-9a-f]{12})\b/.exec(r.sortie)?.[1];
   const texte = dossier?.(version);
-  if (emp && texte !== undefined && new RegExp(`^Empreinte de v2 : ${emp}$`, 'm').test(texte)) return;
+  if (emp && texte !== undefined && new RegExp(`^Empreinte de v2 : ${emp}$`, 'm').test(texte)) return alertes;
   const raison = texte === undefined ? `ni dossier ${PUBLICATIONS}/${version}.md` : `et le dossier ${PUBLICATIONS}/${version}.md ne cite pas l'empreinte ${emp ?? '?'} (ligne « Empreinte de v2 : … »)`;
   throw new RafError(`release : ${version} demande un banc vert sur cette version de v2, ${raison} — ${r.sortie.trim() || 'cadence2 introuvable'}`);
 }
@@ -384,7 +387,7 @@ export function release(rest: string[], dryRun: boolean, root: string, today: Da
   if (rest.length !== 1 || !bump || !BUMPS.includes(bump)) throw new RafError('usage : cadence release patch|minor|major [--dry-run]');
   const p = plan(root, bump, today);
   refuseUnknownWhatsNew(root);
-  gardeBancV2(p.version, () => {
+  const alertesBanc = gardeBancV2(p.version, () => {
     const r = spawnSync('node', [join(root, 'v2', 'bin', 'cadence2.js'), 'bench', 'verifier-publication'], { cwd: root, encoding: 'utf8', timeout: 60_000 });
     const delai = r.error || r.signal ? `cadence2 n'a pas répondu en 60 s (${r.error?.message ?? r.signal}) — ` : '';
     return { code: r.status ?? 1, sortie: `${delai}${r.stdout ?? ''}${r.stderr ?? ''}` };
@@ -400,6 +403,7 @@ export function release(rest: string[], dryRun: boolean, root: string, today: Da
   const branch = inGit('la lecture de la branche', () => currentBranch(root)) ?? 'main';
 
   out(`${dryRun ? 'release (--dry-run, rien n\'est écrit)' : 'release'} : ${p.current} → ${p.version}`);
+  alertesBanc.forEach((a) => out(`  ${a}`)); // L903 : l'alerte du banc complet ne bloque plus, elle se lit ici
   for (const x of p.autres) out(`  ${x}`);
   for (const f of p.files) out(releaseFileLine(f, { version: p.version, today, removes: p.removes, dryRun }));
   if (!dryRun) {

@@ -17,8 +17,8 @@ function depot(script?: string): string {
   return d;
 }
 const STATUT = [
-  'banc : dernier passage … ; garde : banc complet ; publication refusée',
-  "⚠ banc complet rouge le 2026-11-14 sur l'empreinte e1 (banc court : temps total) : la publication exige de nouveau le banc complet",
+  'banc : dernier passage … ; garde : banc mécanique ; publication permise',
+  "⚠ banc complet rouge le 2026-11-14 sur l'empreinte e1 (banc court : temps total) : ne bloque pas la publication (L903) ; à rejouer vert au banc complet du week-end : court",
   '⚠ aucun banc frais cette semaine : en ajouter avec « cadence2 bench ajouter »',
 ].join('\n');
 
@@ -26,7 +26,7 @@ describe('lead tour : l\'alerte du banc complet (L730)', () => {
   it('reprend les seules lignes ⚠ du banc complet, au nom du dépôt ; un dépôt sans v2 construit ne lance rien', () => {
     const avec = depot(''), sans = depot(), lances: string[] = [];
     const lire: StatutBanc = (cli) => { lances.push(cli); return { code: 0, sortie: STATUT }; };
-    expect(tourBancLines([avec, sans], {}, lire)).toEqual([`⚠ ${basename(avec)} · banc complet rouge le 2026-11-14 sur l'empreinte e1 (banc court : temps total) : la publication exige de nouveau le banc complet`]);
+    expect(tourBancLines([avec, sans], {}, lire)).toEqual([`⚠ ${basename(avec)} · banc complet rouge le 2026-11-14 sur l'empreinte e1 (banc court : temps total) : ne bloque pas la publication (L903) ; à rejouer vert au banc complet du week-end : court`]);
     expect(lances).toEqual([join(avec, 'v2', 'bin', 'cadence2.js')]);
   });
   it('rien quand le statut n\'a pas d\'alerte', () => {
@@ -38,7 +38,7 @@ describe('lead tour : l\'alerte du banc complet (L730)', () => {
   });
   it('de bout en bout : lance vraiment `cadence2.js bench statut` du dépôt, avec l\'environnement du tour', () => {
     const d = depot(`if (process.argv.slice(2).join(' ') !== 'bench statut') process.exit(3);\nconsole.log(${JSON.stringify(STATUT)}.replace('e1', process.env.EMPREINTE));\n`);
-    expect(tourBancLines([d], { ...process.env, EMPREINTE: 'abc' })).toEqual([`⚠ ${basename(d)} · banc complet rouge le 2026-11-14 sur l'empreinte abc (banc court : temps total) : la publication exige de nouveau le banc complet`]);
+    expect(tourBancLines([d], { ...process.env, EMPREINTE: 'abc' })).toEqual([`⚠ ${basename(d)} · banc complet rouge le 2026-11-14 sur l'empreinte abc (banc court : temps total) : ne bloque pas la publication (L903) ; à rejouer vert au banc complet du week-end : court`]);
     const casse = depot('process.exit(4)');
     expect(tourBancLines([casse], process.env)).toEqual([`${basename(casse)} · garde du banc : statut illisible (code 4)`]);
   });

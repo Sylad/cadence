@@ -4563,9 +4563,10 @@ lots:
     finished: 2026-11-26
   - id: L877
     title: "Banc de séquence : cadence-run vérifie une sortie attendue de moins que A sur les deux séquences du 25-26-11 (aether-b68-court 3/8 contre 4/8, aether-b68 8/12 contre 9/12) — lire dans les rapports JSON quelles sorties manquent et à quelle étape, établir la cause (brief du run, lecture de la demande, porte) et proposer le correctif. Mesure : sorties attendues ≥ A sur les deux séquences rejouées"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-26
+    started: 2026-11-26
   - id: L878
     title: "Mesurer le bruit de la pente de duplication par une séquence A contre A-bis et remplacer la borne écrite BRUIT_PENTE_DUPLICATION = 0,1 point (L876, v2/src/sequence/verdict.ts:12) par l'écart mesuré, comme MARGE_CACHES (banc.md:43-45). Vécu 26-11 : revue de L876, borne > tout le mouvement de A (0,07). Mesure : borne issue d'au moins 2 paires A/A-bis."
     status: todo

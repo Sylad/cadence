@@ -442,6 +442,10 @@ function noterNouveautes(e: Etat): void {
 }
 
 /** Les réglages de session d'un worktree retiré (aussi par --clore, clore.ts). */
+// Le brief du bras tel que cadence run l'envoie, avant les gabarits : choix du registre, commandes cadence permises, ligne « Taille » retirée
+// (elle sert au banc ; dans un vrai dépôt, elle casserait commitlint). Exportée pour que les tests de brief suivent les mêmes filtres (L877).
+export const briefEnvoye = (brut: string, registre: string | undefined, o: { specCheck?: boolean; analyse?: boolean } = {}) =>
+  briefRegistre(registre)(leverPourCadence(brut, o)).split('\n').filter((l) => !l.startsWith('- Taille fixée par le gardien')).join('\n');
 export const oublierReglages = (worktree: string) => { libererReglages(worktree); rmSync(`${worktree}.reglages`, { recursive: true, force: true }); };
 /** Retire le worktree, la branche et les réglages d'un run intégré : tout son travail est sur la cible. */
 function retirerRun(e: Etat): void {
@@ -502,12 +506,11 @@ export function executerRun(a: { id?: string; repo: string; demande: string; pie
   a.out(`cadence run ${id} : session ${modeleDit(modele, depart.raison)} en mode ${aig.mode} (${aig.raison}) dans ${worktree}${aig.migration ? ` ; cadence.yaml : ${aig.migration}` : ''}`);
   if (sales.length) a.out(`cadence run ${id} : l'arbre principal a des modifications non commitées (hors plan en attente) : ${nommerFichiers(sales)} — le run part de `
     + `${e.base.slice(0, 7)} sans elles ; les commiter sur ${cible} pendant le run est refusé pour un fichier que le run touche (L796), et un fichier que le run change aussi fera échouer l'intégration`);
-  // La ligne « Taille » du brief sert au banc (taille déclarée) ; dans un vrai dépôt, elle casserait commitlint : retirée.
   const nouveautes = a.lot && visible ? consigneNouveautes(a.lot, { maintenant: (a.maintenant ?? (() => new Date()))(), regenere: aRegenerer(worktree) }) : '';
   const demande = `${a.demande}\n\n${a.lot ? `Lot du plan : ${a.lot}. Cite-le dans chaque message de commit, selon les conventions de commit du dépôt (par exemple feat(${a.lot}): …).\n\n` : ''}${nommees.texte}${nouveautes}`
     + preparerRegistre(worktree, a.registre, { demande: a.demande, lot: a.lot, run: id }); // L701 : la demande de l'humain seule entre au registre
   const brut = readFileSync(aig.bras.brief, 'utf8');
-  const brief = briefRegistre(a.registre)(leverPourCadence(brut, { specCheck: nommees.nommeSpec, analyse: nommees.analyse })).split('\n').filter((l) => !l.startsWith('- Taille fixée par le gardien')).join('\n').replaceAll('{{DEMANDE}}', demande).replaceAll('{{CLONE}}', worktree)
+  const brief = briefEnvoye(brut, a.registre, { specCheck: nommees.nommeSpec, analyse: nommees.analyse }).replaceAll('{{DEMANDE}}', demande).replaceAll('{{CLONE}}', worktree)
     .replaceAll('{{QUESTION}}', `${worktree}.question.md`).replaceAll('{{BASE}}', e.base).replaceAll('{{TAILLE}}', e.taille);
   const o = { exec: a.exec, out: a.out, sansPorte: a.sansPorte, raf: a.raf, maintenant: a.maintenant, attendre: a.attendre };
   try { return attendreQuota(tenu(e, o, () => (session(e, brief, o, true) ? suite(e, o) : fin(e, o))), o); } finally { rendreVerrou(fichierVerrou(e.fichier)); }

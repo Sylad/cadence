@@ -1,6 +1,7 @@
 // L877 : bancs aether-b68-court r1/r2 et aether-b68 r1 du 25-11. Sortie attendue « grand D rouge / grand A bleu au réglage par
 // défaut » : cadence-run 0/3, A 2/3. Les trois sessions cadence-run (brief v2d, norme lue en entier) ont ajouté les grandes lettres
-// comme second style, le style normé restant le défaut ; le 22-11 déjà (docs/etudes/banc-b68-court-2026-11-22.md § 3). Le brief v2d
+// comme second style, le style normé restant le défaut. Sur les 7 passages des 22 et 25-11, ce geste revient 5 fois chez cadence-run
+// et 3 fois chez A : un écart, pas une règle (docs/etudes/banc-b68-2026-11-25.md § 2). Le brief v2d
 // dit désormais que la demande fixe le résultat visible par défaut, et qu'une référence ne la réduit pas à une option.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

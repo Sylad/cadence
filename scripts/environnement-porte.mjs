@@ -4,13 +4,13 @@
 // et la porte d'un `cadence run` (v2/src/run/run.ts). JavaScript sans dépendance, comme arbre-non-commite.mjs ; sa déclaration est environnement-porte.d.mts.
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 
 /** La variable qui fait jouer la porte malgré un environnement périmé (un faux positif ne bloque jamais une porte). */
 export const JOUER_QUAND_MEME = 'CADENCE_PORTE_ENV';
 
-/** Profondeur des dossiers lus sous la racine de la porte (backend/, frontend/, packages/x/). */
-const PROFONDEUR = 3;
+// L907 : plus de profondeur bornée — chaque package-lock.json du dépôt est lu, à quelque niveau qu'il soit (le 26-11, seul services/api de maritime
+// avait été vu). Les dépendances (node_modules), .git, les dossiers cachés et les sorties de construction ne sont pas parcourus.
 const SAUTES = new Set(['node_modules', '.git', '.cadence-run', '.venv', 'dist']);
 /** Écarts nommés par dossier ; au-delà, leur compte. */
 const NOMMES = 5;
@@ -23,11 +23,10 @@ const lireJson = (f) => {
   }
 };
 
-/** La racine et ses sous-dossiers jusqu'à PROFONDEUR, hors dépendances et dossiers de cadence. */
+/** La racine et tous ses sous-dossiers, hors dépendances, dossiers cachés et dossiers de cadence. */
 function dossiers(racine) {
   const vus = [racine];
-  const descendre = (d, n) => {
-    if (n >= PROFONDEUR) return;
+  const descendre = (d) => {
     let entrees;
     try {
       entrees = readdirSync(d, { withFileTypes: true });
@@ -37,31 +36,69 @@ function dossiers(racine) {
     for (const x of entrees) {
       if (!x.isDirectory() || SAUTES.has(x.name) || x.name.startsWith('.')) continue;
       vus.push(join(d, x.name));
-      descendre(join(d, x.name), n + 1);
+      descendre(join(d, x.name));
     }
   };
-  descendre(racine, 0);
+  descendre(racine);
   return vus;
 }
 
 const nomDe = (cle) => cle.slice(cle.lastIndexOf('node_modules/') + 'node_modules/'.length);
 
 /**
- * (a) Les paquets dont la version installée (node_modules/.package-lock.json, écrit par npm à chaque installation) n'est pas celle de package-lock.json,
- * et ceux que le lockfile demande sans qu'ils soient installés (hors optionnels). [] quand node_modules est à jour ou qu'on ne peut rien en dire
- * (pas de node_modules, pas de lockfile v2+, pas de lockfile caché : installé par un autre outil).
+ * (a) Les paquets dont la version installée n'est pas celle de package-lock.json, et ceux que le lockfile demande sans qu'ils soient installés
+ * (hors optionnels). Deux lectures réunies : node_modules/.package-lock.json (écrit par npm à chaque installation, tous les paquets), et (L907) le
+ * package.json installé de chaque dépendance directe (node_modules/<nom>/package.json), qui ne dépend pas du lockfile caché : le 26-11, maritime avait
+ * frontend/node_modules/maplibre-gl en 5.24.0 contre 6.19.0 au lockfile et la porte n'en a rien dit. [] quand node_modules est à jour ou qu'on ne
+ * peut rien en dire (pas de node_modules, pas de lockfile v2+).
  */
 export function ecartsLockfile(dossier) {
   const verrou = lireJson(join(dossier, 'package-lock.json'));
+  if (!verrou?.packages || !existsSync(join(dossier, 'node_modules'))) return [];
   const cache = lireJson(join(dossier, 'node_modules', '.package-lock.json'));
-  if (!verrou?.packages || !cache?.packages) return [];
-  return Object.entries(verrou.packages).map(([cle, voulu]) => ecart(cle, voulu, cache.packages[cle])).filter(Boolean);
+  const ecarts = new Map();
+  if (cache?.packages) {
+    for (const [cle, voulu] of Object.entries(verrou.packages)) {
+      const e = ecart(cle, voulu, cache.packages[cle]);
+      if (e) ecarts.set(cle, e);
+    }
+  }
+  for (const nom of directes(verrou)) {
+    const cle = `node_modules/${nom}`, voulu = verrou.packages[cle];
+    if (!voulu || ecarts.has(cle)) continue;
+    const e = ecart(cle, voulu, installeDirect(dossier, nom));
+    if (e) ecarts.set(cle, e);
+  }
+  return [...ecarts.values()];
+}
+
+/** Les dépendances directes déclarées à la racine du lockfile (dependencies, devDependencies, optionalDependencies). */
+function directes(verrou) {
+  const racine = verrou.packages[''] ?? {};
+  return [...new Set(['dependencies', 'devDependencies', 'optionalDependencies'].flatMap((k) => Object.keys(racine[k] ?? {})))];
+}
+
+/**
+ * Le paquet `nom` tel que Node le trouve depuis `dossier` : son package.json sous le node_modules le plus proche en remontant les dossiers (un node_modules
+ * qui ne garde que des caches, comme v2/ de cadence, laisse Node le chercher au-dessus) ; undefined s'il n'est nulle part. Un package.json illisible
+ * n'est pas jugé.
+ */
+function installeDirect(dossier, nom) {
+  for (let d = resolve(dossier); ; d = dirname(d)) {
+    const f = join(d, 'node_modules', nom, 'package.json');
+    if (existsSync(f)) {
+      const pj = lireJson(f);
+      return pj ? { version: pj.version } : { version: undefined, illisible: true };
+    }
+    if (dirname(d) === d) return undefined;
+  }
 }
 
 /** L'écart d'un paquet du lockfile (`voulu`) à ce qui est installé ; null s'il n'y en a pas, ou si le paquet n'est pas une dépendance installée par npm. */
 function ecart(cle, voulu, installe) {
   if (!cle.includes('node_modules/') || voulu.link || voulu.inBundle) return null;
   if (!installe) return voulu.optional || voulu.devOptional ? null : `${nomDe(cle)} absent (${voulu.version ?? '?'} au lockfile)`;
+  if (installe.illisible) return null;
   return voulu.version && installe.version !== voulu.version ? `${nomDe(cle)} ${installe.version ?? '?'} installé, ${voulu.version} au lockfile` : null;
 }
 

@@ -441,11 +441,8 @@ function noterNouveautes(e: Etat): void {
   e.nouveautes = { entrees, manquante: entrees?.length === 0 };
 }
 
+export const briefEnvoye = (brut: string, registre: string | undefined, o: { specCheck?: boolean; analyse?: boolean } = {}) => briefRegistre(registre)(leverPourCadence(brut, o)).split('\n').filter((l) => !l.startsWith('- Taille fixée par le gardien')).join('\n'); // L877 : brief envoyé par cadence run (registre, commandes cadence permises, ligne « Taille » du banc retirée : elle casserait commitlint)
 /** Les réglages de session d'un worktree retiré (aussi par --clore, clore.ts). */
-// Le brief du bras tel que cadence run l'envoie, avant les gabarits : choix du registre, commandes cadence permises, ligne « Taille » retirée
-// (elle sert au banc ; dans un vrai dépôt, elle casserait commitlint). Exportée pour que les tests de brief suivent les mêmes filtres (L877).
-export const briefEnvoye = (brut: string, registre: string | undefined, o: { specCheck?: boolean; analyse?: boolean } = {}) =>
-  briefRegistre(registre)(leverPourCadence(brut, o)).split('\n').filter((l) => !l.startsWith('- Taille fixée par le gardien')).join('\n');
 export const oublierReglages = (worktree: string) => { libererReglages(worktree); rmSync(`${worktree}.reglages`, { recursive: true, force: true }); };
 /** Retire le worktree, la branche et les réglages d'un run intégré : tout son travail est sur la cible. */
 function retirerRun(e: Etat): void {

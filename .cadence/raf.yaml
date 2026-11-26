@@ -4726,10 +4726,14 @@ lots:
     created: 2026-11-26
   - id: L903
     title: "D-39 Garde de publication en semaine : une alerte du banc complet (rouge) ne bloque plus la publication en semaine. Le banc mécanique vert de l'empreinte suffit, avec l'alerte affichée dans la release et au tour, et les bancs rouges se rejouent au banc complet du week-end suivant. Changer la règle 3 de docs/v2/banc.md, verdict.ts (verifier-publication) et ses tests. Vécu 26-11 : 2.0.19 bloquée par l'alerte du banc complet du matin, rejeu demandé de 5 à 6 h (« presque une journée de taf »). Mesure : 0 h de dépôt cadence tenu par un banc en semaine ; délai entre lot clos et publication < 1 h."
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-26
     started: 2026-11-26
+    review: { date: 2026-11-26, verdict: conforme, commit: 64e5d65f128740c85a32dce49b2fef0fd7e655c8 }
+    notes:
+      - { date: 2026-11-26, text: "revue du lead 26-11 conforme ; choix accepté : un banc complet rouge après le mécanique vert ne retire plus la publication (sinon le cas samedi rouge resterait bloquant, contraire à D-39). Vérifié sur le vrai historique après build de v2 : refus faute de mécanique sur 731ad45d5f4c, ligne ⚠ « ne bloque pas la publication (L903) » avec les bancs du week-end." }
+    finished: 2026-11-26
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

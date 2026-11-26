@@ -132,6 +132,8 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // L817 : hooks 419 (+36) : un echo n'est effacé que si sa sortie va à un fichier ou à un filtre qui ne lit pas (FILTRE), jamais dans $(…) ni un sous-shell ;
   // Grep et les commandes récursives (find ~) lisent tout sous leur dossier, un glob qui peut viser une zone (ls ~/proj*) est certain, cd seul va dans ~ et un
   // nom nu est relatif depuis un dossier qui contient une zone (peutViser, recursive) ; l'argument d'une option de grep ou rg n'est pas le motif, sans ligne tassée.
+  // L872 (revue M1) : hooks 448 (+29), deliver 421 (-29, module absent de src/, total du noyau inchangé) : un « /* » ou « /** » n'est retiré que s'il ouvre
+  // un commentaire cité comme texte (cites, COMMENTAIRE, sansCommentaires) ; globstar, zsh et recursive=True gardent tout, sans ligne tassée.
   it('les totaux sont ceux de R29 : noyau 3000, mesure 2585 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742, L752, L756, L762, L775, L777, L798, L804)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
     expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2585]);

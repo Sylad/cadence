@@ -209,11 +209,40 @@ function peutViser(p, pre, z) {
   return true;
 }
 
+/** L872 : positions de `t` que le shell ne développe pas en chemins : corps d'un heredoc et texte entre guillemets. */
+function cites(t) {
+  const dans = new Uint8Array(t.length);
+  for (const m of t.matchAll(/<<-?\s*['"]?(\w+)['"]?[^\n]*\n[\s\S]*?\n\s*\1(?=\n|$)/g)) {
+    dans.fill(1, m.index + m[0].indexOf('\n') + 1, m.index + m[0].length);
+  }
+  for (let i = 0, q = ''; i < t.length; i++) {
+    if (dans[i] && !q) continue; // corps d'un heredoc : ses guillemets sont ceux du script
+    if (q && t[i] === q) q = '';
+    else if (q) {
+      dans[i] = 1;
+      if (q === '"' && t[i] === '\\') dans[++i] = 1;
+    } else if (t[i] === '\\') i++;
+    else if (t[i] === "'" || t[i] === '"') q = t[i];
+  }
+  return dans;
+}
+/** L872 : ouverture d'un commentaire C, JS, TS, Java ou CSS : « /* R14 », « /** Texte », « /**\n * … » (saut réel ou « \n » écrit), ou « /** » seul
+ * entre guillemets après une indentation (« "  /**" », ancre d'un script python). Un « /* » suivi d'un « ; », d'un « | » ou d'un chemin n'en est pas un. */
+const COMMENTAIRE = /\/\*\*?(?=[ \t]+[\p{L}\p{N}«]|(?:\n|\\n)[ \t]*\*(?!\/))|(?<=(['"])[ \t]+)\/\*\*?(?=\1)/gu;
+/** L872 : la commande sans les marqueurs de commentaire qu'elle cite comme TEXTE (heredoc, guillemets : `sed "s|… /* R14 *\/ …|"`, script python) ; un
+ * « /* » ou « /** » argument du shell (`for f in /**`, `echo /* | xargs …`, `bash -c 'cat /**'`) reste lu. Rien n'est retiré quand globstar, zsh ou
+ * `recursive=True` peuvent faire de « /** » une lecture de toute la racine. Aux bancs du 25-11, les 47 appels relevés « / » étaient tous de ces marqueurs. */
+function sansCommentaires(t) {
+  if (/globstar|\bzsh\b|recursive\s*=\s*True/.test(t)) return t;
+  const dans = cites(t);
+  return t.replace(COMMENTAIRE, (m, _q, i) => (dans[i] ? ' '.repeat(m.length) : m));
+}
+
 /** Chemins absolus (globs gardés) que LIT un appel d'outil : ses champs de chemin (file_path, path, notebook_path ; le motif d'un Glob, depuis son
  * `path`), relatifs au dossier courant, et pour Bash le dossier courant et la commande sans ses textes écrits (commandeLue), avec ses chemins relatifs,
  * ses `cd` et ses accolades. Jamais un contenu écrit ni un motif de recherche. `cwd` : dossier courant de l'appel ; `depart` : à défaut de cwd.
  * L817 : Grep et une commande récursive lisent aussi tout sous leurs dossiers (`<d>/**`) ; `cd` seul va dans ~ ; depuis un dossier qui contient une zone
- * de `certains` (après `cd ~`), tout nom est un chemin relatif (« ls projects »). L872 : « /* » ou « /** » nu, non récursif, n'est que « / ». */
+ * de `certains` (après `cd ~`), tout nom est un chemin relatif (« ls projects »). L872 : sans les marqueurs de commentaire cités (sansCommentaires). */
 export function* cheminsCites(name, input, cwd, depart, home, certains = []) {
   const abs = typeof cwd === 'string' && isAbsolute(cwd), base = abs ? cwd : depart;
   const absolu = (v, d) => (/^(~|\$HOME)(\/|$)/.test(v) ? resolve(home, v.replace(/^(~|\$HOME)\/?/, '')) : resolve(d, v));
@@ -225,7 +254,7 @@ export function* cheminsCites(name, input, cwd, depart, home, certains = []) {
   if (abs) yield resolve(cwd);
   if (typeof input?.command !== 'string') return;
   let dir = base;
-  for (const seg of commandeLue(input.command).replace(/\$\{HOME\}/g, '$HOME').split(/&&|\|\||;|\n/)) {
+  for (const seg of sansCommentaires(commandeLue(input.command)).replace(/\$\{HOME\}/g, '$HOME').split(/&&|\|\||;|\n/)) {
     for (const v of accolades(seg)) {
       const cd = /^\s*cd(?:\s+(\S+)|\s*$)/.exec(v), nu = certains.some((z) => z.startsWith(dir === '/' ? '/' : `${dir}/`));
       const cible = cd ? (cd[1] ? resoudre(cd[1].replace(/^['"]|['"]$/g, ''), dir, home, true, true) : home) : null;
@@ -233,7 +262,7 @@ export function* cheminsCites(name, input, cwd, depart, home, certains = []) {
         const nom = /^\s*(?:\w+=\S*\s+)*(\S+)/.exec(etape)?.[1].replace(/^.*\//, '') ?? '', rec = recursive(nom, etape);
         let explicite = false;
         for (const tok of etape.split(/[\s'"`&<>(){}=]+/)) {
-          const e = !rec && /^\/\*+(\\[a-z])*$/.test(tok) ? '/' : resoudre(tok, dir, home, true), p = e ?? (nu && /^[^-$]/.test(tok) ? resolve(dir, tok) : null);
+          const e = resoudre(tok, dir, home, true), p = e ?? (nu && /^[^-$]/.test(tok) ? resolve(dir, tok) : null);
           if (!p) continue;
           explicite ||= !!e;
           yield p;

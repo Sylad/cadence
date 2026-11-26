@@ -383,3 +383,32 @@ describe('L808 : lecture hors du clone refusée au banc, avec la règle du déte
     expect(s.hooks.PreToolUse[0].matcher.split('|')).toEqual(expect.arrayContaining(['Read', 'Glob', 'Grep', 'Bash', 'Edit', 'Write']));
   });
 });
+
+// L872 (revue M1) : le hook partage la règle du détecteur. Un marqueur de commentaire cité comme texte (sed, heredoc python, relevés du 25-11) passe ;
+// un « /* » ou « /** » que le shell ou un interprète développe en lecture de la racine reste refusé, et compté par le détecteur.
+describe('L872 : « /* » et « /** » au banc, côté hook', () => {
+  const borne = (m: Monde) => ({ ...env(m, []), CADENCE_LECTURE_BORNEE: 'b' });
+  const bashE = (m: Monde, command: string) => ({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command }, transcript_path: m.t, cwd: m.clone });
+  it('marqueurs de commentaire des journaux du 25-11 (sed, heredoc python, « \\n » écrit, ancre indentée) : permis et non comptés', () => {
+    const m = monde(); m.ecrire([]);
+    const home = join(m.r, 'home'), regles = reglesDuBras(home, m.r, 'b', m.clone);
+    for (const command of [
+      `cd ${m.clone}/frontend; sed -i "s|sigwxCentre: this.sigwxCentre() /\\* R14 \\*/, ...(this.engineKind()|sigwxCentre: this.sigwxCentre() /* R14 */, pressureCentresLang: this.pressureCentresLang() /* B68 */, ...(this.engineKind()|" src/app/pages/globe/globe.component.ts`,
+      `cd ${m.clone}/frontend/src/app; python3 - <<'EOF'\np='services/arrows.service.ts'\ns=open(p).read()\ns=s.replace("""/**\n * Sert le manifest + résolveur""","""/** Écart maximal entre le curseur et un fichier de flèches. */\n/**\n * Sert le manifest + résolveur""",1)\nopen(p,'w').write(s)\nEOF`,
+      `cd ${m.clone}; python3 - <<'EOF'\nanchor="/**\\n * R-M11 (revue R-M8, L3)"\nold=s[s.index("  /**", s.index("private setArrowsDrawn("))]\nEOF`,
+    ]) {
+      expect([command, hook(bashE(m, command), borne(m)).code]).toEqual([command, 0]);
+      expect([command, chercherFuites([appel('Bash', { command })], regles, home, m.clone).certaines]).toEqual([command, []]);
+    }
+  });
+  it('revue M1 : globstar, bash -O globstar, zsh, glob python récursif, for f in /**, echo /* | xargs : refusés et comptés « / »', () => {
+    const m = monde(); m.ecrire([]);
+    const home = join(m.r, 'home'), regles = reglesDuBras(home, m.r, 'b', m.clone);
+    for (const command of ['shopt -s globstar; grep secret /**', "bash -O globstar -c 'grep -l secret /**'", "zsh -c 'cat /**'",
+      'python3 -c \'import glob;print(glob.glob("/**", recursive=True))\'', 'for f in /**; do cat $f; done', 'echo /* | xargs grep -rl secret', 'grep -r secret /*']) {
+      const r = hook(bashE(m, command), borne(m));
+      expect([command, r.code]).toEqual([command, 2]); expect(r.stderr).toMatch(/hors de ton dépôt/);
+      expect([command, chercherFuites([appel('Bash', { command })], regles, home, m.clone).certaines]).toEqual([command, ['/']]);
+    }
+  });
+});

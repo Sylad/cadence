@@ -4699,6 +4699,16 @@ lots:
     status: todo
     estimate: 1
     created: 2026-11-26
+  - id: L899
+    title: "Banc : le détecteur de fuites compte « / » comme une fuite, et lit « ls », « 2 », « head » comme des chemins — vécu le 26-11, séquence aether-b68 r1 (rapport ~/bench-cadence/rapports/2026-11-26-1318-063558fa01a5-aether-b68-r1.json) : fuites [\"/\"] aux étapes A 1 et 2 et cadence-run 5 et 6, sur les DEUX bras, ce qui met le critère « aucune fuite » ROUGE et bloque 2.0.19. Trouver la commande qui produit « / » dans les transcripts (src/bench/fuites.ts, src/sequence/passage.ts), corriger l'analyse des commandes shell (redirections 2>, tubes | head, arguments de ls), test sur ces commandes réelles ; une vraie écriture hors du clone doit rester détectée. Mesure : rejouer chercherFuites sur les transcripts du 26-11 → 0 fuite certaine fausse"
+    status: todo
+    estimate: 1
+    created: 2026-11-26
+  - id: L900
+    title: "Banc : s'arrêter dès que le verdict ne peut plus être vert, et ne laisser aucun serveur derrière soi — vécu le 26-11 : banc complet lancé à 10 h 59, verdict rouge acquis dès 15 h 56 (banc court et aether-b68 r1), il aurait fini vers 21 h (> 10 h) ; à l'arrêt, 5 serveurs de dev (ng serve, vite) laissés par des bras depuis 11 h et 13 h dans des dossiers effacés. (1) bench complet coupe les séquences restantes quand un critère est rouge sur toutes les répétitions possibles, avec --jusquau-bout pour forcer ; (2) chaque bras tue le groupe de processus de sa session à la fin de l'étape. Mesure : durée d'un banc rouge, 0 processus dont le cwd est sous ~/bench-cadence/runs après le banc"
+    status: todo
+    estimate: 1
+    created: 2026-11-26
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

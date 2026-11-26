@@ -1,0 +1,14 @@
+{
+  "id": "D-39",
+  "texte": "Ça. Loque trop longtemps les dev des banc aussi, il faut trouver une solution! On peu les réduire ou parraleliser les tests? Dure*",
+  "date": "2026-11-26",
+  "etat": "ouverte",
+  "preuve": null,
+  "lots": [
+    "L899",
+    "L900"
+  ],
+  "precisions": [
+    "2026-11-26 (lead) : « Ça. Loque » = « ça bloque » ; « Dure* » corrige « Loque » en « dure » : les bancs durent trop longtemps et bloquent les développements de cadence."
+  ]
+}

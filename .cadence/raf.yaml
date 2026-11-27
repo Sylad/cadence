@@ -4859,11 +4859,13 @@ lots:
     created: 2026-11-27
   - id: L923
     title: "raf start régénère un fichier dérivé du plan suivi par git (warhammer : frontend/public/plan-data/plan.json) dans l'arbre principal, puis cadence run refuse l'intégration parce que le run change le même fichier — vécu 27-11 L133 (refus-integration après 40 min, geste du lead : checkout du fichier + --reponse intègre) ; le run doit traiter un fichier dérivé du plan comme le plan lui-même (régénéré à l'intégration, pas un conflit) ; mesure : aucun refus-integration sur un fichier dérivé du plan"
-    status: doing
+    status: done
     estimate: 0.5
     quickwin: true
     created: 2026-11-27
     started: 2026-11-27
+    review: { date: 2026-11-27, verdict: "conforme revue de code : ne passe outre que pour les fichiers déclarés dans plan.onWrite.files avec une commande ; test 5/5, 3 échouent sans la correction ; mineur derives.ts:63-65 (échec d'avance rapide non testé). Rapport bilans/2026-11-27/L923-code.md", commit: 43bee3f46ecc7cd0e6395c3c1d72c95c20dcc77d }
+    finished: 2026-11-27
   - id: L924
     title: "cadence release --suite : joue elle-même les étapes du lead (commit de version, tag, porte, éval enveloppée par scripts/eval-plugin.mjs, push, gh run watch, npm view, marketplace update, plugin update) au lieu de les imprimer pour qu'on les recopie — vécu 27-11 : l'étape 4 recopiée sans son enveloppe de rejeu, un cas à 0,83 par aléa a retiré le tag, 2,10 $ et 7 min perdus ; mesure : aucune étape de publication recopiée à la main, aucune éval relancée pour une recopie"
     status: todo

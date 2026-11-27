@@ -35,10 +35,15 @@ export function readsUnreleasedOnly(source: string): boolean {
 export function entreeDuLot(root: string, lot: string): string {
   const fragment = join(root, FRAGMENTS_DIR, `${lot}.md`);
   if (existsSync(fragment)) return readFileSync(fragment, 'utf8');
-  const cite = new RegExp(`\\b${lot}\\b`);
-  const section = changelogSectionOf(readFileSync(join(root, 'CHANGELOG.md'), 'utf8'), cite);
+  // L917 : une entrée est celle du lot quand elle le CITE, dans la parenthèse de ses références (« (L778, D-14) », « (`outils N`, L839, D-34) »),
+  // un élément de cette liste (en tête ou après une virgule, suivi d'une virgule ou de la parenthèse fermante) ; pas quand elle le nomme en passant
+  // (« the older guard of L778 », « (L779 unchanged) », « (L817, follow-up of L808) ») ni quand elle nomme son fragment (`changelog.d/L778.md`) : sinon l'entrée
+  // d'un lot plus récent qui parle de L778 masquait celle de L778 dans la section la plus haute.
+  const cite = new RegExp(`\\((?:[^()]*,\\s*)?${lot}(?=[,)])`);
+  const sections = readFileSync(join(root, 'CHANGELOG.md'), 'utf8').split(/\n(?=## \[)/).filter((x) => x.startsWith('## ['));
   // Une entrée : une puce en début de ligne et ses lignes de suite, jusqu'à la puce, la rubrique ou la section suivante.
-  const entrees = section.split(/\n(?=- |#{2,3} )/).filter((e) => e.startsWith('- ') && cite.test(e)).map((e) => e.trimEnd());
+  const entreesDe = (section: string) => section.split(/\n(?=- |#{2,3} )/).filter((e) => e.startsWith('- ') && cite.test(e)).map((e) => e.trimEnd());
+  const entrees = sections.map(entreesDe).find((l) => l.length > 0) ?? [];
   if (!entrees.length) throw new Error(`entrée du lot ${lot} introuvable : ni ${FRAGMENTS_DIR}/${lot}.md, ni entrée qui cite ${lot} dans une section de CHANGELOG.md`);
   return `${entrees.join('\n')}\n`;
 }

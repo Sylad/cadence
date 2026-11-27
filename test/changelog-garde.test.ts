@@ -131,6 +131,39 @@ describe('lecture du CHANGELOG par les tests (L380)', () => {
       for (const p of permis) expect(lignesFragmentSansRepli(p), p).toEqual([]);
     });
 
+    // L917 : l'entrée de L917 nommait L778 en passant ; une fois les deux dans CHANGELOG.md, entreeDuLot('L778') rendait celle de L917.
+    it('R14 — après publication, l\'entrée d\'un lot est celle qui le cite entre parenthèses, pas une entrée plus récente qui le nomme en passant', () => {
+      const d = depot();
+      publier(d);
+      writeFileSync(join(d, 'CHANGELOG.md'), readFileSync(join(d, 'CHANGELOG.md'), 'utf8').replace('## [Unreleased]\n',
+        '## [Unreleased]\n\n## [1.2.4] - 2026-11-27\n\n### Fixed\n\n- A test read `changelog.d/L778.md`; the guard of L778 missed it (L917, [docs](docs/x.md)).\n- Counts tools (`outils N`, L5, D-34).\n'));
+      expect(entreeDuLot(d, 'L778')).toBe(`${ENTREE}\n- une suite de revue (L778).\n`);
+      expect(entreeDuLot(d, 'L917')).toMatch(/^- A test read/);
+      expect(entreeDuLot(d, 'L5')).toBe('- Counts tools (`outils N`, L5, D-34).\n');
+    });
+
+    it('R15 — le vrai dépôt : tous ses fragments publiés ensemble, chaque lot relit les entrées qui le citent, et seulement elles', () => {
+      const d = tempDir();
+      mkdirSync(join(d, 'changelog.d'));
+      writeFileSync(join(d, 'CHANGELOG.md'), readFileSync(join(root, 'CHANGELOG.md'), 'utf8'));
+      const lots = readdirSync(join(root, 'changelog.d')).filter((f) => /^L\d+\.md$/.test(f)).map((f) => f.replace(/\.md$/, ''));
+      const avant = Object.fromEntries(lots.map((l) => [l, readFileSync(join(root, 'changelog.d', `${l}.md`), 'utf8')]));
+      for (const l of lots) writeFileSync(join(d, 'changelog.d', `${l}.md`), avant[l]!);
+      writeFileSync(join(d, 'CHANGELOG.md'), repoChangelog(d).replace('## [Unreleased]\n', '## [Unreleased]\n\n## [9.9.9] - 2026-11-27\n'));
+      for (const l of lots) rmSync(join(d, 'changelog.d', `${l}.md`));
+      const entrees = (t: string) => t.split(/\n(?=- |#{2,3} )/).filter((e) => e.startsWith('- ')).map((e) => e.trimEnd());
+      // Une entrée de fragment qui ne cite pas son lot (2e entrée de L796) n'est rattachable à rien une fois publiée : seules comptent celles qui le citent.
+      const citees = (l: string) => entrees(avant[l]!).filter((e) => new RegExp(`\\((?:[^()]*,\\s*)?${l}(?=[,)])`).test(e));
+      for (const l of lots) {
+        const apres = entreeDuLot(d, l);
+        expect(citees(l).length, `${l} : au moins une entrée cite son lot`).toBeGreaterThan(0);
+        expect(entrees(apres), l).toEqual(expect.arrayContaining(citees(l)));
+        // Une entrée rendue cite le lot ; elle peut venir du fragment d'un autre lot quand elle le cite (« (L824) » dans le fragment de L826).
+        const cite = new RegExp(`\\((?:[^()]*,\\s*)?${l}(?=[,)])`);
+        expect(entrees(apres).filter((e) => !cite.test(e)), l).toEqual([]);
+      }
+    });
+
     it('R13 — aucun test du dépôt ne lit le fragment d\'un lot sans repli : il passe par entreeDuLot', () => {
       const fautifs = readdirSync(dir)
         .filter((f) => f.endsWith('.ts') && f !== 'changelog-garde.test.ts' && f !== 'changelog-section.ts')

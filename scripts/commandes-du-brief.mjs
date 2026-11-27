@@ -18,7 +18,7 @@ import { lotDuPlan } from './nouveautes-du-run.mjs';
 
 /** Les outils de bin/cadence.js hors `spec` (ses verbes autres que check|qa sont refusés par le hook) ; une session de run n'en lance aucun, sauf ceux
  * d'OUTILS_PERMIS dans les limites du hook. */
-export const OUTILS_CADENCE = ['run', 'sondes', 'analyse', 'ecriture', 'raf', 'news', 'session', 'deliver', 'verify', 'eval', 'skills', 'orchestrate', 'lead', 'corrections', 'perf',
+export const OUTILS_CADENCE = ['run', 'sondes', 'analyse', 'ecriture', 'raf', 'news', 'session', 'deliver', 'verify', 'eval', 'skills', 'orchestrate', 'lead', 'suivant', 'corrections', 'perf',
   'cost', 'inspect', 'ref', 'config', 'release', 'local', 'claude-hook'];
 const SPEC_DU_LEAD = ['green', 'reseal'];
 /** L840 : les outils de cadence qu'une session de run peut lancer, options bornées par le hook (cadence-permise.mjs). */

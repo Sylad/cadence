@@ -4813,9 +4813,10 @@ lots:
     created: 2026-11-27
   - id: L917
     title: "Correctif bloquant de 2.0.19 (2e refus) : la CI de publication rejouée sur le commit de version est rouge sur test/banc-code-mode-l839.test.ts:89, qui lit changelog.d/L839.md — fragment consommé par la release (ENOENT). Le test doit lire le texte du lot là où il vit après la release (CHANGELOG.md) ; une garde fait échouer tout test qui lit un changelog.d/<lot>.md sans repli. Vécu 27-11 10 h 07, 2e refus de publication de la journée ; mesure : cadence release patch vert du premier coup"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-27
+    started: 2026-11-27
   - id: L918
     title: "cadence release --dry-run rejoue aussi la CI de publication sur un commit de version SIMULÉ (fragments changelog.d consommés, version montée), dans un clone jetable, sans tag ni écriture : le 27-11, deux refus de publication (L913 couleur, L917 fragment L839) n'ont été vus qu'au vrai release après un dry-run vert ; un run de correctif pourrait le jouer comme preuve. Mesure : aucun refus de release après un dry-run vert sur 5 publications"
     status: todo

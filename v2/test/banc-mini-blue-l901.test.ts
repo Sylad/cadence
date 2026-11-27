@@ -51,6 +51,7 @@ describe('banc détaché sur mini-blue (L901)', () => {
       'historique.jsonl': '{"run":"a"}\n{"run":"b"}\n',
       'rapports/ancien.json': '{}\n', 'rapports/ancien.md': '# ancien\n',
     })) { mkdirSync(join(racine, f, '..'), { recursive: true }); writeFileSync(join(racine, f), c); }
+    mkdirSync(join(t, 'echange')); // transport local : le dossier d'échange présent, c'est mini-blue joignable
     const env = { ...process.env, BANC_MB_TRANSPORT: 'local', BANC_MB_ECHANGE: join(t, 'echange'), BANC_MB_JOBS: join(t, 'jobs'), BANC_MB_BASE: join(t, 'mini-blue'),
       BENCH_ROOT: racine, BANC_MB_PAS: '1', SHA_ATTENDU: sha, BIGBLUE, BASE_SOURCE: base };
     const sh = (...a: string[]) => spawnSync('bash', [SCRIPT, ...a], { env, encoding: 'utf8', timeout: 60_000 });
@@ -96,7 +97,7 @@ describe('banc détaché sur mini-blue (L901)', () => {
     const t = dossierTemp('l901-echec-');
     const depot = join(t, 'cadence'), racine = join(t, 'bench-cadence');
     depotGit(depot, { 'v2/src/a.ts': '\n', 'v2/briefs/b.md': '\n' });
-    mkdirSync(racine); writeFileSync(join(racine, 'bras.yaml'), 'A: {}\n');
+    mkdirSync(racine); writeFileSync(join(racine, 'bras.yaml'), 'A: {}\n'); mkdirSync(join(t, 'echange'));
     const env = { ...process.env, BANC_MB_TRANSPORT: 'local', BANC_MB_ECHANGE: join(t, 'echange'), BANC_MB_JOBS: join(t, 'jobs'), BANC_MB_BASE: join(t, 'mb'), BENCH_ROOT: racine, BANC_MB_PAS: '1' };
     const sh = (...a: string[]) => spawnSync('bash', [SCRIPT, ...a], { env, encoding: 'utf8', timeout: 60_000 });
     expect(sh('lance', '--depot', depot, '--sans-construction', '--commande', 'echo bench refusé >&2; exit 2', 'mecanique').status).toBe(0);
@@ -112,7 +113,7 @@ describe('banc détaché sur mini-blue (L901)', () => {
     const t = dossierTemp('l901-build-');
     const depot = join(t, 'cadence'), racine = join(t, 'bench-cadence');
     depotGit(depot, { 'v2/src/a.ts': '\n', 'v2/briefs/b.md': '\n' }); // ni package.json ni lock : npm ci échoue là-bas
-    mkdirSync(racine); writeFileSync(join(racine, 'bras.yaml'), 'A: {}\n');
+    mkdirSync(racine); writeFileSync(join(racine, 'bras.yaml'), 'A: {}\n'); mkdirSync(join(t, 'echange'));
     const env = { ...process.env, BANC_MB_TRANSPORT: 'local', BANC_MB_ECHANGE: join(t, 'echange'), BANC_MB_JOBS: join(t, 'jobs'), BANC_MB_BASE: join(t, 'mb'), BENCH_ROOT: racine, BANC_MB_PAS: '1' };
     const sh = (...a: string[]) => spawnSync('bash', [SCRIPT, ...a], { env, encoding: 'utf8', timeout: 60_000 });
     expect(sh('lance', '--depot', depot, 'court').status).toBe(0);
@@ -134,7 +135,7 @@ describe('banc détaché sur mini-blue (L901)', () => {
     const t = dossierTemp(prefixe);
     const depot = join(t, 'cadence'), racine = join(t, 'bench-cadence');
     depotGit(depot, { 'v2/src/a.ts': '\n', 'v2/briefs/b.md': '\n' });
-    mkdirSync(racine); writeFileSync(join(racine, 'bras.yaml'), 'A: {}\n');
+    mkdirSync(racine); writeFileSync(join(racine, 'bras.yaml'), 'A: {}\n'); mkdirSync(join(t, 'echange'));
     const env = { ...process.env, BANC_MB_TRANSPORT: 'local', BANC_MB_ECHANGE: join(t, 'echange'), BANC_MB_JOBS: join(t, 'jobs'), BANC_MB_BASE: join(t, 'mb'), BENCH_ROOT: racine, BANC_MB_PAS: '1', ...extra };
     const sh = (...a: string[]) => spawnSync('bash', [SCRIPT, ...a], { env, encoding: 'utf8', timeout: 60_000 });
     return { t, depot, racine, sh };
@@ -188,6 +189,61 @@ describe('banc détaché sur mini-blue (L901)', () => {
     const a = sh('attendre');
     expect(a.status).toBe(0);
     expect(a.stdout).toContain('fini rc=0');
+  });
+
+  it('lance pendant que mini-blue est éteint : rien lancé (5), aucun job local laissé ; mini-blue revenu, le lance suivant passe', () => {
+    const { t, depot, sh } = banc('l901-eteint-');
+    const echange = join(t, 'echange'), coupe = join(t, 'echange-coupe');
+    renameSync(echange, coupe); // éteint dès le départ : l'envoi échoue
+    const l = sh('lance', '--depot', depot, '--sans-construction', '--commande', 'true', 'court');
+    expect(l.status).toBe(5);
+    expect(l.stderr).toContain('envoi');
+    expect(existsSync(join(t, 'jobs')) ? readdirSync(join(t, 'jobs')) : []).toEqual([]);
+    renameSync(coupe, echange); // revenu
+    const l2 = sh('lance', '--depot', depot, '--sans-construction', '--commande', 'echo vert', 'court');
+    expect(l2.stderr).toBe('');
+    expect(l2.status).toBe(0);
+    const a = sh('attendre');
+    expect(a.status).toBe(0);
+    expect(a.stdout).toContain('fini rc=0');
+  });
+
+  it('un job local que mini-blue ne connaît pas n’est pas « injoignable » : écarté avec un message, lance, recup et attendre passent', () => {
+    const { t, depot, sh } = banc('l901-orphelin-');
+    // orphelin d'un envoi interrompu (ancienne version du script : job créé avant l'envoi), et job envoyé dont le dossier là-bas a été effacé
+    mkdirSync(join(t, 'jobs', '20261127-100000-x-court'), { recursive: true });
+    writeFileSync(join(t, 'jobs', '20261127-100000-x-court', 'args.sh'), 'COMMANDE=true\n');
+    mkdirSync(join(t, 'jobs', '20261127-100100-y-court'), { recursive: true });
+    writeFileSync(join(t, 'jobs', '20261127-100100-y-court', 'envoye'), '');
+    expect(sh('etat').stdout).toMatch(/20261127-100000-x-court etat=absent de mini-blue/);
+    const r = sh('recup');
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain('20261127-100000-x-court jamais arrivé sur mini-blue (envoi interrompu) : retiré');
+    expect(r.stderr).toContain('20261127-100100-y-court absent de mini-blue');
+    expect(r.stderr).not.toContain('injoignable');
+    expect(existsSync(join(t, 'jobs', '20261127-100000-x-court'))).toBe(false);
+    expect(sh('etat').stdout).toMatch(/20261127-100100-y-court etat=absent de mini-blue, ignoré/);
+    // le même cas vu par lance (sans recup avant) : un nouvel orphelin n'empêche pas de lancer
+    mkdirSync(join(t, 'jobs', '20261127-100200-z-court'), { recursive: true });
+    const l = sh('lance', '--depot', depot, '--sans-construction', '--commande', 'echo vert', 'court');
+    expect(l.status).toBe(0);
+    expect(l.stderr).toContain('20261127-100200-z-court jamais arrivé');
+    expect(sh('attendre').status).toBe(0);
+  });
+
+  it('l’hôte vient de MINI_BLUE_HOTE ou de ~/.config/cadence/mini-blue-hote, jamais d’une valeur du script', () => {
+    const src = readFileSync(SCRIPT, 'utf8');
+    expect(src).not.toMatch(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/); // aucune adresse écrite en dur
+    const t = dossierTemp('l901-hote-');
+    const sans = spawnSync('bash', [SCRIPT, 'etat'], { env: { ...process.env, MINI_BLUE_HOTE: '', XDG_CONFIG_HOME: t, BANC_MB_JOBS: join(t, 'j') }, encoding: 'utf8' });
+    expect(sans.status).toBe(2);
+    expect(sans.stderr).toContain('MINI_BLUE_HOTE');
+    mkdirSync(join(t, 'cadence')); writeFileSync(join(t, 'cadence', 'mini-blue-hote'), 'alice@machine\n');
+    const hote = (env: Record<string, string>) => spawnSync('bash', ['-c', `${src.split('\nusage()')[0]}\necho "$HOTE $ECH_WSL"`], { env: { ...process.env, MINI_BLUE_HOTE: '', XDG_CONFIG_HOME: t, ...env }, encoding: 'utf8' }).stdout.trim();
+    expect(hote({})).toBe('alice@machine /mnt/c/Users/alice/mini-blue-banc');
+    expect(hote({ MINI_BLUE_HOTE: 'bob@hote' })).toBe('bob@hote /mnt/c/Users/bob/mini-blue-banc');
+    const avec = spawnSync('bash', [SCRIPT, 'etat'], { env: { ...process.env, MINI_BLUE_HOTE: '', XDG_CONFIG_HOME: t, BANC_MB_JOBS: join(t, 'j') }, encoding: 'utf8' });
+    expect(avec.status).toBe(0);
   });
 
   it('un banc complet arrêté là-bas avant de mesurer pose complet-refus.txt, au format de noterRefus', () => {

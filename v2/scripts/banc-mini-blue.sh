@@ -10,8 +10,9 @@
 #   banc-mini-blue.sh etat               une ligne par banc lancé : en cours, fini rc=…, interrompu, injoignable ; sa dernière ligne
 #   banc-mini-blue.sh recup              ramène chaque banc fini dans la racine locale (rapports/, runs/, historique.jsonl à sa date)
 #   banc-mini-blue.sh attendre [<job>]   attend la fin des bancs en cours (sondage chaque minute), puis recup ; à lancer en arrière-plan
-# Codes : 3 un banc tourne déjà ; 5 mini-blue injoignable, état d'un banc inconnu (lance refuse, recup le dit) ; 6 attendre : mini-blue
-# injoignable à BANC_MB_ESSAIS sondages de suite (défaut 15). Injoignable n'est jamais pris pour fini.
+# Codes : 3 un banc tourne déjà ; 5 mini-blue injoignable, état d'un banc inconnu ou envoi impossible (lance refuse, recup le dit) ;
+# 6 attendre : mini-blue injoignable à BANC_MB_ESSAIS sondages de suite (défaut 15). Injoignable n'est jamais pris pour fini.
+# Hôte : MINI_BLUE_HOTE, sinon la première ligne de ~/.config/cadence/mini-blue-hote ; aucun défaut (code 2 sans l'un ni l'autre).
 #
 # Copie figée : le commit HEAD du dépôt (git bundle), jamais l'arbre de travail ; l'empreinte de v2/ est celle de ce commit, et le dépôt
 # peut changer dès que `lance` a rendu la main. Ce qui voyage : ce commit, le référentiel du banc (bancs/, sequences/, secrets/ — les tests
@@ -20,7 +21,10 @@
 # ni ~/.claude, ni ~/.ssh, ni .env ; mini-blue a sa propre session Claude Code. Repli : le banc local, inchangé (cadence2 bench …).
 set -euo pipefail
 
-HOTE=${MINI_BLUE_HOTE:-sylva@192.168.1.26}
+# l'hôte vient de l'utilisateur, jamais du script : cadence sert aussi à d'autres comptes (revue L901)
+CONF_HOTE=${XDG_CONFIG_HOME:-$HOME/.config}/cadence/mini-blue-hote
+HOTE=${MINI_BLUE_HOTE:-}
+if [ -z "$HOTE" ] && [ -f "$CONF_HOTE" ]; then HOTE=$(sed -n '1{s/[[:space:]]//g;p;}' "$CONF_HOTE"); fi
 DISTRO=${MINI_BLUE_DISTRO:-Ubuntu-24.04}
 TRANSPORT=${BANC_MB_TRANSPORT:-ssh}   # ssh (mini-blue) ou local (tests : même machine, sans ssh)
 ICI=$(cd "$(dirname "$0")" && pwd)
@@ -35,23 +39,29 @@ else
   # le même dossier vu du WSL : C:\Users\<utilisateur de MINI_BLUE_HOTE>, ou MINI_BLUE_ECHANGE_WSL si le profil Windows porte un autre nom
   if [[ $HOTE == *@* ]]; then UTIL_WIN=${HOTE%%@*}; else UTIL_WIN=$USER; fi
   ECH_WSL=${MINI_BLUE_ECHANGE_WSL:-/mnt/c/Users/$UTIL_WIN/mini-blue-banc}
+  case ${1:-} in lance|etat|recup|attendre)
+    [ -n "$HOTE" ] || { echo "banc-mini-blue : hôte inconnu : poser MINI_BLUE_HOTE (utilisateur@hôte) ou l'écrire dans $CONF_HOTE" >&2; exit 2; } ;;
+  esac
 fi
 
 usage() { sed -n '5,14p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 
 # --- transport : ssh + scp vers le WSL de mini-blue, ou la même machine (tests) ---
+# En transport local, « mini-blue injoignable » = dossier d'échange absent : chaque geste rend alors 255, comme ssh.
+joignable_local() { [ -d "$ECH_WSL" ] || return 255; }
 distant() { # distant <script> <args…> : bash <script> <args…> là-bas (aucun espace dans les arguments : ils traversent cmd.exe)
-  if [ "$TRANSPORT" = local ]; then bash "$@"; else ssh -n -o BatchMode=yes -o ConnectTimeout=10 "$HOTE" "wsl -d $DISTRO -- bash $*" | tr -d '\r'; fi
+  # code : celui du script ; 255 ssh en échec (injoignable) ; 127 script absent là-bas (job inconnu de mini-blue)
+  if [ "$TRANSPORT" = local ]; then joignable_local && bash "$@"; else ssh -n -o BatchMode=yes -o ConnectTimeout=10 "$HOTE" "wsl -d $DISTRO -- bash $*" | tr -d '\r'; fi
 }
 envoyer() { # envoyer <dossier local> <job>
-  if [ "$TRANSPORT" = local ]; then mkdir -p "$ECH_WSL/$2"; cp -r "$1/." "$ECH_WSL/$2/"
+  if [ "$TRANSPORT" = local ]; then joignable_local && mkdir -p "$ECH_WSL/$2" && cp -r "$1/." "$ECH_WSL/$2/"
   else
-    ssh -n -o BatchMode=yes -o ConnectTimeout=10 "$HOTE" "wsl -d $DISTRO -- mkdir -p $ECH_WSL/$2"
-    scp -q -r -o BatchMode=yes "$1/." "$HOTE:$ECH_SCP/$2/"
+    ssh -n -o BatchMode=yes -o ConnectTimeout=10 "$HOTE" "wsl -d $DISTRO -- mkdir -p $ECH_WSL/$2" &&
+      scp -q -r -o BatchMode=yes "$1/." "$HOTE:$ECH_SCP/$2/"
   fi
 }
 recevoir() { # recevoir <job> <fichier> <cible locale>
-  if [ "$TRANSPORT" = local ]; then cp "$ECH_WSL/$1/$2" "$3"; else scp -q -o BatchMode=yes "$HOTE:$ECH_SCP/$1/$2" "$3"; fi
+  if [ "$TRANSPORT" = local ]; then joignable_local && cp "$ECH_WSL/$1/$2" "$3"; else scp -q -o BatchMode=yes "$HOTE:$ECH_SCP/$1/$2" "$3"; fi
 }
 detacher() { # le banc vit sans la session qui l'a lancé
   local s="$ECH_WSL/$1/banc-mini-blue-distant.sh" j="$ECH_WSL/$1"
@@ -75,9 +85,25 @@ referentiel() { # chemins relatifs à la racine du banc
   if [ -d "$RACINE/rapports" ]; then (cd "$RACINE" && find rapports -maxdepth 1 -name '*.json'); fi
 }
 
-etat_job() { distant "$ECH_WSL/$1/banc-mini-blue-distant.sh" etat "$ECH_WSL/$1"; } # etat=… puis derniere=… ; échec = mini-blue injoignable
-# en_cours <job> : 0 en cours, 1 pas en cours (fini, interrompu, jamais lancé), 2 injoignable (état inconnu : jamais « fini », revue L901)
-en_cours() { local e; e=$(etat_job "$1" 2>/dev/null) || return 2; [ -n "$e" ] || return 2; [[ $e == "etat=en cours"* ]]; } # jamais « | grep -q » : sous pipefail, son SIGPIPE rend faux
+etat_job() { distant "$ECH_WSL/$1/banc-mini-blue-distant.sh" etat "$ECH_WSL/$1"; } # etat=… puis derniere=…
+# sonde <job> : pose ETAT (etat=… puis derniere=…) ; 0 lu, 2 mini-blue injoignable, 3 job absent là-bas (script introuvable : rc 127)
+sonde() {
+  local rc=0; ETAT=$(etat_job "$1" 2>/dev/null) || rc=$?
+  [ "$rc" != 127 ] || return 3
+  [ "$rc" = 0 ] && [ -n "$ETAT" ] || return 2
+}
+# en_cours <job> : 0 en cours, 1 pas en cours (fini, interrompu, jamais lancé), 2 injoignable (état inconnu : jamais « fini », revue L901),
+# 3 absent là-bas (envoi jamais fini, ou dossier d'échange effacé : mini-blue répond, ce n'est pas « injoignable »)
+en_cours() { sonde "$1" || return $?; [[ $ETAT == "etat=en cours"* ]]; } # jamais « | grep -q » : sous pipefail, son SIGPIPE rend faux
+# oublier <job> : un job local que mini-blue ne connaît pas. Sans envoi fini (marque « envoye ») : retiré ; sinon marqué absent, ignoré ensuite.
+oublier() {
+  if [ ! -f "$JOBS/$1/envoye" ]; then
+    rm -rf "${JOBS:?}/$1"; echo "banc-mini-blue : $1 jamais arrivé sur mini-blue (envoi interrompu) : retiré" >&2
+  else
+    printf 'rc=absent\nhistorique=0\n' > "$JOBS/$1/recupere"
+    echo "banc-mini-blue : $1 absent de mini-blue (dossier d'échange effacé ?) : ignoré, rien à ramener" >&2
+  fi
+}
 
 lance() {
   local DEPOT COMMANDE= SANS=0
@@ -97,6 +123,7 @@ lance() {
   for j in $(ls "$JOBS" 2>/dev/null); do
     [ ! -f "$JOBS/$j/recupere" ] || continue
     c=0; en_cours "$j" || c=$?
+    if [ "$c" = 3 ]; then oublier "$j"; continue; fi
     if [ "$c" = 0 ]; then echo "banc-mini-blue : un banc tourne déjà sur mini-blue ($j) : banc-mini-blue.sh etat" >&2; exit 3; fi
     # injoignable : un second banc réinitialiserait la copie sous celui qui tourne peut-être encore
     if [ "$c" = 2 ]; then echo "banc-mini-blue : mini-blue injoignable, état de $j inconnu : rien lancé (banc-mini-blue.sh etat)" >&2; exit 5; fi
@@ -104,7 +131,11 @@ lance() {
   local SHA EMP JOB L
   SHA=$(git -C "$DEPOT" rev-parse HEAD); EMP=$(empreinte "$DEPOT" "$SHA")
   JOB=$(date +%Y%m%d-%H%M%S)-$EMP-$(printf '%s' "${1:-commande}" | tr -c 'a-zA-Z0-9-' '_')
-  L=$JOBS/$JOB; mkdir -p "$L/envoi/sources"
+  L=$JOBS/$JOB
+  # tant que l'envoi n'est pas fini, un échec (bundle, mini-blue éteint…) ne laisse aucun job local : sinon il ferait refuser tout lance suivant
+  EN_ENVOI=$L   # global : le trap s'exécute après la fin de lance, quand ses variables locales n'existent plus
+  trap '[ -z "${EN_ENVOI:-}" ] || [ -f "$EN_ENVOI/envoye" ] || rm -rf "$EN_ENVOI"' EXIT
+  mkdir -p "$L/envoi/sources"
   git -C "$DEPOT" bundle create -q "$L/envoi/aller.bundle" HEAD
   # référentiel du banc : ce qu'un passage lit dans sa racine (bancs, séquences, tests cachés, bras, historique et rapports JSON pour le bruit et l'environnement)
   referentiel | tar -czf "$L/envoi/referentiel.tar.gz" -C "$RACINE" --exclude=node_modules --exclude=.git -T -
@@ -124,9 +155,11 @@ lance() {
   } > "$L/envoi/args.sh"
   cp "$ICI/banc-mini-blue-distant.sh" "$L/envoi/"
   cp "$L/envoi/args.sh" "$L/args.sh"
-  envoyer "$L/envoi" "$JOB"
+  envoyer "$L/envoi" "$JOB" || { echo "banc-mini-blue : mini-blue injoignable, envoi de $JOB impossible : rien lancé" >&2; exit 5; }
+  : > "$L/envoye"
   rm -rf "$L/envoi"   # bundles envoyés : rien à garder ici
-  detacher "$JOB" >/dev/null
+  # échec ici : le job existe là-bas, « jamais lancé », et ne bloque rien
+  detacher "$JOB" >/dev/null || { echo "banc-mini-blue : $JOB envoyé, démarrage impossible (mini-blue injoignable ?) : rien lancé" >&2; exit 5; }
   local k e
   for k in $(seq 1 30); do # le banc a démarré là-bas (pid écrit) avant de rendre la main : attendre ne le prend jamais pour fini
     e=$(etat_job "$JOB" 2>/dev/null | sed -n 1p) || true
@@ -142,13 +175,17 @@ etat() {
   local j e
   [ -n "$(ls "$JOBS" 2>/dev/null)" ] || { echo "aucun banc lancé sur mini-blue"; return 0; }
   for j in $(ls "$JOBS"); do
+    if [ "$(sed -n 1p "$JOBS/$j/recupere" 2>/dev/null)" = rc=absent ]; then echo "JOB $j etat=absent de mini-blue, ignoré"; continue; fi
     if [ -f "$JOBS/$j/recupere" ]; then # déjà ramené : l'état local suffit, sans aller-retour
       echo "JOB $j etat=fini $(sed -n 1p "$JOBS/$j/recupere") recupere=oui"
       echo "    $(sed -n 's/^rapport=//p' "$JOBS/$j/recupere" | head -1)"; continue
     fi
-    e=$(etat_job "$j" 2>/dev/null || echo "etat=injoignable")
-    echo "JOB $j $(sed -n 1p <<<"$e") recupere=non"
-    echo "    $(sed -n 2p <<<"$e")"
+    c=0; sonde "$j" || c=$?
+    case $c in
+      0) echo "JOB $j $(sed -n 1p <<<"$ETAT") recupere=non"; echo "    $(sed -n 2p <<<"$ETAT")" ;;
+      3) echo "JOB $j etat=absent de mini-blue (envoi interrompu ou dossier effacé) recupere=non : le prochain lance ou recup l'écarte" ;;
+      *) echo "JOB $j etat=injoignable recupere=non" ;;
+    esac
   done
 }
 
@@ -202,13 +239,15 @@ recup_job() { # recup_job <job> <ligne etat=fini …> <ligne derniere=…>
 }
 
 recup() {
-  local j e vus=0 inj=0
+  local j c vus=0 inj=0
   for j in $(ls "$JOBS" 2>/dev/null); do
     [ -f "$JOBS/$j/recupere" ] && continue
-    if ! e=$(etat_job "$j" 2>/dev/null) || [ -z "$e" ]; then
+    c=0; sonde "$j" || c=$?
+    if [ "$c" = 3 ]; then oublier "$j"; continue; fi
+    if [ "$c" != 0 ]; then
       echo "banc-mini-blue : mini-blue injoignable, état de $j inconnu : rien ramené" >&2; inj=$((inj + 1)); continue
     fi
-    case $e in "etat=fini "*) recup_job "$j" "$(sed -n 1p <<<"$e")" "$(sed -n 2p <<<"$e")"; vus=$((vus + 1)) ;; esac
+    case $ETAT in "etat=fini "*) recup_job "$j" "$(sed -n 1p <<<"$ETAT")" "$(sed -n 2p <<<"$ETAT")"; vus=$((vus + 1)) ;; esac
   done
   [ "$vus" -gt 0 ] || [ "$inj" -gt 0 ] || echo "banc-mini-blue : aucun banc fini à ramener"
   [ "$inj" = 0 ] || exit 5
@@ -222,7 +261,7 @@ attendre() {
       [ -z "$filtre" ] || [ "$j" = "$filtre" ] || continue
       [ ! -f "$JOBS/$j/recupere" ] || continue
       c=0; en_cours "$j" || c=$?
-      case $c in 0) encore=1 ;; 2) encore=1; inj="$inj $j" ;; esac
+      case $c in 0) encore=1 ;; 2) encore=1; inj="$inj $j" ;; 3) oublier "$j" ;; esac
     done
     # injoignable : état inconnu, on réessaie ; jamais pris pour fini (revue L901 : coupure Wi-Fi, mise en veille de mini-blue)
     if [ -n "$inj" ]; then

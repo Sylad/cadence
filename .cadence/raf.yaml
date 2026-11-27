@@ -4716,9 +4716,10 @@ lots:
     created: 2026-11-26
   - id: L901
     title: "D-39 Banc sur mini-blue : lancer bench court et complet DÉTACHÉS sur mini-blue (20 fils, 23 Go libres, inoccupée) depuis Big-Blue, à partir d'une copie figée de cadence (empreinte v2/), comme scripts/mini-blue-run.sh ; rapports ramenés dans ~/bench-cadence/rapports ; Big-Blue garde ses créneaux et le dépôt de cadence n'est plus tenu pendant un banc (la règle D-3 « aucun run pendant un banc » tombe : un lot qui touche v2/ après le banc va à la version suivante). Vécu 26-11 : banc court 2 h sous la charge de Big-Blue contre 28 min les 19 et 21-11 au calme. Mesure : durée du banc court ≤ 35 min, 0 h de dépôt cadence tenu par un banc en semaine"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-26
+    started: 2026-11-27
   - id: L902
     title: "D-39 Banc parallèle : jouer en même temps les 3 bancs du banc court et les répétitions r1/r2 des séquences (aujourd'hui « 1 banc(s) à la fois »), sur mini-blue, chaque bras avec son clone et ses ports ; décider par le banc de bruit que le parallèle ne fait pas sortir les mesures de temps du seuil de bruit (sinon rester séquentiel pour les critères de temps). Vécu 26-11 : séquence aether-b68 = 2 h 40 par répétition, jouées l'une après l'autre. Mesure : banc complet ≤ 3 h (5 à 6 h aujourd'hui), mêmes verdicts sur deux bancs rejoués"
     status: todo

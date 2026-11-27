@@ -4846,6 +4846,7 @@ lots:
     quickwin: true
     created: 2026-11-27
     started: 2026-11-27
+    review: { date: 2026-11-27, verdict: compliant, commit: b53adcebaac80f6f73ac06b1f9496792d1a11dd0 }
   - id: L922
     title: "D-43 : retrouver les mécanismes en installant cadence — inventaire des mécanismes du dossier developpeur (hooks, règles des CLAUDE.md, scripts, gardes) avec pour chacun générique ou personnel ; les génériques entrent dans le plugin et cadence init (désactivables dans cadence.yaml), ex. arrêt à heure fixe, modèle peu coûteux des agents de recherche, tassement de MEMORY.md, garde de rythme du quota ; vécu 27-11 : Sylvain, en changeant de PC, devrait tout retrouver ; mesure : un projet neuf avec cadence init sur mini-blue a les mécanismes génériques actifs sans geste manuel"
     status: todo

@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import type { Io } from '../cli.js';
 import { ajouterBanc } from './ajouter.js';
 import { chargerBanc, listerBancs, piecesBanc, racineBanc, type Banc } from './banc.js';
-import { bootId, fichierPassage, porteurVivant } from '../../../scripts/verrou-banc.mjs'; // revue L931 : même lecture du verrou que cadence suivant
+import { bootId, fichierPassage, tenantVivant } from '../../../scripts/verrou-banc.mjs'; // revue L931 : même lecture du verrou que cadence suivant
 import { chargeMachine, lignesCharge, nombreCoeurs, nommer, occupants, refusCharge, registreCreneaux, type Charge } from './charge.js';
 import { chargerBras, executeurClaude, lancerBras, libererReglages, type DefBras, type Executeur, type Mesure } from './bras.js';
 import { enteteEnvironnement, environnement, ligneComparaison, modelesExacts, passagePrecedent, versionClaude, type Environnement } from './environnement.js';
@@ -58,7 +58,7 @@ export function verrouiller(racine: string): () => void {
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'EEXIST' || essai > 0) throw e;
       const contenu = readFileSync(f, 'utf8');
-      if (porteurVivant(contenu)) throw new Error(`un passage est déjà en cours (${contenu}) : ${f}`);
+      if (tenantVivant(contenu)) throw new Error(`un passage est déjà en cours (${contenu}) : ${f}`);
       rmSync(f, { force: true });
     }
   }

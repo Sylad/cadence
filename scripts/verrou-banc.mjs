@@ -21,7 +21,7 @@ const vivant = (pid) => {
 };
 
 /** Le contenu d'un verrou (« pid date boot ») tient-il encore ? Un pid mort, ou d'un autre démarrage (pid réutilisé après un redémarrage de WSL), ne tient rien. */
-export function porteurVivant(contenu) {
+export function tenantVivant(contenu) {
   const [pid, , boot] = contenu.trim().split(' ');
   const ici = bootId();
   if (boot && ici && boot !== ici) return false;
@@ -32,5 +32,5 @@ export function porteurVivant(contenu) {
 export function passageEnCours(racine) {
   let contenu;
   try { contenu = readFileSync(fichierPassage(racine), 'utf8'); } catch { return null; }
-  return porteurVivant(contenu) ? contenu.trim() : null;
+  return tenantVivant(contenu) ? contenu.trim() : null;
 }

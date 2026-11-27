@@ -1,0 +1,11 @@
+{
+  "id": "D-40",
+  "texte": "3/3 banc, c'est quand même dingue que les bancs bloque tout, faut vraiment faire en sorte que les banc de tests servent à quelque chose et qu'ils soient performant",
+  "date": "2026-11-27",
+  "etat": "ouverte",
+  "preuve": null,
+  "lots": ["L901", "L902", "L911", "L912"],
+  "precisions": [
+    "2026-11-27 (lead) : trois besoins — ne plus bloquer (L901 banc détaché sur mini-blue, le dépôt et les créneaux de Big-Blue restent libres), être performant (L902 bras en parallèle, L911 pas de rouge de temps dû à la charge), servir à quelque chose (L912 bilan des rouges : régressions réelles contre bruit, critère retiré s'il n'attrape rien en 4 semaines). Ordre : L901 premier lot de cadence après la publication de 2.0.19."
+  ]
+}

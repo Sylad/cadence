@@ -1,13 +1,13 @@
 {
- "id": "D-42",
- "texte": "limite dans le readme de cadence, il pourrais y avoir un liens vers cette page. ce qui nécessiterais peut-être que l'on gère les langue dans codex, car moi je lis facilement le français, mais l'anglais c'est une torture. Et une personne curieuse ca risque d'être l'inverse",
- "date": "2026-11-27",
- "etat": "ouverte",
- "preuve": null,
- "lots": [
-  "L921"
- ],
- "precisions": [
-  "2026-11-27 (lead) : part cadence = lien du README vers l'étude de cas (version EN, avec renvoi FR), après le lot de codex qui publie la version anglaise (codex D-5)."
- ]
+  "id": "D-42",
+  "texte": "limite dans le readme de cadence, il pourrais y avoir un liens vers cette page. ce qui nécessiterais peut-être que l'on gère les langue dans codex, car moi je lis facilement le français, mais l'anglais c'est une torture. Et une personne curieuse ca risque d'être l'inverse",
+  "date": "2026-11-27",
+  "etat": "livrée",
+  "preuve": "L921 poussé le 2026-11-27 (b2df5c39, main 357b55e5) : le README renvoie à https://claude-code-codex-25m.pages.dev/en/case-studies/cadence/ (curl : 200), page anglaise qui renvoie à la française ; test R13",
+  "lots": [
+    "L921"
+  ],
+  "precisions": [
+    "2026-11-27 (lead) : part cadence = lien du README vers l'étude de cas (version EN, avec renvoi FR), après le lot de codex qui publie la version anglaise (codex D-5)."
+  ]
 }

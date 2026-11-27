@@ -1,11 +1,24 @@
 {
-  "id": "D-40",
-  "texte": "3/3 banc, c'est quand même dingue que les bancs bloque tout, faut vraiment faire en sorte que les banc de tests servent à quelque chose et qu'ils soient performant",
-  "date": "2026-11-27",
-  "etat": "ouverte",
-  "preuve": null,
-  "lots": ["L901", "L902", "L911", "L912"],
-  "precisions": [
-    "2026-11-27 (lead) : trois besoins — ne plus bloquer (L901 banc détaché sur mini-blue, le dépôt et les créneaux de Big-Blue restent libres), être performant (L902 bras en parallèle, L911 pas de rouge de temps dû à la charge), servir à quelque chose (L912 bilan des rouges : régressions réelles contre bruit, critère retiré s'il n'attrape rien en 4 semaines). Ordre : L901 premier lot de cadence après la publication de 2.0.19."
-  ]
+ "id": "D-40",
+ "texte": "3/3 banc, c'est quand même dingue que les bancs bloque tout, faut vraiment faire en sorte que les banc de tests servent à quelque chose et qu'ils soient performant",
+ "date": "2026-11-27",
+ "etat": "ouverte",
+ "preuve": null,
+ "lots": [
+  "L901",
+  "L902",
+  "L911",
+  "L912"
+ ],
+ "precisions": [
+  "2026-11-27 (lead) : trois besoins — ne plus bloquer (L901 banc détaché sur mini-blue, le dépôt et les créneaux de Big-Blue restent libres), être performant (L902 bras en parallèle, L911 pas de rouge de temps dû à la charge), servir à quelque chose (L912 bilan des rouges : régressions réelles contre bruit, critère retiré s'il n'attrape rien en 4 semaines). Ordre : L901 premier lot de cadence après la publication de 2.0.19.",
+  {
+   "date": "2026-11-27",
+   "texte": "2026-11-27 (Sylvain) : « en repensant aux bancs, claude de base ne lance pas ces bancs, niveau temps forcement ca va impacter le résultat. Par contre comme il remonte des erreurs, paut-être que niveaux qualité, au moins ca améliore quelque chose, non? » — à trancher par le bilan de L912 : le banc est un coût de fabrication de cadence (hors temps par lot), qui ne se garde que s'il attrape des régressions réelles que la porte seule laisse passer."
+  },
+  {
+   "date": "2026-11-27",
+   "texte": "2026-11-27 (Sylvain : « on suit tes recommandations ») : critère 8 « coût d'entretien de cadence, compté à part » ajouté à revues-cadence/criteres.md — heures de banc, dépôt tenu, créneaux, jetons des lots de cadence ; hors temps par lot, dans le verdict abandonner ; justifié seulement par les régressions réelles du bilan L912."
+  }
+ ]
 }

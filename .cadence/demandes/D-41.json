@@ -1,0 +1,14 @@
+{
+ "id": "D-41",
+ "texte": "je regardais ta page https://claude-code-codex-25m.pages.dev/case-studies/cadence/, c'est très bien. Il faudra bien garder les 5 causes en mémoire quand on retesteera la V2, pour voir si on a bien répondu à ces sources de pb",
+ "date": "2026-11-27",
+ "etat": "ouverte",
+ "preuve": null,
+ "lots": [
+  "L919"
+ ],
+ "precisions": [
+  "2026-11-27 (lead) : mécanisme — les 5 causes C1–C5 de l'échec de la V1 (design §0, page codex case-studies/cadence) entrent dans revues-cadence/criteres.md avec une mesure chacune ; la revue D-30 (agent neuf, première le 29-11) les relève à chaque fois. Le banc doit rendre ces mesures sans calcul à la main : lot à ajouter au plan après L917.",
+  "2026-11-27 (lead) : section « Les 5 causes de l'échec de la V1 » ajoutée à revues-cadence/criteres.md (une mesure par cause C1–C5) ; première mesure : revue D-30 du 29-11."
+ ]
+}

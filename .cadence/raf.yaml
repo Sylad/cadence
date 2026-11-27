@@ -4813,14 +4813,39 @@ lots:
     created: 2026-11-27
   - id: L917
     title: "Correctif bloquant de 2.0.19 (2e refus) : la CI de publication rejouée sur le commit de version est rouge sur test/banc-code-mode-l839.test.ts:89, qui lit changelog.d/L839.md — fragment consommé par la release (ENOENT). Le test doit lire le texte du lot là où il vit après la release (CHANGELOG.md) ; une garde fait échouer tout test qui lit un changelog.d/<lot>.md sans repli. Vécu 27-11 10 h 07, 2e refus de publication de la journée ; mesure : cadence release patch vert du premier coup"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-27
     started: 2026-11-27
+    review: { date: 2026-11-27, verdict: "conforme (relu par le lead) : test L839 via entreeDuLot, citation stricte dans la parenthèse de références, gardes R12-R16 ; CI rejouée verte sur un commit de version simulé", commit: 36493163b938f0c9ac7024fb4305c44668c04b79 }
+    finished: 2026-11-27
   - id: L918
     title: "cadence release --dry-run rejoue aussi la CI de publication sur un commit de version SIMULÉ (fragments changelog.d consommés, version montée), dans un clone jetable, sans tag ni écriture : le 27-11, deux refus de publication (L913 couleur, L917 fragment L839) n'ont été vus qu'au vrai release après un dry-run vert ; un run de correctif pourrait le jouer comme preuve. Mesure : aucun refus de release après un dry-run vert sur 5 publications"
     status: todo
     estimate: 1
+    created: 2026-11-27
+  - id: L919
+    title: "D-41 : le rapport du banc rend une ligne par cause C1–C5 de l'échec V1 — mesures de revues-cadence/criteres.md (C1 lots rendus pour écart à une fiche contre écarts à la demande, C2 sessions qui codent par lot et leur modèle, C3 temps de porte / temps de travail et portes sans rouge, C4 lignes de v2/ et options ajoutées sans banc, C5 gestes du lead par lot) ; vécu 27-11 : Sylvain veut vérifier au re-test de la V2 que les 5 causes sont réglées ; mesure : la revue D-30 lit ces lignes sans calcul à la main"
+    status: todo
+    estimate: 1
+    uses: [ banc ]
+    created: 2026-11-27
+  - id: L920
+    title: "Commit de registre seul (.cadence/demandes/) poussé sans verdict de porte, comme un commit de plan seul (L784) — vécu 27-11 : push de « registre: D-4 livrée » refusé dans ol-companion, il faudrait rejouer toute la porte pour un JSON ; mesure : aucun push de registre seul refusé, aucun CADENCE_PUSH_UNGATED"
+    status: todo
+    estimate: 0.5
+    quickwin: true
+    created: 2026-11-27
+  - id: L921
+    title: "D-42 : le README de cadence renvoie vers l'étude de cas de cadence sur codex (version anglaise, avec renvoi à la version française) — après le lot D-5 de codex qui publie la page EN ; mesure : le lien du README répond 200 et tombe sur la page anglaise"
+    status: todo
+    estimate: 0.25
+    quickwin: true
+    created: 2026-11-27
+  - id: L922
+    title: "D-43 : retrouver les mécanismes en installant cadence — inventaire des mécanismes du dossier developpeur (hooks, règles des CLAUDE.md, scripts, gardes) avec pour chacun générique ou personnel ; les génériques entrent dans le plugin et cadence init (désactivables dans cadence.yaml), ex. arrêt à heure fixe, modèle peu coûteux des agents de recherche, tassement de MEMORY.md, garde de rythme du quota ; vécu 27-11 : Sylvain, en changeant de PC, devrait tout retrouver ; mesure : un projet neuf avec cadence init sur mini-blue a les mécanismes génériques actifs sans geste manuel"
+    status: todo
+    estimate: 3
     created: 2026-11-27
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

@@ -1,0 +1,13 @@
+{
+ "id": "D-43",
+ "texte": "le truc qui me titille, c'est qua ca aurait été bien, que en installant cadence par exemple on est ce genre de mécanique soit mis en place automatiquement. Typiquement, si jamais je change de pc, je ré install claude code, sur un nouveau projet, il faudrait retrouvé  tout ces mécanismes mis en place ici",
+ "date": "2026-11-27",
+ "etat": "ouverte",
+ "preuve": null,
+ "lots": [
+  "L922"
+ ],
+ "precisions": [
+  "2026-11-27 (lead) : part cadence — ce qui est générique (utile au compte pro comme à un nouveau projet) passe dans le plugin et `cadence init` : inventaire des mécanismes du dossier developpeur, tri générique / personnel, puis portage un par un, chacun avec sa mesure. Le personnel (machines, boîte, topologie) reste au dépôt de poste (registre parent D-38)."
+ ]
+}

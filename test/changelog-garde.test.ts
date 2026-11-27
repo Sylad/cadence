@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { changelogSectionOf, entreeDuLot, lignesFragmentSansRepli, readsUnreleasedOnly, repoChangelog } from './changelog-section.js';
@@ -162,6 +162,22 @@ describe('lecture du CHANGELOG par les tests (L380)', () => {
         const cite = new RegExp(`\\((?:[^()]*,\\s*)?${l}(?=[,)])`);
         expect(entrees(apres).filter((e) => !cite.test(e)), l).toEqual([]);
       }
+    });
+
+    // L917 : le fragment de L917 citait « (L778, D-14) » en exemple ; avant publication rien ne changeait (L778 déjà publié), après, la
+    // section 2.0.19 portait une entrée qui cite L778 et sondes-interaction-l778 lisait celle-là : rouge seulement dans la CI de publication.
+    it('R16 — publier les fragments du dépôt ne change pas l\'entrée d\'un lot déjà publié que lit un test', () => {
+      const lus = new Set(readdirSync(dir).filter((f) => f.endsWith('.test.ts'))
+        .flatMap((f) => [...readFileSync(join(dir, f), 'utf8').matchAll(/entreeDuLot\((?:root|racine|RACINE),\s*'(L\d+)'\)/g)].map((m) => m[1]!)));
+      const publies = [...lus].filter((l) => !existsSync(join(root, 'changelog.d', `${l}.md`)));
+      expect(publies.length).toBeGreaterThan(0);
+      const d = tempDir();
+      mkdirSync(join(d, 'changelog.d'));
+      writeFileSync(join(d, 'CHANGELOG.md'), readFileSync(join(root, 'CHANGELOG.md'), 'utf8'));
+      for (const f of readdirSync(join(root, 'changelog.d')).filter((x) => /^L\d+\.md$/.test(x))) writeFileSync(join(d, 'changelog.d', f), readFileSync(join(root, 'changelog.d', f), 'utf8'));
+      writeFileSync(join(d, 'CHANGELOG.md'), repoChangelog(d).replace('## [Unreleased]\n', '## [Unreleased]\n\n## [9.9.9] - 2026-11-27\n'));
+      rmSync(join(d, 'changelog.d'), { recursive: true });
+      for (const l of publies) expect(entreeDuLot(d, l), `${l} : un fragment cite ${l} entre parenthèses ; écrire L<n> dans un exemple`).toBe(entreeDuLot(root, l));
     });
 
     it('R13 — aucun test du dépôt ne lit le fragment d\'un lot sans repli : il passe par entreeDuLot', () => {

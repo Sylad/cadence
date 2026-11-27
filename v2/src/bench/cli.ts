@@ -5,6 +5,7 @@ import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readdirSync
 import { join, resolve } from 'node:path';
 import type { Io } from '../cli.js';
 import { ajouterBanc } from './ajouter.js';
+import { classerAuPassage, commandeBilan, lignesClassement } from './bilan.js';
 import { chargerBanc, listerBancs, piecesBanc, racineBanc, type Banc } from './banc.js';
 import { bootId, fichierPassage, tenantVivant } from '../../../scripts/verrou-banc.mjs'; // revue L931 : même lecture du verrou que cadence suivant
 import { lignesCharge } from './charge.js';
@@ -24,9 +25,12 @@ export function empreinte(repo: string): string {
   try {
     const arbres = ['v2/src', 'v2/briefs'].map((p) => execFileSync('git', ['rev-parse', `HEAD:${p}`], { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim());
     const hooks = execFileSync('git', ['ls-tree', 'HEAD', 'v2/hooks'], { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); // hooks d'un bras : vide sans eux
-    return createHash('sha1').update([...arbres, ...(hooks ? [hooks] : [])].join('\n')).digest('hex').slice(0, 12);
+    return empreinteArbres(arbres, hooks);
   } catch { return 'inconnue'; }
 }
+
+/** L912 : l'empreinte à partir des arbres de v2/src et v2/briefs et de la ligne `ls-tree` de v2/hooks ; `bench bilan` la recalcule pour chaque commit. */
+export const empreinteArbres = (arbres: string[], hooks: string | undefined): string => createHash('sha1').update([...arbres, ...(hooks ? [hooks] : [])].join('\n')).digest('hex').slice(0, 12);
 
 /** Premier sujet de commit « Taille … » de base..HEAD (le bras classe sa demande). */
 const tailleDeclaree = (c: string, base: string): string | undefined => { try { return execFileSync('git', ['log', '--reverse', '--format=%s', `${base}..HEAD`], { cwd: c, encoding: 'utf8' }).split('\n').find((l) => l.startsWith('Taille')); } catch { return undefined; } };
@@ -285,8 +289,9 @@ async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?:
   const base = join(o.racine, 'rapports', id);
   const env = environnement(version, Object.fromEntries([o.ref, o.cand].map((n) => [n, bras[n].modele])), res.flatMap((r) => Object.values(r.mesures)), { alias: o.juge, jugements: res.map((r) => r.jugement) });
   const entete = enteteEnvironnement(env, passagePrecedent(o.racine, id));
-  writeFileSync(`${base}.md`, rapport(res, o.ref, o.cand, v, { date, empreinte: o.empreinte, repetitions: N, eclair: e?.lignes, niveau: o.niveau, depot: o.depot, duree_s, environnement: entete, charge: lignesCharge(ch) }));
-  writeFileSync(`${base}.json`, JSON.stringify({ verdict: v, environnement: env, charge: ch, resultats: res.map((r, i) => ({ ...r, clones: joues[i].clones })) }, null, 2));
+  const classement = classerAuPassage(v, res); // L912 : charge et réseau tout de suite, le reste par bench bilan
+  writeFileSync(`${base}.md`, rapport(res, o.ref, o.cand, v, { date, empreinte: o.empreinte, repetitions: N, eclair: e?.lignes, niveau: o.niveau, depot: o.depot, duree_s, environnement: entete, charge: lignesCharge(ch), classement: lignesClassement(classement) }));
+  writeFileSync(`${base}.json`, JSON.stringify({ verdict: v, classement, environnement: env, charge: ch, resultats: res.map((r, i) => ({ ...r, clones: joues[i].clones })) }, null, 2));
   if (entete[0].startsWith('⚠')) o.out(entete[0]);
   if (o.niveau === 'bruit') { // L738 : seul l'écart compte, lu au prochain passage dans rapports/<run>.json ; la garde ne voit pas ce passage
     const ecarts = res.map((r) => ecartPaire(r)); // correctif L738 : toujours montré, compté pour le seuil seulement quand le banc complet l'a joué
@@ -438,11 +443,12 @@ export async function bench(args: string[], io: Io, repo = REPO, machine: Machin
     } catch (e) { io.err(`cadence2 bench ajouter : ${e instanceof Error ? e.message : String(e)}`); return 1; }
   }
   if (sous === 'comparer') return comparer(racine, reste, io);
+  if (sous === 'bilan' || sous === '--bilan') return commandeBilan(racine, reste, io, repo); // L912 (D-40) : régressions réelles contre bruit, sur 4 semaines
   const bancs = option(reste, 'bancs');
   if (sous === 'bruit') return remesurerBruit(racine, bancs, emp, repo, io);
   const choix = sous === 'lancer' ? (bancs ? { numeros: bancs.split(',') } : null) : Object.hasOwn(SOUS, sous ?? '') ? SOUS[sous!] : null;
   if (choix === null) {
-    io.err('usage : cadence2 bench micro|mecanique|court|hebdo|eclair|lancer --bancs 1,3|bruit [--bancs 3,7]|complet|statut|verifier-publication|comparer <a> <b>|ajouter [--candidat c] [--reference r] [--repetitions N] [--paralleles N] [--garder-clones] [--malgre-charge] [--attendre [min]]');
+    io.err('usage : cadence2 bench micro|mecanique|court|hebdo|eclair|lancer --bancs 1,3|bruit [--bancs 3,7]|complet|statut|verifier-publication|comparer <a> <b>|bilan [--semaines N]|ajouter [--candidat c] [--reference r] [--repetitions N] [--paralleles N] [--garder-clones] [--malgre-charge] [--attendre [min]]');
     return 2;
   }
   const rep = entierOption(reste, 'repetitions', 1);

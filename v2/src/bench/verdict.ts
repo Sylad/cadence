@@ -300,7 +300,7 @@ export function verdict(res: ResultatBanc[], ref: string, cand: string, barre: B
 const okRouge = (x: boolean | null | undefined) => (x === null || x === undefined ? '–' : x ? 'ok' : 'ROUGE');
 
 /** `niveau` (L689) : micro ou mécanique ; `depot` : le dépôt dont le banc a lancé le code ; `duree_s` : durée du passage entier. */
-export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdict, e: { date: string; empreinte: string; repetitions?: number; eclair?: string[]; niveau?: string; depot?: string; duree_s?: number; environnement?: string[]; charge?: string[] }): string {
+export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdict, e: { date: string; empreinte: string; repetitions?: number; eclair?: string[]; niveau?: string; depot?: string; duree_s?: number; environnement?: string[]; charge?: string[]; classement?: string[] }): string {
   const lignes = res.map((r) => {
     const j = r.jugement; const sj = r.sans_juge; const m = (b: string) => r.mesures[b]; const deux = (f: (x: Meca) => string) => (j ? `${f(j.meca[ref])} · ${f(j.meca[cand])}` : '–');
     const nbCaches = (b: string, f: string) => (f === 'caches_ok' && sj?.[b]?.caches_reussis ? ` ${somme(Object.values(sj[b].caches_reussis!))}` : ''); // L777 : tests d'origine réussis
@@ -322,6 +322,7 @@ export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdi
     `| Banc | Temps ${ref} | Temps ${cand} | Tokens ${ref} | Tokens ${cand} | Préféré | Cachés ${ref} · ${cand} | Mutations ${ref} · ${cand} | Suite ${ref} · ${cand} | Attendu ${ref} · ${cand} | Taille déclarée ${ref} · ${cand} |`,
     '|---|---|---|---|---|---|---|---|---|---|---|', ...lignes, '', '| Critère | Valeur | Seuil | Résultat |', '|---|---|---|---|',
     ...v.criteres.map((c) => `| ${c.nom} | ${c.valeur} | ${c.seuil} | ${c.ok ? 'ok' : c.non_mesurable ? '**non mesurable** (charge)' : c.bloquant ? '**ROUGE**' : c.nom === 'bras qui ont livré le travail' ? '**non livré**' : [FUITES_SIGNALEES, ECART_DANS_LE_BRUIT].includes(c.nom) ? '**signalé**' : 'en dessous (indicatif)'} |`), '',
+    ...(e.classement ?? []), // L912 : classement des rouges
     ...(rejoues.length ? ['## Suites rejouées', '', 'Rouge pendant que les autres bancs tournaient, rejouée seule après eux : le rejeu compte (L734).', '', ...rejoues, ''] : []),
     ...(v.criteres.some((k) => k.non_mesurable && !k.ok) ? ['## Temps non mesurables (charge)', '', `La machine était chargée par d'autres travaux pendant le passage (${v.criteres.find((k) => k.non_mesurable)!.non_mesurable}) : un temps hors seuil n'y dit rien du candidat (L911). Il n'est pas compté rouge ; rejouer le passage au calme.`, '',
       ...v.criteres.filter((k) => k.non_mesurable && !k.ok).map((k) => `- ${k.nom} : ${k.valeur} (seuil ${k.seuil})`), ''] : []),

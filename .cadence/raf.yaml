@@ -4798,6 +4798,11 @@ lots:
     status: todo
     estimate: 1
     created: 2026-11-27
+  - id: L915
+    title: "Inventaire avant/après d'une refonte d'écran (idée de hallmark sloplint --before/--kept, testé le 27-11) : avant un lot visible qui refait un écran existant, relever par Playwright sur la page rendue (SPA comprises) ses liens, champs, boutons et gestionnaires, titres et data-testid ; après le lot, la revue UX compare et nomme chaque élément perdu. hallmark ne le fait que sur du HTML statique, comparaison par ensemble (un lien dupliqué retiré passe inaperçu). Mesure : sur les 5 prochains lots de refonte, éléments perdus trouvés par l'inventaire contre ceux vus par la revue UX ; sans écart, l'idée est retirée"
+    status: todo
+    estimate: 1
+    created: 2026-11-27
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

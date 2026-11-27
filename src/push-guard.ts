@@ -1,6 +1,6 @@
 import { verdictFor, type GateVerdict } from './gate-verdict.js';
 import { changedFiles, tryGit } from './git.js';
-import { planSideAt, type PlanSideRefs } from './plan-side.js';
+import { isRequestFile, planSideAt, type PlanSideRefs } from './plan-side.js';
 import { blockingLots, LABEL } from './orchestrate/table.js';
 import type { LotState } from './orchestrate/state.js';
 
@@ -54,12 +54,12 @@ const PLAN_HOPS = 50;
  * Le verdict de la porte pour `sha`, ou, quand `sha` ne change que le plan (`planFile`) et n'a qu'un parent, celui de son parent, de proche en proche
  * (L432 : un commit de `raf done` au-dessus d'un sha à porte verte ne réclame pas une suite complète rejouée). Son propre verdict, s'il en a un, prime.
  * `side` (L786, `orchestrate.gate.readsPlan` absent) : un commit dont chaque fichier est un fichier du plan (`planSideAt` : le plan, `.cadence/**`, les sorties de
- * `plan.onWrite`) hérite aussi ; sans lui, seul un commit qui ne change que `planFile`. Revue r1 (m1) : les sorties de `plan.onWrite` sont lues au commit traversé
+ * `plan.onWrite`) hérite aussi ; sans lui, seul un commit qui ne change que `planFile` et des documents du registre des demandes (`.cadence/demandes/*.json`, L920). Revue r1 (m1) : les sorties de `plan.onWrite` sont lues au commit traversé
  * ET au sha dont le verdict est repris, jamais dans l'arbre courant : une sortie que la configuration jugée ne déclarait pas n'hérite pas de son verdict.
  * Une fusion (deux parents), un commit racine, un commit qui touche autre chose que le plan ou un commit sans fichier n'héritent de rien.
  */
 function planVerdict(root: string, sha: string, planFile: string, side?: PlanSideRefs): GateVerdict | null {
-  const planOnly = (files: string[], rev: string) => (side ? files.length > 0 && files.every(planSideAt(root, rev, side)) : files.length === 1 && files[0] === planFile);
+  const planOnly = (files: string[], rev: string) => (side ? files.length > 0 && files.every(planSideAt(root, rev, side)) : files.length > 0 && files.every((f) => f === planFile || isRequestFile(f)));
   const crossed: string[][] = [];
   let at = sha;
   for (let hop = 0; hop <= PLAN_HOPS; hop++) {
@@ -79,7 +79,7 @@ function planVerdict(root: string, sha: string, planFile: string, side?: PlanSid
  * le sha local d'une branche (`refs/heads/`) doit avoir son dernier verdict à 0 dans l'état partagé du dépôt. Absent ou rouge, le refus nomme le sha, dit lequel des deux
  * et donne la commande qui rend le verdict (`cadence verify --gate --sha <sha>`) ; il rappelle la variable qui passe outre. Une suppression de branche, un sha illisible
  * et une réf hors `refs/heads/` (un tag : son sha est celui de l'objet tag, pas d'un commit à vérifier) passent. Sans porte déclarée (`gate` faux) rien n'est exigé.
- * Un commit qui ne change que le plan (`planFile`, relatif à la racine du dépôt) reprend le verdict de son parent (L432, `planVerdict`) ; avec `side` (L786), tout
+ * Un commit qui ne change que le plan (`planFile`, relatif à la racine du dépôt) et le registre des demandes reprend le verdict de son parent (L432, L920, `planVerdict`) ; avec `side` (L786), tout
  * commit de plan seul au sens de `planSideAt`.
  */
 export function gateRefusal(root: string, gate: boolean, input: string, planFile: string, side?: PlanSideRefs): string | null {

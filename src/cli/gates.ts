@@ -242,7 +242,8 @@ function prePush(io: Io, { root, remoteName, configPath, planFile, review }: Pre
 
 /**
  * L786 : sans `gate.readsPlan`, aucun test ne lit le plan : un commit de plan seul (plan, `.cadence/`, sorties de `plan.onWrite` lues au commit, revue r1 m1)
- * reprend le verdict du sha dessous. Un test qui lit un fichier de `.cadence/` (registre des demandes, `docs-ok.yaml`) le déclare aussi (revue r1, m2).
+ * reprend le verdict du sha dessous. Un test qui lit un autre fichier de `.cadence/` (`docs-ok.yaml`) le déclare aussi (revue r1, m2). Avec `readsPlan`, le plan et
+ * le registre des demandes (`.cadence/demandes/*.json`, L920) héritent encore, seuls ou ensemble (`planVerdict`).
  */
 function gateSide(config: ReturnType<typeof readOrchestrateConfig> | null, refs: PlanSideRefs): PlanSideRefs | undefined {
   return config?.gate?.readsPlan ? undefined : refs;

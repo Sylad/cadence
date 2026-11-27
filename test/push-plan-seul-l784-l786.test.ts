@@ -169,14 +169,53 @@ describe('hook pre-push, porte : un commit de plan seul au-dessus d\'un sha à p
     expect(r.err).toContain('aucun verdict de la porte pour ce sha');
   });
 
-  it('R9 — gate.readsPlan déclaré : un commit plan + demande exige sa porte ; le plan seul hérite comme avant (L432)', async () => {
+  it('R9 — gate.readsPlan déclaré : le plan seul hérite comme avant (L432) ; un autre fichier de .cadence/ que le registre exige sa porte', async () => {
     const { dir, base } = project(true);
     const seul = change(dir, { '.cadence/raf.yaml': 'lots: []\n' }, 'plan: L5 terminé');
     expect((await prePush(dir, push(seul, base))).code).toBe(0);
-    const p = change(dir, demande(1), 'plan: D-1');
+    const p = change(dir, { '.cadence/docs-ok.yaml': 'ok: []\n' }, 'plan: docs-ok');
     const r = await prePush(dir, push(p, base));
     expect(r.code).toBe(3);
     expect(r.err).toContain('aucun verdict de la porte pour ce sha');
+  });
+
+  // L920 : « registre: D-4 livrée » (un seul .cadence/demandes/D-4.json) refusé au push dans ol-companion le 27-11, toute la porte à rejouer pour un JSON.
+  // Le registre suit la règle du plan seul, avec ou sans gate.readsPlan, et sans CADENCE_PUSH_UNGATED.
+  for (const readsPlan of [false, true]) {
+    const cas = readsPlan ? 'gate.readsPlan déclaré' : 'sans gate.readsPlan';
+    it(`R14 (L920, ${cas}) — un commit de registre seul au-dessus d'un sha à porte verte : le push passe`, async () => {
+      const { dir, base } = project(readsPlan);
+      const p = change(dir, demande(4), 'registre: D-4 livrée');
+      const r = await prePush(dir, push(p, base));
+      expect(r.err).toBe('');
+      expect(r.code).toBe(0);
+    });
+
+    it(`R15 (L920, ${cas}) — un commit registre + code : la porte reste due`, async () => {
+      const { dir, base } = project(readsPlan);
+      const p = change(dir, { ...demande(4), 'src/a.ts': '2\n' }, 'registre: D-4 livrée');
+      const r = await prePush(dir, push(p, base));
+      expect(r.code).toBe(3);
+      expect(r.err).toContain('aucun verdict de la porte pour ce sha');
+    });
+
+    it(`R16 (L920, ${cas}) — plan + registre ensemble, puis un registre seul empilé : le push passe`, async () => {
+      const { dir, base } = project(readsPlan);
+      change(dir, { '.cadence/raf.yaml': 'lots: []\n', ...demande(4) }, 'plan: L5 terminé (D-4)');
+      const p = change(dir, demande(5), 'registre: D-5 notée');
+      const r = await prePush(dir, push(p, base));
+      expect(r.err).toBe('');
+      expect(r.code).toBe(0);
+    });
+  }
+
+  it('R17 (L920) — un fichier qui ressemble au registre sans en être (.cadence/demandes/archive/D-1.json, D-1.md) n\'hérite pas sous gate.readsPlan', async () => {
+    const { dir, base } = project(true);
+    for (const file of ['.cadence/demandes/archive/D-1.json', '.cadence/demandes/D-1.md']) {
+      const p = change(dir, { [file]: '{}\n' }, 'registre: autre');
+      const r = await prePush(dir, push(p, base));
+      expect(r.code).toBe(3);
+    }
   });
 
   it('R10 (revue r1, m1) — plan.onWrite.files lu au sha jugé : une sortie déclarée dans l\'arbre courant seulement n\'hérite pas du verdict', async () => {

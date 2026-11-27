@@ -11,6 +11,15 @@ import { fileAt } from './git.js';
 /** Le dossier de cadence à la racine du dépôt : rien n'y est du code d'un lot. */
 const CADENCE_DIR = '.cadence/';
 
+/**
+ * Un document du registre des demandes (`.cadence/demandes/<id>.json`, L920) : comme le plan, aucun test de la porte n'est censé le lire, et un commit qui ne
+ * touche que lui et le plan se pousse sans porte, même quand `orchestrate.gate.readsPlan` déclare qu'un test lit le plan (vécu 27-11 : « registre: D-4 livrée »
+ * refusé au push dans ol-companion, toute la porte à rejouer pour un JSON).
+ */
+export function isRequestFile(file: string): boolean {
+  return /^\.cadence\/demandes\/[^/]+\.json$/.test(file);
+}
+
 /** Le plan et la configuration, chemins relatifs à la racine du dépôt. */
 export interface PlanSideRefs {
   planFile: string;

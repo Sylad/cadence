@@ -4794,6 +4794,7 @@ lots:
     after: [ L911 ]
     created: 2026-11-27
     started: 2026-11-27
+    review: { date: 2026-11-27, verdict: "non conforme : 1 majeur (une régression réelle présumée comptée comme un fait), 2 mineurs ; rapport revues/L912-code.md", commit: 3c59c97a6f075a5d2b04b508444e823b24670692 }
   - id: L913
     title: "Correctif bloquant de 2.0.19 : la CI de publication rejouée par cadence release est rouge sur v2/test/run-rejeu-seul-l842.test.ts:112 — la sortie du vitest imbriqué y est en couleurs (« a.test.ts␛[2m > ␛[22ms »), la regex du nom de test ne trouve rien. Retirer les codes ANSI là où le rejeu (rejouerRouges) lit les noms de tests dans une sortie, pas seulement dans le test, et lancer le vitest imbriqué du test sans couleur ; un test prouve qu'une sortie colorée donne les mêmes rouges qu'une sortie sans couleur. Vécu 27-11 09 h 08 et 09 h 19 (deux refus de release). Mesure : cadence release patch --dry-run puis la vraie préparation vertes"
     status: done
@@ -4953,6 +4954,11 @@ lots:
     title: "Fichiers dérivés oubliés au commit du lead (2e occurrence le 27-11) : codex L113 — entrée docs/nouveautes commitée sans régénérer frontend/public/nouveautes-data/nouveautes.json (porte rouge au livreur, 10 min) ; ol-companion L273 — « git commit -- .cadence/raf.yaml » sans frontend/public/plan-data/plan.json régénéré par plan.onWrite (porte rouge au livreur). Mécanisme : (1) la ligne « à commiter » de raf cite aussi les fichiers de plan.onWrite.files ; (2) cadence news new / raf ux régénèrent le JSON des Nouveautés ou impriment la commande ; (3) un pre-commit refuse un commit qui touche docs/nouveautes/*.md ou le plan sans le fichier dérivé à jour. Mesure : aucune porte de livreur rouge sur un fichier dérivé pendant 2 semaines."
     status: todo
     estimate: 1
+    created: 2026-11-27
+  - id: L940
+    title: "Le hook pre-push prend pour un commit du lot tout identifiant cité dans le message : le 27-11, d838467 « L113: titre … (test L62 R8) » a été refusé comme commit de L62 sans revue, et il a fallu un faux verdict de revue sur L62 pour livrer L113. Ne rattacher un commit qu'au lot de son préfixe (« L113: », « feat(L113) »), une citation entre parenthèses restant une citation. Mesure : aucun push refusé pour un lot seulement cité, sur le journal des refus du hook"
+    status: todo
+    estimate: 0.5
     created: 2026-11-27
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

@@ -4786,6 +4786,7 @@ lots:
     estimate: 1
     created: 2026-11-27
     started: 2026-11-27
+    review: { date: 2026-11-27, verdict: "non conforme : 2 corrections — le pic de charge compte la charge que le banc produit lui-même (au calme 10,7–15,1 pour un seuil de 16 : un vrai ralentissement sortirait NON MESURABLE, à chaque passage sur mini-blue, seuil 10) ; le relevé de chaque minute n'a aucun test. Mineurs : --attendre 0 attend 60 min sans rien dire ; seuil lu à deux endroits. Rapport bilans/2026-11-27/L911-code.md", commit: 4b1bcdc931bb5f112b28226babe5d8fa3eeb7001 }
   - id: L912
     title: "D-40 Utilité du banc : chaque rapport de banc classe ses rouges en « régression réelle » (corrigée ensuite par un commit de v2/) ou « bruit » (charge, réseau, amont, rejoué vert sans changement), et cadence bench --bilan donne sur 4 semaines : bancs joués, heures de machine, régressions réelles attrapées, faux rouges, et ce qu'aurait laissé passer la suite de tests seule. Vécu 27-11 : 2 rouges sur 3 bancs mécaniques dus à la charge (247 s contre 188), aucune régression. Mesure : le bilan existe et tient la revue D-30 ; un critère du banc qui n'attrape rien en 4 semaines est retiré ou fondu dans la porte"
     status: doing
@@ -4930,6 +4931,26 @@ lots:
     created: 2026-11-27
   - id: L935
     title: "Suites de la revue de L920 (27-11) : 1) preloadChangedFiles (src/git.ts) lit git log --name-only, qui suit les renommages et garde le nouveau nom : pendant une vague, un commit qui renomme du code vers .cadence/demandes/ passe pour un commit de registre seul (défaut antérieur à L920, étendu aux projets readsPlan) → --no-renames ou --name-status ; 2) isRequestFile n'accepte que D-<n>.json (pas tout *.json) ; 3) la moitié .md de R17 (push-plan-seul-l784-l786.test.ts:212) ne peut pas échouer : la tester seule. Rapport : bilans/2026-11-27/L920-code.md"
+    status: todo
+    estimate: 1
+    created: 2026-11-27
+  - id: L936
+    title: "Alléger le socle fixe d'un cadence run (D-45, piste 1). Bilan d'usage 7 j du 27-11 : au premier appel, un run porte déjà ~71k jetons (médiane, min 64k) de consignes, CLAUDE.md, mémoire, outils, skills, agents et MCP ; sa seule relecture coûte ~240 $ sur 1 164 $ estimés pour les 348 runs (~21 %), plus les écritures de cache. Inventorier ce qui compose ce socle dans un run réel, retirer ce dont un run n'a pas besoin (serveurs MCP, skills et agents hors sujet, CLAUDE.md et mémoire du dossier parent destinés au lead), sans toucher au brief gagnant du banc. Mesure : socle médian sous 35k au premier appel, réussite et durée au banc inchangées, coût par lot réussi en baisse (touche v2/ : banc requis)"
+    status: todo
+    estimate: 1
+    created: 2026-11-27
+  - id: L937
+    title: "Banc mécanique de semaine moins coûteux (D-45, piste 2). Bilan d'usage 7 j du 27-11 : le banc de semaine joue de vraies sessions de modèle (aether-b68, r1/r2, c1/c2) et coûte 136 à 162 $ estimés par jour où il tourne (25 et 26-11), ~5-6 % du quota hebdo à chaque passage, 22 % du coût de la semaine avec le banc complet. Réduire ce que joue le banc de semaine (un seul scénario court, une seule répétition, ou rejeu seulement quand le brief ou le noyau de run change), le banc complet restant au week-end (D-39). Vérifier aussi que le hook d'arrêt de 20 h couvre son lancement : un banc porte l'horodatage 2026-11-25-2147. Mesure : coût d'un banc de semaine sous 2 % du quota hebdo, et les régressions qu'il a trouvées sur les 4 dernières semaines toujours trouvées (rejeu)"
+    status: todo
+    estimate: 1
+    created: 2026-11-27
+  - id: L938
+    title: "Contexte des runs et des sessions lead plus petit (D-45, piste 3). Bilan d'usage 7 j du 27-11 : contexte moyen 175k jetons par appel de run (max 266k), 14 % des appels au-delà de 200k ; sessions lead à 198k en moyenne. Le coût vient de la relecture (41 %) et de la réécriture du cache (38 %), la sortie ne pèse que 21 %. Mesurer où le contexte d'un run grossit (sorties de porte, lectures de fichiers entiers, reprises après correction), puis le borner : sorties de commandes tronquées ou résumées, compactage plus tôt, passe de correction dans une session neuve avec un résumé. Côté lead : relais par fichier plutôt que sorties brutes, sessions plus courtes. S'appuie sur les jetons par lot de L820. Mesure : contexte moyen d'un appel de run sous 120k et coût par lot réussi en baisse au banc, à réussite égale"
+    status: todo
+    estimate: 1
+    created: 2026-11-27
+  - id: L939
+    title: "Fichiers dérivés oubliés au commit du lead (2e occurrence le 27-11) : codex L113 — entrée docs/nouveautes commitée sans régénérer frontend/public/nouveautes-data/nouveautes.json (porte rouge au livreur, 10 min) ; ol-companion L273 — « git commit -- .cadence/raf.yaml » sans frontend/public/plan-data/plan.json régénéré par plan.onWrite (porte rouge au livreur). Mécanisme : (1) la ligne « à commiter » de raf cite aussi les fichiers de plan.onWrite.files ; (2) cadence news new / raf ux régénèrent le JSON des Nouveautés ou impriment la commande ; (3) un pre-commit refuse un commit qui touche docs/nouveautes/*.md ou le plan sans le fichier dérivé à jour. Mesure : aucune porte de livreur rouge sur un fichier dérivé pendant 2 semaines."
     status: todo
     estimate: 1
     created: 2026-11-27

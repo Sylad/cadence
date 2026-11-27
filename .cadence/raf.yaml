@@ -4788,10 +4788,11 @@ lots:
     started: 2026-11-27
   - id: L912
     title: "D-40 Utilité du banc : chaque rapport de banc classe ses rouges en « régression réelle » (corrigée ensuite par un commit de v2/) ou « bruit » (charge, réseau, amont, rejoué vert sans changement), et cadence bench --bilan donne sur 4 semaines : bancs joués, heures de machine, régressions réelles attrapées, faux rouges, et ce qu'aurait laissé passer la suite de tests seule. Vécu 27-11 : 2 rouges sur 3 bancs mécaniques dus à la charge (247 s contre 188), aucune régression. Mesure : le bilan existe et tient la revue D-30 ; un critère du banc qui n'attrape rien en 4 semaines est retiré ou fondu dans la porte"
-    status: todo
+    status: doing
     estimate: 1
     after: [ L911 ]
     created: 2026-11-27
+    started: 2026-11-27
   - id: L913
     title: "Correctif bloquant de 2.0.19 : la CI de publication rejouée par cadence release est rouge sur v2/test/run-rejeu-seul-l842.test.ts:112 — la sortie du vitest imbriqué y est en couleurs (« a.test.ts␛[2m > ␛[22ms »), la regex du nom de test ne trouve rien. Retirer les codes ANSI là où le rejeu (rejouerRouges) lit les noms de tests dans une sortie, pas seulement dans le test, et lancer le vitest imbriqué du test sans couleur ; un test prouve qu'une sortie colorée donne les mêmes rouges qu'une sortie sans couleur. Vécu 27-11 09 h 08 et 09 h 19 (deux refus de release). Mesure : cadence release patch --dry-run puis la vraie préparation vertes"
     status: done

@@ -2,7 +2,7 @@
 // à côté des journaux de vague : depuis 2.0.0 les lots se font par run, et un perf qui ne lit que les vagues rend n/d sur toutes les lignes sauf « livrés ».
 // Les runs d'un même lot font un seul journal de lot ; un lot qui a aussi un journal de vague est fondu dans le dernier, pour n'être compté qu'une fois.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, isAbsolute, join, relative, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { Journal, JournalPass, JournalStep } from './corrections.js';
 import type { PriceGrid } from './perf-config.js';
 import type { Lot } from './plan.js';
@@ -83,6 +83,20 @@ export function readRunStates(parent: string, projects: string[]): ProjectRun[] 
     if (!s || !project || !known.has(project)) return [];
     return [{ ...s, project, ...(s.clos ? {} : { fin: statSync(path).mtime.toISOString() }) }];
   }));
+}
+
+/** Le dernier état de run de chaque lot du dépôt `repo` (`<dossier du dépôt>/.cadence-run`, comme run.ts) ; `fini` : intégré, rendu ou en échec (revue L931). */
+export function lastRunByLot(repo: string): Map<string, { id: string; etat: string; fini: boolean }> {
+  const dir = join(dirname(repo), '.cadence-run');
+  const out = new Map<string, { id: string; etat: string; fini: boolean; debut: string }>();
+  if (!existsSync(dir)) return out;
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+    const s = readState(join(dir, file));
+    if (!s?.lot || resolve(s.repo) !== resolve(repo)) continue;
+    const prev = out.get(s.lot);
+    if (!prev || s.debut >= prev.debut) out.set(s.lot, { id: s.id, etat: s.etat, fini: statusOf(s) !== null, debut: s.debut });
+  }
+  return out;
 }
 
 /** Le lot du plan qu'un run cite, pour sa visibilité et sa revue d'ergonomie. */

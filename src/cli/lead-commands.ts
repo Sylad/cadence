@@ -186,7 +186,7 @@ export function cmdLead(c: EarlyCtx): number {
     const roots = tourRoots(parent, depth);
     // … puis l'alerte de la garde de publication (L730, D-22) : un banc complet du samedi rouge, ou manqué, fait revenir la garde au banc complet
     for (const l of [...expiredHoldLines(io.now()), ...localOverdueLines(roots, io.now()), ...tourQuotaLines(io.env, roots, io.now().getTime()), ...tourBancLines(roots, io.env)]) io.out(l);
-    // … puis ce que cadence suivant rendrait (L931) : le même calcul sur les lignes du tour, dépôts tenus sautés, lot en cours sans run vivant d'abord
+    // … puis ce que cadence suivant rendrait (L931) : le même calcul sur les lignes du tour, dépôts tenus sautés, lot en cours sans run ni commit d'abord
     io.out(suivantLine(suivant(parent, today, { cap, env: io.env, now: io.now(), entries })));
     // les réglages lead.chain (L772) puis lead.ux (L197) du cadence.yaml du dossier : le lead les lit ici, au lieu d'ouvrir le fichier
     for (const l of tourSettingsLines(parent)) io.out(l);

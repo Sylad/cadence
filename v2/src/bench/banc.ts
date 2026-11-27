@@ -10,7 +10,7 @@ export class BancInvalide extends Error {}
 const TAILLES: Taille[] = ['retouche', 'fonction', 'grosse'];
 const REQUIS = ['projet', 'source', 'base', 'install', 'tests'] as const;
 
-export const racineBanc = (env: NodeJS.ProcessEnv) => env.BENCH_ROOT ?? join(env.HOME ?? '', 'bench-cadence');
+export { racineBanc } from '../../../scripts/verrou-banc.mjs'; // revue L931 : la racine partagée avec cadence suivant (src)
 
 export function chargerBanc(racine: string, id: string): Banc {
   const dir = join(racine, 'bancs', id);

@@ -45,6 +45,8 @@
     "scripts/etapes-porte.d.mts",
     "scripts/porte-rapide.mjs",
     "scripts/porte-rapide.d.mts",
+    "scripts/verrou-banc.mjs",
+    "scripts/verrou-banc.d.mts",
     "scripts/commandes-du-brief.mjs",
     "scripts/commandes-du-brief.d.mts",
     "scripts/nouveautes-du-run.mjs",

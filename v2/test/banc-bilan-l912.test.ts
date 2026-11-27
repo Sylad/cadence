@@ -39,11 +39,12 @@ describe('au passage : le rapport classe ce qu\'il sait déjà', () => {
 });
 
 const p = (date: string, empreinte: string, vert: boolean, rouges: string[] = [], x: Partial<Passage> = {}): Passage => ({ date, empreinte, vert, rouges, niveau: 'mecanique', duree_s: 1800, ...x });
-/** e1 → c1 ; e2 → c2 (après un commit de run) ; e3 → c3 (après un commit du banc seul). */
+/** e1 → c1 ; e2 → c2 (après un commit de run) ; e3 → c3 (après un commit du banc seul) ; e4 → c4 (après 48 commits du noyau) ; c2..c1 : c1 ne descend pas de c2. */
+const noyau = Array.from({ length: 48 }, (_, i) => ({ commit: `n${i} feat(L${700 + i}): lot du noyau`, fichiers: [`v2/src/lot${i}.ts`] }));
 const depot: Depot = {
-  commitDe: (e) => ({ e1: 'c1', e2: 'c2', e3: 'c3' } as Record<string, string>)[e],
-  commitsEntre: (a, b) => ({ 'c1..c2': [{ commit: 'aaa fix(L1): le run rend son rapport', fichiers: ['v2/src/run/run.ts', 'v2/src/bench/cli.ts'] }],
-    'c1..c3': [{ commit: 'bbb fix(L2): compte des tests d\'origine', fichiers: ['v2/src/bench/sans-juge.ts', 'v2/src/cli.ts'] }] } as Record<string, { commit: string; fichiers: string[] }[]>)[`${a}..${b}`] ?? [],
+  commitDe: (e) => ({ e1: 'c1', e2: 'c2', e3: 'c3', e4: 'c4' } as Record<string, string>)[e],
+  commitsEntre: (a, b) => (`${a}..${b}` === 'c2..c1' ? null : ({ 'c1..c2': [{ commit: 'aaa fix(L1): le run rend son rapport', fichiers: ['v2/src/run/run.ts', 'v2/src/bench/cli.ts'] }],
+    'c1..c3': [{ commit: 'bbb fix(L2): compte des tests d\'origine', fichiers: ['v2/src/bench/sans-juge.ts', 'v2/src/cli.ts'] }], 'c1..c4': noyau } as Record<string, { commit: string; fichiers: string[] }[]>)[`${a}..${b}`] ?? []),
 };
 const sansRapport = () => null;
 
@@ -55,9 +56,26 @@ describe('après coup : la suite de l\'historique tranche', () => {
   it('vert après un commit de v2/ hors du banc : régression réelle, avec le commit ; après un commit du banc seul : bruit, banc corrigé', () => {
     const r = p('2026-11-26T16:27:00Z', 'e1', false, ['tests d\'origine verts']);
     expect(classerPassage(r, [p('2026-11-27T07:36:00Z', 'e2', true)], depot, sansRapport)['tests d\'origine verts'])
-      .toEqual({ classe: 'régression réelle', cause: 'corrigée avant le vert du 2026-11-27-0836', commits: ['aaa fix(L1): le run rend son rapport'] });
+      .toEqual({ classe: 'régression réelle', cause: 'corrigée avant le vert du 2026-11-27-0836 (1 commit(s) de v2/ hors du banc, 15 h)', commits: ['aaa fix(L1): le run rend son rapport'],
+        vert: '2026-11-27-0836-e2' });
     expect(classerPassage(r, [p('2026-11-27T07:36:00Z', 'e3', true)], depot, sansRapport)['tests d\'origine verts'].cause)
       .toBe('banc corrigé : vert le 2026-11-27-0836 après 1 commit(s) du banc seulement (v2/src/bench/, v2/src/sequence/, v2/src/cli.ts)');
+  });
+  it('revue L912 : un vert lointain (7 jours) ou une longue suite de commits du noyau ne fait qu\'une régression présumée', () => {
+    const r = p('2026-11-07T20:32:00Z', 'e1', false, ['temps total']);
+    const loin = classerPassage(r, [p('2026-11-14T09:18:00Z', 'e2', true)], depot, sansRapport)['temps total'];
+    expect(loin).toMatchObject({ classe: 'régression présumée', commits: ['aaa fix(L1): le run rend son rapport'] });
+    expect(loin.cause).toBe('vert du 2026-11-14-1018 après 1 commit(s) de v2/ hors du banc et 157 h : correction non nommée, à trancher dans classements.json');
+    const longue = classerPassage(p('2026-11-27T07:01:00Z', 'e1', false, ['aucune fuite']), [p('2026-11-27T09:00:00Z', 'e4', true)], depot, sansRapport)['aucune fuite'];
+    expect(longue.classe).toBe('régression présumée');
+    expect(longue.cause).toMatch(/^vert du 2026-11-27-1000 après 48 commit\(s\) de v2\/ hors du banc et 2 h/);
+    expect(longue.commits).toHaveLength(48);
+    expect(tranche({ '2026-11-07-2132-e1': { 'temps total': 'régression présumée : à revoir' } }, r, 'temps total')?.classe).toBe('régression présumée');
+  });
+  it('revue L912 : un vert sur un commit antérieur à celui du rouge ne tranche rien (pas « banc corrigé après 0 commit »)', () => {
+    const r = p('2026-11-27T07:01:00Z', 'e2', false, ['aucune fuite']);
+    expect(classerPassage(r, [p('2026-11-27T08:00:00Z', 'e1', true)], depot, sansRapport)['aucune fuite'])
+      .toEqual({ classe: 'non tranché', cause: 'vert du 2026-11-27-0900 sur un commit antérieur au rouge' });
   });
   it('le vert suivant est celui de la même famille ; sans lui, ou hors de main : non tranché', () => {
     const r = p('2026-11-26T10:21:00Z', 'e1', false, ['mutations tuées'], { niveau: undefined });
@@ -99,13 +117,27 @@ describe('bench bilan : 4 semaines', () => {
     expect(l[0]).toBe('Bilan du banc du 2026-10-30 au 2026-11-27 (L912, D-40)');
     expect(l).toContain('- bancs joués : 6 passages (mecanique 4, séquence aether-b68-court 1, bruit (A contre A) 1)');
     expect(l).toContain(`- heures de machine : ${b.heures.toFixed(1).replace('.', ',')} h`);
-    expect(l).toContain('- régressions réelles attrapées : 1 (2 rouge(s) de critère, corrigés par un commit de v2/ hors du banc ; une par vert qui les clôt)');
+    expect(l).toContain('- régressions réelles attrapées : 1 (2 rouge(s) de critère, clos par un vert après au plus 3 commit(s) de v2/ hors du banc et 24 h ; une par vert qui les clôt)');
+    expect(l).toContain('- régressions présumées, à trancher dans classements.json : 0 (0 rouge(s) de critère, clos par un vert plus lointain ; jamais comptées avec les réelles)');
     expect(l).toContain('- faux rouges (bruit) : 1 (non mesurable 1)');
     expect(l).toContain('- non tranchés : 1 (aucun passage vert depuis 1) ; passages non mesurables (charge) : 0');
-    expect(l.find((x) => x.startsWith('- ce qu\'aurait laissé passer la suite de tests seule'))).toMatch(/: 1 régression\(s\)/);
-    expect(l).toContain('| tests d\'origine verts | 2 | 2 | 0 | 0 |');
-    expect(l).toContain('Critères sans régression réelle sur la fenêtre (à retirer ou fondre dans la porte s\'ils n\'attrapent rien en 4 semaines) : aucune fuite, cohérence UI, temps des retouches');
-    expect(l).toContain('- 2026-11-26 17:27 mecanique e1 — tests d\'origine verts : régression réelle, corrigée avant le vert du 2026-11-27-0836 : aaa fix(L1): le run rend son rapport');
+    expect(l.find((x) => x.startsWith('- ce qu\'aurait laissé passer la suite de tests seule'))).toBe('- ce qu\'aurait laissé passer la suite de tests seule : présomption, non mesurée — au plus 1 régression(s) réelle(s), chacune sur un commit de main intégré après la porte');
+    expect(l).toContain('| tests d\'origine verts | 2 | 2 | 0 | 0 | 0 |');
+    // aucune fuite : seul rouge non tranché (séquence sans vert) → à trancher, pas à retirer ; temps des retouches : bruit seul ; cohérence UI : jamais rouge
+    expect(l).toContain('Critères jamais rouges ou seulement en bruit sur la fenêtre (à retirer ou fondre dans la porte s\'ils n\'attrapent rien en 4 semaines) : cohérence UI, temps des retouches');
+    expect(l).toContain('Critères sans régression réelle mais avec des rouges non tranchés ou présumés (utilité non mesurée, à trancher avant tout retrait) : aucune fuite');
+    expect(l).toContain('- 2026-11-26 17:27 mecanique e1 — tests d\'origine verts : régression réelle, corrigée avant le vert du 2026-11-27-0836 (1 commit(s) de v2/ hors du banc, 15 h) : aaa fix(L1): le run rend son rapport');
+  });
+  it('revue L912 : les présumées sont comptées à part, jamais additionnées aux réelles', () => {
+    const b = bilan([p('2026-11-07T20:32:00Z', 'e1', false, ['temps total', 'aucun bras en échec']), p('2026-11-14T09:18:00Z', 'e4', true)], [],
+      { maintenant: MAINTENANT, semaines: 4, depot, lire: sansRapport });
+    const l = lignesBilan(b);
+    expect(l).toContain('- régressions réelles attrapées : 0 (0 rouge(s) de critère, clos par un vert après au plus 3 commit(s) de v2/ hors du banc et 24 h ; une par vert qui les clôt)');
+    expect(l).toContain('- régressions présumées, à trancher dans classements.json : 1 (2 rouge(s) de critère, clos par un vert plus lointain ; jamais comptées avec les réelles)');
+    expect(l.find((x) => x.startsWith('- ce qu\'aurait laissé passer'))).toContain('au plus 0 régression(s) réelle(s)');
+    expect(l).toContain('| temps total | 1 | 0 | 1 | 0 | 0 |');
+    expect(l.find((x) => x.startsWith('Critères jamais rouges'))).toMatch(/: aucun$/);
+    expect(l.find((x) => x.startsWith('Critères sans régression réelle mais'))).toMatch(/: aucun bras en échec, temps total$/);
   });
   it('la commande lit la racine du banc (historique, rapports, classements.json) ; --semaines faux : code 2', async () => {
     const racine = dossierTemp('banc-l912-');
@@ -137,5 +169,7 @@ describe('le dépôt réel : empreinte → commit, commits de v2/ entre deux', (
     const dep = depotGit(d);
     expect([dep.commitDe(e1), dep.commitDe(e3), dep.commitDe('inconnue')]).toEqual([c1, c3, undefined]);
     expect(dep.commitsEntre(c1, c3)).toEqual([{ commit: `${c3.slice(0, 7)} fix(L1): run`, fichiers: ['v2/hooks/h.mjs', 'v2/src/run/run.ts'] }]);
+    expect(dep.commitsEntre(c3, c1)).toBeNull(); // revue L912 : c1 ne descend pas de c3
+    expect(dep.commitsEntre(c3, c3)).toEqual([]);
   });
 });

@@ -132,6 +132,8 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // lus dans /proc toutes les 5 s et lissés sur 1 min : tachesProc, actifsHorsArbre, suivreCharge), --attendre refuse 0 ou un texte, seuil lu dans io.env seul, sans ligne tassée.
   // L912 (D-40) : bench 2176 (+203), mesure 2909 : chaque rapport classe ses rouges (régression réelle ou bruit : charge, réseau, rejoué vert, banc corrigé) et
   // bench bilan compte sur 4 semaines bancs joués, heures, régressions réelles et faux rouges (bilan.ts : empreinte → commit de main, classements.json), sans ligne tassée.
+  // revue L912 (D-40) : bench 2257 (+18), mesure 2990 : une régression close par un vert lointain (> 24 h) ou après plus de 3 commits du noyau n'est que
+  // présumée, comptée à part ; critères à retirer séparés de ceux aux rouges non tranchés ; un vert sur un commit antérieur au rouge ne tranche rien, sans ligne tassée.
   // L808 : hooks 321 (+90) : cheminsCites et classer passent de bench/fuites.ts (-53) à hooks/lecture.mjs, partagés par le détecteur de fuites et le hook
   // lecture-obligatoire.mjs, qui refuse au banc toute lecture hors du clone (lectureHorsClone), sans ligne tassée.
   // L808 (revue r1) : hooks 376 (+55) : seul ce qui est LU est jugé (commandeLue retire d'une commande Bash les textes écrits : heredoc, message de commit,
@@ -153,9 +155,9 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // (« / » de prose, commentaire suivi d'un chiffre, délimiteur de sed, import TS, nom de commande, « 2>/dev/null ») retirés, sans ligne tassée.
   // L923 : run 1478 (+103), deliver 286 (-103, module absent de src/, total du noyau inchangé) : run/derives.ts, un fichier dérivé du plan (plan.onWrite.files)
   // modifié dans l'arbre principal et par le run est régénéré après l'avance rapide au lieu de faire refuser l'intégration ; commiterStart y passe, découpé sous le seuil de complexité, sans ligne tassée.
-  it('les totaux sont ceux de R29 : noyau 3000, mesure 2972 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742, L752, L756, L762, L775, L777, L798, L804, L905, L911, L912, revue L911)', () => {
+  it('les totaux sont ceux de R29 : noyau 3000, mesure 2990 (L689, issue #57, L730, L733, L734, L736, L737, L738, L739, L742, L752, L756, L762, L775, L777, L798, L804, L905, L911, L912, revue L911, revue L912)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
-    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2972]);
+    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2990]);
   });
   for (const [nom, g] of Object.entries(budget)) {
     it(`groupe ${nom} : la somme des budgets ne dépasse pas ${g.total}`, () =>

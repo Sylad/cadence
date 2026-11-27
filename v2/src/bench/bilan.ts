@@ -9,15 +9,20 @@ import { chargeHaute, type Charge } from './charge.js';
 import { empreinteArbres } from './cli.js'; // appelé à l'exécution seulement : le cycle cli.ts ↔ bilan.ts est sans effet au chargement
 import { datePassage, parisJour, type ResultatBanc, type Verdict } from './verdict.js';
 
-export type Classe = 'régression réelle' | 'bruit' | 'non tranché';
-/** `commits` : pour une régression réelle, les commits de v2/ qui l'ont corrigée (sha court et sujet). */
-export interface Classement { classe: Classe; cause: string; commits?: string[] }
+/** « régression présumée » (revue L912) : le vert qui clôt le rouge suit trop de commits du noyau, ou arrive trop tard, pour en nommer la correction ; comptée à part, jamais avec les réelles. */
+export type Classe = 'régression réelle' | 'régression présumée' | 'bruit' | 'non tranché';
+/** `commits` : pour une régression (réelle ou présumée), les commits de v2/ hors du banc entre le rouge et le vert (sha court et sujet). */
+/** `vert` : le rapport du vert qui clôt une régression, pour la compter une fois par vert. */
+export interface Classement { classe: Classe; cause: string; commits?: string[]; vert?: string }
 
 /** Les critères de temps : sous la charge, ils ne mesurent rien (L911). */
 export const CRITERES_TEMPS = ['temps total', 'temps des retouches'];
 /** L'instrument de mesure (banc, banc séquence, aide et aiguillage de cadence2) : un rouge corrigé par ces seuls fichiers était un défaut du banc, pas de cadence. */
 export const INSTRUMENT = ['v2/src/bench/', 'v2/src/sequence/', 'v2/src/cli.ts'];
 const instrument = (f: string) => INSTRUMENT.some((x) => f.startsWith(x));
+/** Au-delà de ces commits du noyau, ou de ce délai entre le rouge et le vert, la correction n'est qu'une présomption (revue L912 : 22 rouges « réels » sur 4 à 48 commits, du 07-11 au 14-11). */
+export const MAX_COMMITS_REELLE = 3;
+export const MAX_HEURES_REELLE = 24;
 /** Échec d'un bras dû au réseau ou à l'amont (API, quota), pas au code mesuré. */
 const RESEAU = /ECONNRESET|ETIMEDOUT|EAI_AGAIN|ENOTFOUND|socket hang up|overloaded|rate.?limit|API Error|\b(429|529)\b|réseau|network/i;
 const A_TRANCHER = 'à trancher par « cadence2 bench bilan » : régression réelle si un commit de v2/ hors du banc le corrige, bruit s\'il repasse vert sans changement';
@@ -45,8 +50,8 @@ export const lignesClassement = (cl: Record<string, Classement>): string[] => (O
 /** Une ligne de `historique.jsonl`, ce que le bilan en lit. */
 export interface Passage { type?: string; sequence?: string; run?: string; repetition?: number; niveau?: string; hebdo?: boolean; date: string; empreinte: string;
   duree_s?: number; vert: boolean; rouges?: string[]; non_mesurable?: string[]; charge_haute?: string }
-/** Ce que le bilan lit du dépôt : le commit qui a fait une empreinte, et les commits de v2/ entre deux commits (fichiers touchés compris). */
-export interface Depot { commitDe(empreinte: string): string | undefined; commitsEntre(a: string, b: string): { commit: string; fichiers: string[] }[] }
+/** Ce que le bilan lit du dépôt : le commit qui a fait une empreinte, et les commits de v2/ entre deux commits (fichiers touchés compris) ; null quand b ne descend pas de a. */
+export interface Depot { commitDe(empreinte: string): string | undefined; commitsEntre(a: string, b: string): { commit: string; fichiers: string[] }[] | null }
 /** Ce que le bilan lit d'un passage dans `rapports/` : la charge et les échecs de bras. */
 export type LireRapport = (p: Passage) => { charge?: Charge; resultats?: ResultatBanc[] } | null;
 
@@ -68,9 +73,14 @@ function classerParLaSuite(p: Passage, vertSuivant: Passage | undefined, depot: 
   const [a, b] = [depot.commitDe(p.empreinte), depot.commitDe(vertSuivant.empreinte)];
   if (!a || !b) return { classe: 'non tranché', cause: `empreinte absente de l'historique de main (${a ? vertSuivant.empreinte : p.empreinte})` };
   const commits = depot.commitsEntre(a, b);
+  if (!commits) return { classe: 'non tranché', cause: `vert du ${quand} sur un commit antérieur au rouge` };
   const mesure = commits.filter((c) => c.fichiers.some((f) => !instrument(f)));
   if (!mesure.length) return { classe: 'bruit', cause: `banc corrigé : vert le ${quand} après ${commits.length} commit(s) du banc seulement (${INSTRUMENT.join(', ')})` };
-  return { classe: 'régression réelle', cause: `corrigée avant le vert du ${quand}`, commits: mesure.map((c) => c.commit) };
+  const heures = (Date.parse(vertSuivant.date) - Date.parse(p.date)) / 3_600_000;
+  if (mesure.length > MAX_COMMITS_REELLE || heures > MAX_HEURES_REELLE) {
+    return { classe: 'régression présumée', cause: `vert du ${quand} après ${mesure.length} commit(s) de v2/ hors du banc et ${Math.round(heures)} h : correction non nommée, à trancher dans classements.json`, commits: mesure.map((c) => c.commit), vert: nomRapport(vertSuivant) };
+  }
+  return { classe: 'régression réelle', cause: `corrigée avant le vert du ${quand} (${mesure.length} commit(s) de v2/ hors du banc, ${Math.round(heures)} h)`, commits: mesure.map((c) => c.commit), vert: nomRapport(vertSuivant) };
 }
 
 /** Chaque rouge d'un passage : la charge et le réseau d'abord (lus au rapport), puis la suite de l'historique. */
@@ -86,7 +96,7 @@ export function classerPassage(p: Passage, apres: Passage[], depot: Depot, lire:
 
 /** Les rouges tranchés à la main (`classements.json` de la racine) : { "<nom du rapport>": { "<critère>" ou "*": "<classe> : <cause>" } }. */
 export type Tranches = Record<string, Record<string, string>>;
-const CLASSES: Classe[] = ['régression réelle', 'bruit', 'non tranché'];
+const CLASSES: Classe[] = ['régression réelle', 'régression présumée', 'bruit', 'non tranché'];
 /** Le classement tranché à la main d'un rouge, s'il y en a un valide ; il passe avant la règle automatique. */
 export function tranche(t: Tranches | undefined, p: Passage, critere: string): Classement | undefined {
   const x = t?.[nomRapport(p)]?.[critere] ?? t?.[nomRapport(p)]?.['*'];
@@ -133,26 +143,34 @@ const genre = (r: RougeClasse) => r.cause.replace(/ \(.*$/, '').replace(/ :.*$/,
 /** Le bilan lisible : comptes, ce que la suite de tests seule aurait laissé passer, critères qui n'attrapent rien, puis le détail des rouges. */
 export function lignesBilan(b: Bilan): string[] {
   const reels = b.rouges.filter((r) => r.classe === 'régression réelle'), bruit = b.rouges.filter((r) => r.classe === 'bruit');
-  const nt = b.rouges.filter((r) => r.classe === 'non tranché');
-  const corrections = new Set(reels.map((r) => `${famille(r.passage)} ${r.cause}`)); // une régression par vert qui clôt ses rouges
+  const nt = b.rouges.filter((r) => r.classe === 'non tranché'), presumees = b.rouges.filter((r) => r.classe === 'régression présumée');
+  const parVert = (l: RougeClasse[]) => new Set(l.map((r) => `${famille(r.passage)} ${r.vert ?? r.cause}`)).size; // une régression par vert qui clôt ses rouges
   const par = (c: string, k: Classe) => b.rouges.filter((r) => r.critere === c && r.classe === k).length;
-  const muets = b.criteres.filter((c) => par(c, 'régression réelle') === 0);
+  const sansReelle = b.criteres.filter((c) => par(c, 'régression réelle') === 0);
+  const aTrancher = sansReelle.filter((c) => par(c, 'non tranché') + par(c, 'régression présumée') > 0);
+  const muets = sansReelle.filter((c) => !aTrancher.includes(c)); // jamais rouges, ou rouges tous du bruit
   return [`Bilan du banc du ${parisJour(b.depuis).jour} au ${parisJour(b.jusqua).jour} (L912, D-40)`,
     `- bancs joués : ${Object.values(b.joues).reduce((a, n) => a + n, 0)} passages (${Object.entries(b.joues).map(([f, n]) => `${f} ${n}`).join(', ') || 'aucun'})`,
     `- heures de machine : ${fr1(b.heures)} h`,
-    `- régressions réelles attrapées : ${corrections.size} (${reels.length} rouge(s) de critère, corrigés par un commit de v2/ hors du banc ; une par vert qui les clôt)`,
+    `- régressions réelles attrapées : ${parVert(reels)} (${reels.length} rouge(s) de critère, clos par un vert après au plus ${MAX_COMMITS_REELLE} commit(s) de v2/ hors du banc et ${MAX_HEURES_REELLE} h ; une par vert qui les clôt)`,
+    `- régressions présumées, à trancher dans classements.json : ${parVert(presumees)} (${presumees.length} rouge(s) de critère, clos par un vert plus lointain ; jamais comptées avec les réelles)`,
     `- faux rouges (bruit) : ${bruit.length}${bruit.length ? ` (${compter(bruit.map(genre))})` : ''}`,
     `- non tranchés : ${nt.length}${nt.length ? ` (${compter(nt.map(genre))})` : ''} ; passages non mesurables (charge) : ${b.nonMesurables.length}`,
-    `- ce qu'aurait laissé passer la suite de tests seule : ${corrections.size} régression(s) — chaque rouge porte sur un commit de main, intégré après la porte (suite verte)`,
-    '', '| Critère | Rouges | Régressions réelles | Bruit | Non tranchés |', '|---|---|---|---|---|',
-    ...b.criteres.map((c) => `| ${c} | ${b.rouges.filter((r) => r.critere === c).length} | ${par(c, 'régression réelle')} | ${par(c, 'bruit')} | ${par(c, 'non tranché')} |`), '',
-    `Critères sans régression réelle sur la fenêtre (à retirer ou fondre dans la porte s'ils n'attrapent rien en 4 semaines) : ${muets.join(', ') || 'aucun'}`,
+    `- ce qu'aurait laissé passer la suite de tests seule : présomption, non mesurée — au plus ${parVert(reels)} régression(s) réelle(s), chacune sur un commit de main intégré après la porte`,
+    '', '| Critère | Rouges | Régressions réelles | Présumées | Bruit | Non tranchés |', '|---|---|---|---|---|---|',
+    ...b.criteres.map((c) => `| ${c} | ${b.rouges.filter((r) => r.critere === c).length} | ${par(c, 'régression réelle')} | ${par(c, 'régression présumée')} | ${par(c, 'bruit')} | ${par(c, 'non tranché')} |`), '',
+    `Critères jamais rouges ou seulement en bruit sur la fenêtre (à retirer ou fondre dans la porte s'ils n'attrapent rien en 4 semaines) : ${muets.join(', ') || 'aucun'}`,
+    `Critères sans régression réelle mais avec des rouges non tranchés ou présumés (utilité non mesurée, à trancher avant tout retrait) : ${aTrancher.join(', ') || 'aucun'}`,
     ...(b.rouges.length ? ['', 'Détail des rouges :', ...b.rouges.map((r) => `- ${quand(r.passage)} ${famille(r.passage)} ${r.passage.empreinte} — ${r.critere} : ${r.classe}, ${r.cause}${r.commits ? ` : ${extrait(r.commits)}` : ''}`)] : [])];
 }
 
 /** Sortie de git, vide hors d'un dépôt (le bilan dit alors « non tranché » plutôt que d'échouer). */
 const git = (repo: string, args: string[]): string => { try { return execFileSync('git', args, { cwd: repo, encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['ignore', 'pipe', 'ignore'] }); } catch { return ''; } };
 const MESURE = ['v2/src', 'v2/briefs', 'v2/hooks'];
+/** a est-il un ancêtre de b (ou b lui-même) ? Un vert sur un commit plus ancien que le rouge ne tranche rien (revue L912). */
+const estAncetre = (repo: string, a: string, b: string): boolean => {
+  try { execFileSync('git', ['merge-base', '--is-ancestor', a, b], { cwd: repo, stdio: 'ignore' }); return true; } catch { return false; }
+};
 
 /** Le dépôt réel : l'empreinte de chaque commit de main qui touche v2/ (même calcul que `empreinte` de cli.ts, lu dans `git ls-tree`). */
 export function depotGit(repo: string): Depot {
@@ -165,8 +183,8 @@ export function depotGit(repo: string): Depot {
   }
   return {
     commitDe: (e) => parEmpreinte.get(e),
-    commitsEntre: (a, b) => git(repo, ['log', '--format=@%h %s', '--name-only', `${a}..${b}`, '--', ...MESURE]).split('\n@').map((x) => x.replace(/^@/, '').trim()).filter(Boolean)
-      .map((x) => { const [commit, ...fichiers] = x.split('\n').filter(Boolean); return { commit, fichiers }; }),
+    commitsEntre: (a, b) => (!estAncetre(repo, a, b) ? null : git(repo, ['log', '--format=@%h %s', '--name-only', `${a}..${b}`, '--', ...MESURE]).split('\n@').map((x) => x.replace(/^@/, '').trim()).filter(Boolean)
+      .map((x) => { const [commit, ...fichiers] = x.split('\n').filter(Boolean); return { commit, fichiers }; })),
   };
 }
 

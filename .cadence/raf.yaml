@@ -4899,9 +4899,14 @@ lots:
     estimate: 1
     created: 2026-11-27
     started: 2026-11-27
-    review: { date: 2026-11-27, verdict: not-compliant, commit: c828ad6c8f7ee7006b0db36ee1b126fab3c88007 }
+    review: { date: 2026-11-27, verdict: compliant, commit: 0ccf8b767bb56c27373634402dca282b43f2c029 }
   - id: L932
     title: "Porte : un outil d'analyse tué par un signal (code ≥ 128, ex. V8 « Trace/breakpoint trap » 133 sans rapport) est rejoué une fois avant de passer la porte au rouge, et la correction n'est jamais lancée sur ce cas. Vécu 27-11 codex L110 : ESLint planté une fois (15 passes saines ensuite), la session de correction a changé la commande eslint de cadence.yaml (refusé par analyse --contre), 9,18 $ et un run rendu. Mesure : aucun run rendu en porte-rouge pour un outil tué par signal."
+    status: todo
+    estimate: 1
+    created: 2026-11-27
+  - id: L933
+    title: "cadence suivant : un lot d'un plan à états projetés dont l'état natif n'est pas « en cours » (teste, bloque) n'est pas « à reprendre » — vu le 27-11 : maritime-atlas:UX-WEB1 (etat teste, revue faite le 18-11) rendu « à reprendre » ; aucun test sur un plan à états projetés (revue de L931 passe 2). Mesure : test sur un plan projeté, UX-WEB1 absent des « à reprendre »"
     status: todo
     estimate: 1
     created: 2026-11-27

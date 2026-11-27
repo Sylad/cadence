@@ -4772,6 +4772,11 @@ lots:
     status: todo
     estimate: 1
     created: 2026-11-26
+  - id: L910
+    title: 'Issue #74 (compte pro) : raf demande new "texte mot pour mot" [--lot L12] [--precision "…"] crée une entrée du registre ; prend le numéro suivant en comptant les créations en attente ; sur une branche tenue, mise en attente dans .cadence/plan-en-attente.yaml comme raf add, appliquée et commitée quand le run rend le dépôt ; raf demande D-<n> lot <id> accepte une entrée ou un lot encore en attente (ordre de la file gardé). Vécu 2.0.18 et 13-11 (D-1.json non suivi exposé au fast-forward). Mesure : aucune entrée du registre écrite à la main par le lead pendant un run.'
+    status: todo
+    estimate: 1
+    created: 2026-11-27
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

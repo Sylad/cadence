@@ -2,7 +2,7 @@
 // à la session ; vert seul, il est « sensible à la charge » (journal, état, détail de fin), compté vert, sans passe de correction ; rouge seul, correction
 // comme avant. Le filtre se déclare (testReplay, replay d'une partie) ou se déduit (vitest, jest, pytest, dotnet test, script npm) ; sinon, pas de rejeu, dit.
 import { execFileSync } from 'node:child_process';
-import { readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { verdictPour } from '../../scripts/verdicts-porte.mjs';
@@ -81,6 +81,15 @@ describe('rejeu seul : la preuve du vert et les rouges jamais rejoués (L842)', 
     const saute = rejouerRouges(rouge, r, () => joue(0, ' ↓ a.test.ts (2 tests | 2 skipped)\n Tests  2 skipped (2)'));
     expect(saute.sensibles).toEqual([]);
   });
+  it('L913 : un rejeu coloré qui ne joue aucun test ne prouve rien ; une suite colorée donne les mêmes rouges', () => {
+    const declare = rejeuDeLaCommande('bash lanceur.sh', 'bash lanceur.sh {files}', '/x');
+    const vide = (s: string) => rejouerRouges(rouge, declare, () => joue(0, `${s}\n a.test.ts\n b.test.ts`)).sensibles;
+    expect(vide('No test files found, exiting with code 0')).toEqual([]);
+    expect(vide('\u001b[31mNo test files found, exiting with code 0\u001b[39m')).toEqual([]);
+    const colore = ' \u001b[31mFAIL\u001b[39m  a.test.ts\u001b[2m > \u001b[22ms\u001b[2m > \u001b[22mlent\n \u001b[31mFAIL\u001b[39m  b.test.ts\u001b[2m > \u001b[22ms\u001b[2m > \u001b[22mvrai\n';
+    const vert = () => joue(0, ' \u001b[32m✓\u001b[39m a.test.ts\n \u001b[2m Tests \u001b[22m \u001b[32m1 passed\u001b[39m (1)');
+    expect(rejouerRouges(colore, r, vert)).toEqual(rejouerRouges(rouge, r, vert));
+  });
   it('un échec sans test nommé, trop de rouges, pas de façon de filtrer : rien n\'est rejoué et la raison est dite ; aucun rouge nommé : rien n\'est dit', () => {
     const jamais = () => { throw new Error('rejoué'); };
     expect(rejouerRouges(`${rouge}Unhandled Errors`, r, jamais).raison).toMatch(/aucun test/);
@@ -91,11 +100,27 @@ describe('rejeu seul : la preuve du vert et les rouges jamais rejoués (L842)', 
   });
 });
 
+/** L913 : l'environnement d'un vitest imbriqué, coloré ou non. CI=true (la CI, le rejeu de `cadence release`) force la couleur ; NO_COLOR l'emporte. */
+function envCouleur(couleur: boolean): NodeJS.ProcessEnv {
+  const { FORCE_COLOR: _f, NO_COLOR: _n, ...env } = process.env;
+  return couleur ? { ...env, FORCE_COLOR: '1' } : { ...env, NO_COLOR: '1' };
+}
+/** Un dossier où un vrai vitest tourne, avec le node_modules de cadence. */
+function dossierVitest(prefixe: string): string {
+  const d = dossierTemp(prefixe);
+  symlinkSync(join(import.meta.dirname, '..', '..', 'node_modules'), join(d, 'node_modules'));
+  writeFileSync(join(d, 'vitest.config.mjs'), 'export default {};\n');
+  return d;
+}
+/** La sortie (stdout + stderr) d'un vitest imbriqué rouge ; vide s'il est vert. */
+function sortieVitest(args: string[], cwd: string, env: NodeJS.ProcessEnv): string {
+  try { execFileSync('npx', ['vitest', ...args], { cwd, env, encoding: 'utf8', stdio: 'pipe' }); } catch (e) { return `${(e as { stdout: string }).stdout}${(e as { stderr: string }).stderr}`; }
+  return '';
+}
+
 describe('rejeu seul avec un vrai vitest (L842)', () => {
   it('un test rouge dans la suite et vert seul est sensible ; un vrai rouge le reste ; un rouge dû au test précédent du fichier le reste (revue L842, M1)', () => {
-    const d = dossierTemp('rejeu-vitest-');
-    symlinkSync(join(import.meta.dirname, '..', '..', 'node_modules'), join(d, 'node_modules'));
-    writeFileSync(join(d, 'vitest.config.mjs'), 'export default {};\n');
+    const d = dossierVitest('rejeu-vitest-'), sansCouleur = envCouleur(false); // L913 : sans couleur, même sous CI=true
     const entete = `import { existsSync, writeFileSync } from 'node:fs';\nimport { describe, expect, it } from 'vitest';\n`;
     // « charge » : rouge à la première exécution (la suite), vert ensuite (le rejeu) ; « vrai » : toujours rouge
     writeFileSync(join(d, 'a.test.ts'), `${entete}describe('s', () => {
@@ -107,15 +132,40 @@ describe('rejeu seul avec un vrai vitest (L842)', () => {
     writeFileSync(join(d, 'c.test.ts'), `${entete}const cache: string[] = [];
 it('remplit', () => { cache.push('x'); expect(cache).toHaveLength(1); });
 it('vide au depart', () => expect(cache).toHaveLength(0));\n`);
-    let suite = '';
-    try { execFileSync('npx', ['vitest', 'run'], { cwd: d, encoding: 'utf8', stdio: 'pipe' }); } catch (e) { suite = `${(e as { stdout: string }).stdout}${(e as { stderr: string }).stderr}`; }
+    const suite = sortieVitest(['run'], d, sansCouleur);
     expect(suite).toMatch(/c\.test\.ts > vide au depart/); // le cas existe : rouge dans la suite
     let seul = 0;
-    try { execFileSync('npx', ['vitest', 'run', 'c.test.ts', '-t', 'vide au depart'], { cwd: d, stdio: 'pipe' }); } catch { seul = 1; }
+    try { execFileSync('npx', ['vitest', 'run', 'c.test.ts', '-t', 'vide au depart'], { cwd: d, env: sansCouleur, stdio: 'pipe' }); } catch { seul = 1; }
     expect(seul).toBe(0); // et vert seul avec -t : ce que l'ancien rejeu aurait excusé
     const j = rejouerRouges(suite, rejeuDeLaCommande('npx vitest run', undefined, d), (c) => jouerRejeu(c, d));
     expect(j.sensibles.map((s) => s.test)).toEqual(['a.test.ts > s > charge (lente)']);
     expect(j.rouges).toEqual(['b.test.ts > s > vrai', 'c.test.ts > vide au depart']);
+  }, 60_000);
+
+  it('L913 : une sortie colorée (suite et rejeu) donne les mêmes rouges et les mêmes sensibles qu\'une sortie sans couleur', () => {
+    const d = dossierVitest('rejeu-couleur-');
+    const entete = `import { existsSync, writeFileSync } from 'node:fs';\nimport { describe, expect, it } from 'vitest';\n`;
+    writeFileSync(join(d, 'a.test.ts'), `${entete}describe('s', () => {
+  it('charge (lente)', () => { const vu = existsSync('vu'); writeFileSync('vu', ''); expect(vu).toBe(true); });
+  it('vert', () => expect(1).toBe(1));
+});\n`);
+    writeFileSync(join(d, 'b.test.ts'), `${entete}describe('s', () => { it('vrai', () => expect(1).toBe(2)); });\n`);
+    const rejeu = rejeuDeLaCommande('npx vitest run', undefined, d);
+    const jouer = (couleur: boolean) => {
+      rmSync(join(d, 'vu'), { force: true });
+      const suite = sortieVitest(['run'], d, envCouleur(couleur));
+      const rejoues: string[] = [];
+      // le rejeu aussi, coloré ou non : FORCE_COLOR / NO_COLOR en tête de la commande
+      const j = rejouerRouges(suite, rejeu, (c) => { const r = jouerRejeu(`${couleur ? 'FORCE_COLOR=1' : 'NO_COLOR=1'} ${c}`, d); rejoues.push(r.sortie); return r; });
+      return { suite, rejoues, j: { ...j, sensibles: j.sensibles.map((s) => s.test) } };
+    };
+    const brut = jouer(false), colore = jouer(true);
+    expect(brut.suite).not.toMatch(/\u001b\[/);
+    expect(colore.suite).toMatch(/\u001b\[/); // la suite est bien colorée
+    expect(colore.rejoues.join('')).toMatch(/\u001b\[/); // et le rejeu aussi
+    expect(colore.suite).not.toMatch(/a\.test\.ts > s > charge/); // le nom brut est coupé par les couleurs : la regex d'avant ne le trouvait pas
+    expect(brut.j).toEqual({ sensibles: ['a.test.ts > s > charge (lente)'], rouges: ['b.test.ts > s > vrai'] });
+    expect(colore.j).toEqual(brut.j);
   }, 60_000);
 });
 

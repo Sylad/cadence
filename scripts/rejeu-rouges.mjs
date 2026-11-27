@@ -151,10 +151,11 @@ export function rougesDotnet(sortie) {
  * lanceur (hors écho de npm) ; un filtre sur le test ou un fichier vitest, au moins un test RÉUSSI (vitest -t sans correspondance, ou un fichier tout sauté, sort en 0).
  */
 function prouveVert(r, nom, c) {
-  if (r.code !== 0 || NO_TEST_RAN.test(r.sortie)) return false;
-  if (c.titreNode) return nodeTestRan(r.sortie, nom);
-  if (c.filtre && testsReussis(r.sortie) < 1) return false;
-  return c.fichier ? replayRanFile(r.sortie, c.fichier) : true;
+  const sortie = stripAnsi(r.sortie); // L913 : un lanceur coloré (CI=true force la couleur de vitest) se lit comme sans couleur
+  if (r.code !== 0 || NO_TEST_RAN.test(sortie)) return false;
+  if (c.titreNode) return nodeTestRan(sortie, nom);
+  if (c.filtre && testsReussis(sortie) < 1) return false;
+  return c.fichier ? replayRanFile(sortie, c.fichier) : true;
 }
 
 const entierPositif = (v) => (/^\d+$/.test(v?.trim() ?? '') && Number(v) >= 1 ? Number(v) : null);
@@ -176,8 +177,11 @@ export function jouerRejeu(commande, cwd) {
  * Rend `{ sensibles: [{ test, ms }], rouges: [noms encore rouges], raison? }` : `raison` dit pourquoi rien n'a été rejoué (la commande reste rouge) ; une sortie
  * sans test rouge nommé rend deux listes vides, sans raison : la commande reste rouge (seul un rouge nommé et vert seul l'excuse).
  * Un échec que la sortie ne rattache à aucun test (erreur non gérée, fichier qui ne se charge pas, seuil de couverture) n'est jamais rejoué.
+ * Une sortie colorée (codes ANSI) donne les mêmes rouges qu'une sortie sans couleur (L913).
  */
-export function rejouerRouges(sortie, rejeu, jouer) {
+export function rejouerRouges(sortieBrute, rejeu, jouer) {
+  // L913 : les codes de couleur retirés une fois, ici, pour tout ce qui lit la sortie (noms, fichiers jest, titres node --test, échec sans nom)
+  const sortie = stripAnsi(sortieBrute);
   const noms = [...new Set([...failedTests(sortie), ...rougesDotnet(sortie)])];
   const sans = (raison) => ({ sensibles: [], rouges: noms, raison });
   if (hasUnnamedFailure(sortie)) return sans('un échec que la sortie ne rattache à aucun test (erreur non gérée, fichier qui ne se charge pas, seuil de couverture)');

@@ -1,0 +1,13 @@
+{
+ "id": "D-45",
+ "texte": "ok pour tes 3 pistes",
+ "date": "2026-11-27",
+ "etat": "ouverte",
+ "preuve": "",
+ "contexte": "Réponse au bilan d'usage sur 7 jours du 27-11 (scripts/bilan-usage.py --heures 168 du dossier parent). Les trois pistes : (1) alléger le socle fixe d'un cadence run (~71k jetons au premier appel, ~21 % du coût des runs) ; (2) réduire le coût du banc mécanique de semaine (136 à 162 $ estimés par passage, ~5-6 % du quota hebdo) ; (3) garder plus petit le contexte des runs et des sessions lead (moyenne 175k, 14 % des appels de run au-delà de 200k). Sylvain ajoute : « c'est pas grave si on atteint le quota, je dois faire des pauses aussi ».",
+ "lots": [
+  "L936",
+  "L937",
+  "L938"
+ ]
+}

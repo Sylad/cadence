@@ -252,7 +252,7 @@ function lancer(racine, bin, args, accepte) {
   if (!existsSync(join(racine, 'node_modules', bin))) throw new Error(`${bin.split('/')[0]} est absent de node_modules (${racine}) : lancer « npm install » puis relancer.`);
   const r = spawnSync(process.execPath, [join(racine, 'node_modules', bin), ...args], { cwd: racine, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
   // un outil qui plante ne doit jamais passer pour « zéro défaut »
-  if (r.error || !accepte.includes(r.status)) throw new Error(`${bin} a échoué (code ${r.status}) : ${r.error?.message ?? r.stderr.slice(0, 500)}`);
+  if (r.error || !accepte.includes(r.status)) throw new Error(`${bin} a échoué (code ${r.status}${r.signal ? `, tué par ${r.signal}` : ''}) : ${r.error?.message ?? r.stderr.slice(0, 500)}`);
   return r.stdout;
 }
 

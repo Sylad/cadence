@@ -4782,19 +4782,23 @@ lots:
     created: 2026-11-27
   - id: L911
     title: "Le banc mécanique devient rouge sur « temps des retouches » quand la machine est chargée par d'autres runs : 27-11 08:01 (charge de fin 23,6 ; 247 s contre 188 s), 26-11 11:21 (38,7 ; 296 contre 180) ; vert à 10,7 et 14,3 le 26-11. Avant de lancer, le banc lit la charge et les cadence run vivants de tous les dépôts : il refuse (ou attend) si d'autres runs tournent, et un passage dont la charge a dépassé le nombre de cœurs ÷ 2 est marqué non mesurable sur les critères de temps au lieu de rouge. Complète L901 (banc sur mini-blue). Mesure : aucun rouge de temps dû à la charge sur 2 semaines."
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-27
     started: 2026-11-27
     review: { date: 2026-11-27, verdict: "conforme : M1, M2, m1 et m2 corrigés (1a06032f, f624d045) ; 2 notes mineures ; rapport revues/L911-code-2.md", commit: f624d0459eaf68b1746d3368b4c6ef9d45873149 }
+    finished: 2026-11-27
   - id: L912
     title: "D-40 Utilité du banc : chaque rapport de banc classe ses rouges en « régression réelle » (corrigée ensuite par un commit de v2/) ou « bruit » (charge, réseau, amont, rejoué vert sans changement), et cadence bench --bilan donne sur 4 semaines : bancs joués, heures de machine, régressions réelles attrapées, faux rouges, et ce qu'aurait laissé passer la suite de tests seule. Vécu 27-11 : 2 rouges sur 3 bancs mécaniques dus à la charge (247 s contre 188), aucune régression. Mesure : le bilan existe et tient la revue D-30 ; un critère du banc qui n'attrape rien en 4 semaines est retiré ou fondu dans la porte"
-    status: doing
+    status: done
     estimate: 1
     after: [ L911 ]
     created: 2026-11-27
     started: 2026-11-27
-    review: { date: 2026-11-27, verdict: "non conforme : 1 majeur (une régression réelle présumée comptée comme un fait), 2 mineurs ; rapport revues/L912-code.md", commit: 3c59c97a6f075a5d2b04b508444e823b24670692 }
+    review: { date: 2026-11-27, verdict: "conforme (2e revue, 500d22c1) : 3 points corrigés et testés ; notes mineures : A_TRANCHER sans « présumée », JSDoc de Classement dédoublé", commit: 500d22c12eec6fa7f9d39534d2f11fd765cf0def }
+    finished: 2026-11-27
+    notes:
+      - { date: 2026-11-27, text: "notes mineures de la 2e revue à reprendre avec le lot suivant du banc : texte A_TRANCHER (bilan.ts:28) sans « régression présumée », JSDoc de Classement dédoublé (bilan.ts:14-15)" }
   - id: L913
     title: "Correctif bloquant de 2.0.19 : la CI de publication rejouée par cadence release est rouge sur v2/test/run-rejeu-seul-l842.test.ts:112 — la sortie du vitest imbriqué y est en couleurs (« a.test.ts␛[2m > ␛[22ms »), la regex du nom de test ne trouve rien. Retirer les codes ANSI là où le rejeu (rejouerRouges) lit les noms de tests dans une sortie, pas seulement dans le test, et lancer le vitest imbriqué du test sans couleur ; un test prouve qu'une sortie colorée donne les mêmes rouges qu'une sortie sans couleur. Vécu 27-11 09 h 08 et 09 h 19 (deux refus de release). Mesure : cadence release patch --dry-run puis la vraie préparation vertes"
     status: done

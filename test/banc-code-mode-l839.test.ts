@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { outilsDe } from '../scripts/jetons-agents.mjs';
 import { OUTILS_CADENCE } from '../scripts/commandes-du-brief.mjs';
+import { entreeDuLot } from './changelog-section.js';
 
 const RACINE = join(import.meta.dirname, '..');
 const ETUDE = join(RACINE, 'docs', 'etudes', '2026-11-25-code-mode-banc-court');
@@ -85,8 +86,9 @@ describe('L839 — le mode script et cadence mesures sont retirés', () => {
     for (const f of ['scripts/mesures-page.mjs', 'scripts/mesures-page-dom.mjs', 'scripts/banc-ux-script.mjs', 'docs/mesures-page.md']) expect(existsSync(join(RACINE, f)), f).toBe(false);
   });
 
-  it('le fragment du changelog ne promet plus d\'économie ni de commande', () => {
-    const fragment = readFileSync(join(RACINE, 'changelog.d', 'L839.md'), 'utf8');
+  // L917 : le fragment est retiré par le commit de version ; l'entrée se lit alors dans la section publiée de CHANGELOG.md.
+  it('l\'entrée du changelog ne promet plus d\'économie ni de commande', () => {
+    const fragment = entreeDuLot(RACINE, 'L839');
     expect(fragment).not.toMatch(/cadence mesures|Mode: script|\d+ %|banc-ux-script/);
     expect(fragment).toContain('outils N');
   });

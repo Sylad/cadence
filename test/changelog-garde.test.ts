@@ -1,7 +1,7 @@
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { changelogSectionOf, entreeDuLot, readsUnreleasedOnly, repoChangelog } from './changelog-section.js';
+import { changelogSectionOf, entreeDuLot, lignesFragmentSansRepli, readsUnreleasedOnly, repoChangelog } from './changelog-section.js';
 import { tempDir } from './helpers.js';
 
 const dir = import.meta.dirname;
@@ -104,6 +104,38 @@ describe('lecture du CHANGELOG par les tests (L380)', () => {
         .filter((f) => f.endsWith('.test.ts') && f !== 'changelog-garde.test.ts')
         .filter((f) => /for \(const f of \[[^\]]*'changelog\.d\/L\d+\.md'|read\w*\([^)\n]*(?:root|import\.meta\.dirname)[^)\n]*'changelog\.d\/?'?[^)\n]*L\d+\.md/.test(readFileSync(join(dir, f), 'utf8')));
       expect(fautifs, 'utiliser entreeDuLot (test/changelog-section.ts)').toEqual([]);
+    });
+
+    // L917 : 2.0.19 refusée, ENOENT sur changelog.d/L839.md dans le clone du commit de version ; R11 ne voyait pas join(RACINE, 'changelog.d', 'L839.md').
+    it('R12 — le détecteur voit toutes les formes d\'une lecture du fragment d\'un lot du dépôt, et laisse passer les fragments des dépôts jetables', () => {
+      const fautes = [
+        "const fragment = readFileSync(join(RACINE, 'changelog.d', 'L839.md'), 'utf8');",
+        "readFileSync(join(root, 'changelog.d/L778.md'), 'utf8')",
+        "const F = join(import.meta.dirname, '..', 'changelog.d', 'L12.md');",
+        "read(join(racine, FRAGMENTS_DIR, 'L5.md'))",
+        "readFileSync(`${root}/${FRAGMENTS_DIR}/L5.md`, 'utf8')",
+        "lire('changelog.d/L839.md')",
+        "existsSync('changelog.d/L1.md') && readFileSync('changelog.d/L1.md', 'utf8')",
+        "readFileSync(join(process.cwd(), 'changelog.d', 'L9.md'), 'utf8')",
+      ];
+      for (const f of fautes) expect(lignesFragmentSansRepli(f), f).toEqual([f]);
+      const permis = [
+        "entreeDuLot(RACINE, 'L839')",
+        "writeFileSync(join(d, 'changelog.d', 'L778.md'), x);",
+        "expect(readFileSync(join(d, 'changelog.d', 'L778.md'), 'utf8')).toBe(y);",
+        "put(dir, `${FRAGMENTS_DIR}/L10.md`, '### Fixed');",
+        "ecrire('changelog.d/L1.md', '### Changed');",
+        "// readFileSync(join(RACINE, 'changelog.d', 'L839.md'))",
+        "expect(existsSync(join(root, FRAGMENTS_DIR, 'README.md'))).toBe(true);",
+      ];
+      for (const p of permis) expect(lignesFragmentSansRepli(p), p).toEqual([]);
+    });
+
+    it('R13 — aucun test du dépôt ne lit le fragment d\'un lot sans repli : il passe par entreeDuLot', () => {
+      const fautifs = readdirSync(dir)
+        .filter((f) => f.endsWith('.ts') && f !== 'changelog-garde.test.ts' && f !== 'changelog-section.ts')
+        .flatMap((f) => lignesFragmentSansRepli(readFileSync(join(dir, f), 'utf8')).map((l) => `${f} : ${l}`));
+      expect(fautifs, 'utiliser entreeDuLot (test/changelog-section.ts), qui lit la section publiée de CHANGELOG.md une fois le fragment retiré').toEqual([]);
     });
   });
 });

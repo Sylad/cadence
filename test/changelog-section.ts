@@ -42,3 +42,16 @@ export function entreeDuLot(root: string, lot: string): string {
   if (!entrees.length) throw new Error(`entrée du lot ${lot} introuvable : ni ${FRAGMENTS_DIR}/${lot}.md, ni entrée qui cite ${lot} dans une section de CHANGELOG.md`);
   return `${entrees.join('\n')}\n`;
 }
+
+/**
+ * Les lignes d'un source de test qui désignent le fragment précis d'un lot du dépôt (`changelog.d/L<n>.md`) sans passer par `entreeDuLot`
+ * (L917 : 2.0.19 refusée, `test/banc-code-mode-l839.test.ts` lisait `join(RACINE, 'changelog.d', 'L839.md')`, forme que R11 de L778 ne voyait pas).
+ * Une ligne compte quand elle nomme le fragment (chemin d'un seul tenant, segments de `join`, ou `FRAGMENTS_DIR`) ET la racine du dépôt
+ * (`root`, `racine`, `RACINE`, `import.meta.dirname`, `__dirname`, `process.cwd()`, ou un chemin relatif lu tel quel) ; un fragment écrit
+ * dans un dépôt jetable (`d`, `dir`, `tempDir()`) ne compte pas, ni une ligne de commentaire.
+ */
+export function lignesFragmentSansRepli(source: string): string[] {
+  const fragment = /changelog\.d\/L\d+\.md|(?:['"`]changelog\.d['"`]|FRAGMENTS_DIR)\s*,\s*['"`]L\d+\.md|\$\{FRAGMENTS_DIR\}\/L\d+\.md/;
+  const racine = /\b(?:root|racine|RACINE|ROOT|repoRoot)\b|import\.meta\.dirname|__dirname|process\.cwd\(\)|\b(?:read|lire|exists)\w*\(\s*['"`](?:\.\.?\/)?changelog\.d\//;
+  return source.split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l) && fragment.test(l) && racine.test(l)).map((l) => l.trim());
+}

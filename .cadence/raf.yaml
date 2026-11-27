@@ -4895,11 +4895,12 @@ lots:
     created: 2026-11-27
   - id: L931
     title: "cadence suivant (D-44) : orchestrateur minimal, sans modèle — rend le prochain projet:lot à lancer d'après l'ordre priority: du cadence.yaml parent, les runs et holds vivants (un run par dépôt, créneaux), les dépôts tenus (banc, publication) et les lots tirables (dépendances, exclusions, lot en cours à finir d'abord) ; ou « rien » avec la raison ; --json. Réutilise le calcul « tirables, ressources libres » du tour (src/lead.ts:354). Socle de L930 (garde d'ordre) et L927 (enchaîner après un run) — mesure : temps de créneau vide et runs lancés hors ordre, sur 3 jours"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-27
     started: 2026-11-27
     review: { date: 2026-11-27, verdict: compliant, commit: 0ccf8b767bb56c27373634402dca282b43f2c029 }
+    finished: 2026-11-27
   - id: L932
     title: "Porte : un outil d'analyse tué par un signal (code ≥ 128, ex. V8 « Trace/breakpoint trap » 133 sans rapport) est rejoué une fois avant de passer la porte au rouge, et la correction n'est jamais lancée sur ce cas. Vécu 27-11 codex L110 : ESLint planté une fois (15 passes saines ensuite), la session de correction a changé la commande eslint de cadence.yaml (refusé par analyse --contre), 9,18 $ et un run rendu. Mesure : aucun run rendu en porte-rouge pour un outil tué par signal."
     status: todo

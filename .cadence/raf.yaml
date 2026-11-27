@@ -4835,10 +4835,11 @@ lots:
     created: 2026-11-27
   - id: L920
     title: "Commit de registre seul (.cadence/demandes/) poussé sans verdict de porte, comme un commit de plan seul (L784) — vécu 27-11 : push de « registre: D-4 livrée » refusé dans ol-companion, il faudrait rejouer toute la porte pour un JSON ; mesure : aucun push de registre seul refusé, aucun CADENCE_PUSH_UNGATED"
-    status: todo
+    status: doing
     estimate: 0.5
     quickwin: true
     created: 2026-11-27
+    started: 2026-11-27
   - id: L921
     title: "D-42 : le README de cadence renvoie vers l'étude de cas de cadence sur codex (version anglaise, avec renvoi à la version française) — après le lot D-5 de codex qui publie la page EN ; mesure : le lien du README répond 200 et tombe sur la page anglaise"
     status: done

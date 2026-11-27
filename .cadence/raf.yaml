@@ -4786,7 +4786,7 @@ lots:
     estimate: 1
     created: 2026-11-27
     started: 2026-11-27
-    review: { date: 2026-11-27, verdict: "non conforme : 2 corrections — le pic de charge compte la charge que le banc produit lui-même (au calme 10,7–15,1 pour un seuil de 16 : un vrai ralentissement sortirait NON MESURABLE, à chaque passage sur mini-blue, seuil 10) ; le relevé de chaque minute n'a aucun test. Mineurs : --attendre 0 attend 60 min sans rien dire ; seuil lu à deux endroits. Rapport bilans/2026-11-27/L911-code.md", commit: 4b1bcdc931bb5f112b28226babe5d8fa3eeb7001 }
+    review: { date: 2026-11-27, verdict: "conforme : M1, M2, m1 et m2 corrigés (1a06032f, f624d045) ; 2 notes mineures ; rapport revues/L911-code-2.md", commit: f624d0459eaf68b1746d3368b4c6ef9d45873149 }
   - id: L912
     title: "D-40 Utilité du banc : chaque rapport de banc classe ses rouges en « régression réelle » (corrigée ensuite par un commit de v2/) ou « bruit » (charge, réseau, amont, rejoué vert sans changement), et cadence bench --bilan donne sur 4 semaines : bancs joués, heures de machine, régressions réelles attrapées, faux rouges, et ce qu'aurait laissé passer la suite de tests seule. Vécu 27-11 : 2 rouges sur 3 bancs mécaniques dus à la charge (247 s contre 188), aucune régression. Mesure : le bilan existe et tient la revue D-30 ; un critère du banc qui n'attrape rien en 4 semaines est retiré ou fondu dans la porte"
     status: doing

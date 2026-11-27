@@ -8,7 +8,7 @@ import { ajouterBanc } from './ajouter.js';
 import { classerAuPassage, commandeBilan, lignesClassement } from './bilan.js';
 import { chargerBanc, listerBancs, piecesBanc, racineBanc, type Banc } from './banc.js';
 import { bootId, fichierPassage, tenantVivant } from '../../../scripts/verrou-banc.mjs'; // revue L931 : même lecture du verrou que cadence suivant
-import { lignesCharge } from './charge.js';
+import { lignesCharge, nombreCoeurs, seuilCharge } from './charge.js';
 import { avantLeBanc, suivreCharge, type Machine, type ReglagesCharge } from './charge-banc.js';
 import { chargerBras, executeurClaude, lancerBras, libererReglages, type DefBras, type Executeur, type Mesure } from './bras.js';
 import { enteteEnvironnement, environnement, ligneComparaison, modelesExacts, passagePrecedent, versionClaude, type Environnement } from './environnement.js';
@@ -327,7 +327,8 @@ async function remesurerBruit(racine: string, bancs: string | undefined, emp: st
   } catch (e) { refus = e instanceof Error ? e.message : String(e); }
   if (refus) { io.err(`bench bruit refusé : ${refus}`); return 2; }
   const v = await passage({ racine, numeros, niveau: 'bruit', ref, cand, hebdo: false, juge: 'opus', exec: executeurClaude, prep: preparer,
-    maintenant: io.now(), empreinte: emp, home: io.env.HOME ?? '', out: io.out, depot: depotMesure(repo), bruitCompte });
+    maintenant: io.now(), empreinte: emp, home: io.env.HOME ?? '', out: io.out, depot: depotMesure(repo), bruitCompte,
+    reglagesCharge: { seuil: seuilCharge(nombreCoeurs(), io.env) } }); // revue L911 (m2) : le seuil lu dans io.env
   return v.vert ? 0 : 1;
 }
 
@@ -470,6 +471,7 @@ export async function bench(args: string[], io: Io, repo = REPO, machine: Machin
   const v = await passage({ racine, numeros: choix.numeros, ...(malgreCharge && { malgreCharge }), niveau: choix.niveau, ref, cand, eclair: sous === 'eclair',
     hebdo: sous === 'hebdo', repetitions: rep, garderClones: reste.includes('--garder-clones'), juge: option(reste, 'juge') ?? 'opus', exec: executeurClaude, prep: preparer,
     maintenant: io.now(), empreinte: emp, home: io.env.HOME ?? '', out: io.out, depot: depotMesure(repo),
+    reglagesCharge: { seuil: seuilCharge(machine.coeurs ?? nombreCoeurs(), io.env) }, // revue L911 (m2) : le seuil lu dans io.env, comme avant de lancer
     ...(par > 1 && { enfants: { lanceur: [process.execPath, join(repo, 'v2', 'bin', 'cadence2.js')], paralleles: par } }) });
   return v.non_mesurable ? 3 : v.vert && v.eclair_ok !== false ? 0 : 1;
 }

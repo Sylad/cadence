@@ -94,14 +94,14 @@ describe('le rapport note la charge', () => {
   const jouer = (r: string, malgreCharge?: string[]) => {
     const lectures = [[1.5, 1.2, 0.8], [9.25, 6, 3.1]];
     return passage({ racine: r, ref: 'A', cand: 'cadence-run', hebdo: false, juge: 'opus', niveau: 'mecanique', exec, prep: prep as never, maintenant: MAINTENANT,
-      empreinte: 'e1', home: r, out: () => {}, version: () => '2.1.325', charge: () => lectures.shift()!, reglagesCharge: { coeurs: 32 }, ...(malgreCharge && { malgreCharge }) });
+      empreinte: 'e1', home: r, out: () => {}, version: () => '2.1.325', charge: () => lectures.shift()!, reglagesCharge: { coeurs: 32, externe: () => 0 }, ...(malgreCharge && { malgreCharge }) });
   };
 
   it('au départ et à la fin, dans le .md et le .json ; pas de ligne de forçage sans --malgre-charge', async () => {
     const r = racine();
     await jouer(r);
     const md = readFileSync(join(r, 'rapports', '2026-11-17-1000-e1.md'), 'utf8');
-    expect(md).toMatch(/^Charge de la machine \(load average 1 · 5 · 15 min, \d+ cœurs\) : départ 1,50 · 1,20 · 0,80 ; fin 9,25 · 6,00 · 3,10 ; pic à 1 min 9,25 \(seuil 16,00\)$/m);
+    expect(md).toMatch(/^Charge de la machine \(load average 1 · 5 · 15 min, \d+ cœurs\) : départ 1,50 · 1,20 · 0,80 ; fin 9,25 · 6,00 · 3,10 ; pic à 1 min 9,25 ; pic externe au banc 1,50 \(seuil 16,00\)$/m);
     expect(md).not.toMatch(/Forcé malgré la charge/);
     expect(JSON.parse(readFileSync(join(r, 'rapports', '2026-11-17-1000-e1.json'), 'utf8')).charge).toMatchObject({ depart: [1.5, 1.2, 0.8], fin: [9.25, 6, 3.1] });
     expect(JSON.parse(readFileSync(join(r, 'historique.jsonl'), 'utf8')).malgre_charge).toBeUndefined();

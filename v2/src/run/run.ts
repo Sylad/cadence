@@ -28,6 +28,7 @@ import { etapeAnalyse } from '../../../scripts/analyse.mjs'; // L801 : l'étape 
 import { avecMesure, lignesSensibles, type Sensible } from './rejeu.js'; // L842 : rouges rejoués seuls avant correction, commits des corrections
 import { etapeTests, lirePorteRapide as lireTestsTouches, type PorteRapide } from '../../../scripts/porte-rapide.mjs'; // L838 : run.fastGate, les tests touchés seulement
 import { consigneNouveautes, entreesQuiCitent, ligneNouveautes, lotVisible } from '../../../scripts/nouveautes-du-run.mjs'; // L794 : entrée Nouveautés d'un lot visible
+import { avancerSurDerives, commiterStart, lignesDerives } from './derives.js'; // L923 : un fichier dérivé du plan n'empêche plus l'intégration ; L796 (3)
 import { debutProcessus, inscrireCreneau, occupantVivant, prendreVerrou, rendreVerrou, roleVerrou } from '../verrou.js';
 
 /** D-15 : le run reprend une minute après l'heure de remise à zéro annoncée, relit son état au plus tard toutes les 10 min (une reprise par --reponse arrête
@@ -66,6 +67,8 @@ export interface Etat extends EtatRapport, AvecGroupe { id: string; repo: string
   /** L796 : la cible a avancé pendant la porte par des commits sur des fichiers que le run ne touche pas : rebasé sur `sur` ; `porte` a jugé le run avant ;
    * `plan_seul` : les commits arrivés ne touchent que le plan ou le registre, la porte n'est pas rejouée ; sinon elle l'est sur le sha rebasé (revue r1, M1). */
   cible_avancee?: { sur: string; commits: number; fichiers: string[]; porte: string; plan_seul?: boolean }[];
+  /** L923 : des fichiers dérivés du plan modifiés dans l'arbre principal et par le run, régénérés par plan.onWrite après l'avance rapide (la ligne du détail). */
+  derives?: string;
   clos?: { date: string; cible: string; tete: string; integre?: boolean; archives?: string[]; restes?: string[]; force?: true } }
 /** `maintenant` et `attendre` : l'horloge et l'attente du quota (D-15), simulées par les tests ; `attendre: null` rend la main sans attendre la remise à zéro. */
 interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null }
@@ -317,8 +320,10 @@ function avancer(e: Etat, br: string, cible: string): { avance: boolean; raison:
     // fichiersNonCommites (L722) dit un dossier non suivi en « dossier/ » : seul un fichier que le run crée et qui y existe déjà fait refuser git.
     const locales = fichiersNonCommites(e.repo) ?? [], dossiers = locales.filter((f) => f.endsWith('/'));
     const sales = fichiersGit(e.repo, 'diff', '--name-only', cible, br).filter((t) => locales.includes(t) || (dossiers.some((d) => t.startsWith(d)) && existsSync(join(e.repo, t))));
-    if (sales.length) return { avance: false, raison: `modifications non commitées dans l'arbre principal (${e.repo}) sur des fichiers que le run modifie aussi : ${nommerFichiers(sales)}. `
-      + `Commite-les ou mets-les de côté, puis : cadence run --reponse ${e.id} "intègre"` };
+    // L923 : des fichiers dérivés du plan seuls sont régénérés après l'avance rapide ; tout autre fichier garde le refus de L723
+    if (sales.length) return avancerSurDerives(e.repo, sales, { avancer: () => essaiGit(e.repo, 'merge', '-q', '--ff-only', br).status === 0, aAvance: () => git(e.repo, 'rev-parse', e.cible) !== cible,
+      dire: (l) => { e.derives = l; }, refus: () => ({ avance: false, raison: `modifications non commitées dans l'arbre principal (${e.repo}) sur des fichiers que le run modifie aussi : ${nommerFichiers(sales)}. `
+      + `Commite-les ou mets-les de côté, puis : cadence run --reponse ${e.id} "intègre"` }) });
   }
   const m = actuelle === e.cible ? essaiGit(e.repo, 'merge', '-q', '--ff-only', br) : essaiGit(e.repo, 'fetch', '-q', '.', `${br}:${e.cible}`);
   return m.status === 0 ? null : { avance: git(e.repo, 'rev-parse', e.cible) !== cible, raison: `${m.stderr}`.trim() || 'avance rapide impossible' };
@@ -405,31 +410,12 @@ function suite(e: Etat, o: Opts): Etat {
   const regenere = regenerations(e);
   // L723 : intégré, mais une fusion écrite par la session est à relire ; L724 : de même pour une correction après porte rouge
   e.detail = [...(e.porte_changee ? [`${e.porte_changee} — à relire : la porte qui a jugé le run est la sienne`] : []), ...(e.analyse_dite ?? []).map((l) => `${l} — à relire`), ...ligneTestsTouches(e),
-    ...lignesSensibles(e.sensibles_charge), ...(e.cible_avancee ?? []).map((a) => cibleAvancee(e, a)), ...(e.conflits ?? []).filter((c) => c.resolu).map((c) => conflitResolu(e, c)), ...(e.corrections ?? []).filter((c) => c.verte).map(correctionFaite),
+    ...lignesSensibles(e.sensibles_charge), ...(e.cible_avancee ?? []).map((a) => cibleAvancee(e, a)), ...lignesDerives(e), ...(e.conflits ?? []).filter((c) => c.resolu).map((c) => conflitResolu(e, c)), ...(e.corrections ?? []).filter((c) => c.verte).map(correctionFaite),
     ...(regenere.length ? [`fichiers générés régénérés par le run avant la porte (run.regenerate, L781) : commit ${regenere.join(', ')}`] : [])].join('\n');
   const registre = registreOuvert(e.worktree);
   noterNouveautes(e);
   retirerRun(e);
   return fin(e, o, registre);
-}
-
-/** L796 (3, issue #70) : un `raf start` laissé non commité faisait rendre son lot refus-integration (~50 min). Un plan qui ne diffère de HEAD QUE par le statut
- * du lot (et `started`) est commité par le run, hooks compris, au modèle `plan.commit` du projet ; sinon rien, l'avertissement des fichiers non commités reste. */
-function commiterStart(repo: string, lot: string, id: string, out: (l: string) => void): void {
-  const conf = cadenceYaml(repo) as { plan?: { path?: string; commit?: string } } | null, plan = conf?.plan?.path ?? '.cadence/raf.yaml';
-  if (!(fichiersNonCommites(repo) ?? []).includes(plan)) return;
-  const tete = essaiGit(repo, 'show', `HEAD:${plan}`);
-  let avant: { lots?: Record<string, unknown>[] }, apres: typeof avant;
-  try { avant = parse(tete.stdout); apres = parse(readFileSync(join(repo, plan), 'utf8')); } catch { return; }
-  const duLot = (p: typeof avant) => (Array.isArray(p?.lots) ? p.lots.find((l) => l?.id === lot) : undefined), l0 = duLot(avant), l1 = duLot(apres);
-  if (tete.status !== 0 || !l0 || !l1 || l0.status === l1.status) return;
-  l1.status = l0.status;
-  if ('started' in l0) l1.started = l0.started; else delete l1.started;
-  if (JSON.stringify(avant) !== JSON.stringify(apres)) return;
-  const titre = (conf?.plan?.commit ?? 'plan: {lot} {action}').replaceAll('{lot}', lot).replaceAll('{action}', 'démarré').replaceAll('{vague}', `run ${id}`);
-  const r = essaiGit(repo, 'commit', '-q', '-m', titre, '-m', `raf start ${lot} laissé non commité au lancement de cadence run ${id} : commité par le run (L796).`, '--', plan);
-  out(r.status === 0 ? `raf start ${lot} laissé non commité : commité par le run (${titre}, ${git(repo, 'rev-parse', '--short', 'HEAD')})`
-    : `raf start ${lot} laissé non commité : commit refusé (${`${r.stderr}${r.stdout}`.trim().split('\n').at(-1) || `code ${r.status}`}), le run part sans lui`);
 }
 
 /** L794 : run.regenerate déclarée (la consigne dit alors de ne pas régénérer) ; une clé mal formée n'est pas lue ici, la régénération la rendra. */

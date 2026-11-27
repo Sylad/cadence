@@ -4840,6 +4840,7 @@ lots:
     quickwin: true
     created: 2026-11-27
     started: 2026-11-27
+    review: { date: 2026-11-27, verdict: compliant, commit: 3fcc76d029a2ec0e56e2ce2a76bd25cb012661d4 }
   - id: L921
     title: "D-42 : le README de cadence renvoie vers l'étude de cas de cadence sur codex (version anglaise, avec renvoi à la version française) — après le lot D-5 de codex qui publie la page EN ; mesure : le lien du README répond 200 et tombe sur la page anglaise"
     status: done
@@ -4918,6 +4919,11 @@ lots:
     created: 2026-11-27
   - id: L934
     title: "livreur : cadence verify --gate lancé dans un Bash au délai par défaut (120-180 s) passe en arrière-plan, le livreur relance une seconde porte en parallèle sur le même arbre ; la première finit en dépassement (npm test code 124) et rend une Question à tort — vécu 27-11 L111 codex. Geste : l'agent livreur lance la porte avec timeout 600000 (ou run_in_background + attente de la notification), jamais deux portes sur le même arbre ; verify refuse une seconde porte concurrente sur le même dépôt. Mesure : aucune Question du livreur pour une porte doublée"
+    status: todo
+    estimate: 1
+    created: 2026-11-27
+  - id: L935
+    title: "Suites de la revue de L920 (27-11) : 1) preloadChangedFiles (src/git.ts) lit git log --name-only, qui suit les renommages et garde le nouveau nom : pendant une vague, un commit qui renomme du code vers .cadence/demandes/ passe pour un commit de registre seul (défaut antérieur à L920, étendu aux projets readsPlan) → --no-renames ou --name-status ; 2) isRequestFile n'accepte que D-<n>.json (pas tout *.json) ; 3) la moitié .md de R17 (push-plan-seul-l784-l786.test.ts:212) ne peut pas échouer : la tester seule. Rapport : bilans/2026-11-27/L920-code.md"
     status: todo
     estimate: 1
     created: 2026-11-27

@@ -4872,6 +4872,21 @@ lots:
     status: todo
     estimate: 1
     created: 2026-11-27
+  - id: L927
+    title: "cadence run : à la fin d'un run intégré, avec lead.chain: on, lancer le lot tirable suivant du même dépôt, ou au moins écrire « créneau libre : prochain tirable <lot> » (journal et sortie) — vécu 27-11 côté pro : 3 créneaux sur 3 vides ~10 min, un run intégré libère son créneau et rien ne le reprend ; mesure : temps de créneau vide après un run intégré"
+    status: todo
+    estimate: 1
+    created: 2026-11-27
+  - id: L928
+    title: "cadence verify --gate --sha X lit la porte du cadence.yaml AU SHA vérifié, pas celui de l'arbre courant — vécu 27-11 côté pro (canopy-map) : la porte de HEAD appelait scripts/ci-skipped_test.sh absent à 3db3f71, faux rouge « not found » ; contournement : git checkout --detach ; mesure : test d'un sha dont la porte diffère de HEAD"
+    status: todo
+    estimate: 1
+    created: 2026-11-27
+  - id: L929
+    title: "cadence analyse --contre <base> : le message dit que le plan est lu à <base> (un lot passé de config: true à ordinaire dans la plage reste jugé config: true jusqu'à la poussée du changement) — vécu 27-11 côté pro : poussée en trois temps ; mesure : message présent dans le refus"
+    status: todo
+    estimate: 1
+    created: 2026-11-27
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

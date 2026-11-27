@@ -4804,6 +4804,11 @@ lots:
     status: todo
     estimate: 1
     created: 2026-11-27
+  - id: L916
+    title: "Mesurer agent-browser (vercel-labs, CLI Rust, testé le 27-11) contre le MCP Playwright pour la revue QA et UX : même app, même fichier d'attentes, deux qa-reviewer (Sonnet), l'un avec le MCP Playwright, l'autre avec agent-browser par Bash (snapshot -i et read, a11y = axe-core intégré, console, errors ; --cdp vers le Chrome de mini-blue pour le WebGL). Comparer jetons, durée, constats vrais et faux. Mesuré au test : instantané complet aussi lourd que l'ariaSnapshot de Playwright (75 contre 62 Ko, 157 contre 136 Ko), interactif seul 2,9 Ko ; le gain viendrait de -i et de read, pas de l'instantané. Mesure : adopter dans l'agent QA seulement si ≥ 30 % de jetons en moins à constats égaux, sinon rien"
+    status: todo
+    estimate: 1
+    created: 2026-11-27
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

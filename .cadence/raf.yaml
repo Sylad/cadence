@@ -4847,6 +4847,17 @@ lots:
     status: todo
     estimate: 3
     created: 2026-11-27
+  - id: L923
+    title: "raf start régénère un fichier dérivé du plan suivi par git (warhammer : frontend/public/plan-data/plan.json) dans l'arbre principal, puis cadence run refuse l'intégration parce que le run change le même fichier — vécu 27-11 L133 (refus-integration après 40 min, geste du lead : checkout du fichier + --reponse intègre) ; le run doit traiter un fichier dérivé du plan comme le plan lui-même (régénéré à l'intégration, pas un conflit) ; mesure : aucun refus-integration sur un fichier dérivé du plan"
+    status: todo
+    estimate: 0.5
+    quickwin: true
+    created: 2026-11-27
+  - id: L924
+    title: "cadence release --suite : joue elle-même les étapes du lead (commit de version, tag, porte, éval enveloppée par scripts/eval-plugin.mjs, push, gh run watch, npm view, marketplace update, plugin update) au lieu de les imprimer pour qu'on les recopie — vécu 27-11 : l'étape 4 recopiée sans son enveloppe de rejeu, un cas à 0,83 par aléa a retiré le tag, 2,10 $ et 7 min perdus ; mesure : aucune étape de publication recopiée à la main, aucune éval relancée pour une recopie"
+    status: todo
+    estimate: 1
+    created: 2026-11-27
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

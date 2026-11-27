@@ -7,7 +7,8 @@ import type { Io } from '../cli.js';
 import { ajouterBanc } from './ajouter.js';
 import { chargerBanc, listerBancs, piecesBanc, racineBanc, type Banc } from './banc.js';
 import { bootId, fichierPassage, tenantVivant } from '../../../scripts/verrou-banc.mjs'; // revue L931 : même lecture du verrou que cadence suivant
-import { chargeMachine, lignesCharge, nombreCoeurs, nommer, occupants, refusCharge, registreCreneaux, type Charge } from './charge.js';
+import { lignesCharge } from './charge.js';
+import { avantLeBanc, suivreCharge, type Machine, type ReglagesCharge } from './charge-banc.js';
 import { chargerBras, executeurClaude, lancerBras, libererReglages, type DefBras, type Executeur, type Mesure } from './bras.js';
 import { enteteEnvironnement, environnement, ligneComparaison, modelesExacts, passagePrecedent, versionClaude, type Environnement } from './environnement.js';
 import { fuitesDuBras, trierFuitesReference } from './fuites.js';
@@ -94,7 +95,7 @@ export function horlogeAPas(depart: string | Date, pas_ms: number): () => Date {
 type OptPassage = { racine: string; numeros?: string[]; ref: string; cand: string; hebdo: boolean; juge: string; repetitions?: number; garderClones?: boolean;
   exec: Executeur; prep: typeof preparer; maintenant: Date; empreinte: string; home: string; out: (l: string) => void; eclair?: boolean;
   niveau?: Niveau; enfants?: Enfants; depot?: string; bruitCompte?: boolean; version?: () => string; horloge?: () => Date;
-  charge?: () => number[]; malgreCharge?: string[] }; // charge (L762) : load average, remplacé par les tests ; malgreCharge : occupants nommés quand --malgre-charge a forcé le banc ; version (L742) : claude --version ; horloge (L751) : début et fin des bras joués en ligne (duree_s, « temps total ») ; les deux remplacées par les tests
+  charge?: () => number[]; malgreCharge?: string[]; reglagesCharge?: ReglagesCharge }; // reglagesCharge (L911) : cœurs, seuil et relevé, remplacés par les tests ; charge (L762) : load average, remplacé par les tests ; malgreCharge : occupants nommés quand --malgre-charge a forcé le banc ; version (L742) : claude --version ; horloge (L751) : début et fin des bras joués en ligne (duree_s, « temps total ») ; les deux remplacées par les tests
 
 /** Un banc (une répétition) à jouer, sérialisable pour un processus enfant. `joues` (L737) : passages antérieurs de ce banc, pour alterner l'ordre des bras. */
 export type Tache = { racine: string; dirRun: string; run: string; ref: string; cand: string; N: number; juge: string; garderClones: boolean;
@@ -251,7 +252,7 @@ async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?:
   const passes = lirePassages(o.racine);
   const dejaJoues = (bid: string) => passes.filter((p) => p.resultats.some((r) => banBase(r.banc) === bid)).length;
   const version = (o.version ?? versionClaude)(); // L742 : au lancement, avant toute session
-  const charge = o.charge ?? chargeMachine, depart = charge(); // L762 : charge au départ, avant la première session
+  const charge = suivreCharge(o.charge, o.enfants !== undefined, o.reglagesCharge); // L762 : charge au départ, avant la première session ; L911 : pic pendant
   const debut = new Date(); const phases: Record<string, string> = {}; let termines = 0;
   const taches: Tache[] = ids.flatMap((bid, i) => Array.from({ length: N }, (_, k) => ({
     racine: o.racine, dirRun, run: id, ref: o.ref, cand: o.cand, N, juge: o.juge, garderClones: o.garderClones ?? false,
@@ -270,16 +271,16 @@ async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?:
   if (o.enfants) mkdirSync(dirTaches, { recursive: true });
   if (o.depot) o.out(`banc ${o.niveau ?? 'avec juges'} : dépôt mesuré ${o.depot}, empreinte ${o.empreinte}, ${o.enfants ? Math.min(o.enfants.paralleles, taches.length) : 1} banc(s) à la fois`);
   const enfants = o.enfants;
-  const joues = enfants
-    ? await enParallele(taches, enfants.paralleles, async (t) => fini(t, await bancDansEnfant(t, enfants, dirTaches, o.out, signaler(t))))
-    : taches.map((t) => fini(t, jouerBanc(t, o.exec, o.prep, o.out, signaler(t), o.horloge)));
+  const joues = await charge.pendant(() => (enfants
+    ? enParallele(taches, enfants.paralleles, async (t) => fini(t, await bancDansEnfant(t, enfants, dirTaches, o.out, signaler(t))))
+    : taches.map((t) => fini(t, jouerBanc(t, o.exec, o.prep, o.out, signaler(t), o.horloge)))));
+  const { ch, marque } = charge.finir(o.malgreCharge, o.out); // L911 : fin des bancs mesurés, avant les rejeux seuls (L734), qui ne sont pas des temps
   rejouerSuites(joues, o.racine, o.garderClones ?? false, o.out);
   const res = joues.map((j) => j.r);
-  const v = (o.niveau ? verdictSansJuge : verdict)(res, o.ref, o.cand, { ...BARRE_SPEC, bruit: bruitParBanc(passes, o.maintenant) }); // L737 : bruit tiré des passages d'avant celui-ci ; L738 : des 14 derniers jours
+  const v = (o.niveau ? verdictSansJuge : verdict)(res, o.ref, o.cand, { ...BARRE_SPEC, bruit: bruitParBanc(passes, o.maintenant), ...marque }); // L911 : temps non mesurables sous la charge ; L737 : bruit tiré des passages d'avant celui-ci ; L738 : des 14 derniers jours
   const e = o.eclair ? controlesEclair(res, o.ref, o.cand) : undefined;
   e?.lignes.forEach((l) => o.out(l));
   const duree_s = Math.round((Date.now() - debut.getTime()) / 1000);
-  const ch: Charge = { coeurs: nombreCoeurs(), depart, fin: charge(), ...(o.malgreCharge && { malgre_charge: o.malgreCharge }) };
   mkdirSync(join(o.racine, 'rapports'), { recursive: true });
   const base = join(o.racine, 'rapports', id);
   const env = environnement(version, Object.fromEntries([o.ref, o.cand].map((n) => [n, bras[n].modele])), res.flatMap((r) => Object.values(r.mesures)), { alias: o.juge, jugements: res.map((r) => r.jugement) });
@@ -295,7 +296,7 @@ async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?:
   }
   appendFileSync(join(o.racine, 'historique.jsonl'), `${ligneHistorique(v, { date: o.maintenant.toISOString(), empreinte: o.empreinte,
     candidat: o.cand, reference: o.ref, modele_candidat: bras[o.cand].modele, bancs: res.map((r) => r.banc), hebdo: o.hebdo, frais: new Set(res.filter((r) => r.frais).map((r) => banBase(r.banc))).size,
-    ...(e && { eclair_ok: e.ok }), ...(o.niveau && { niveau: o.niveau }), ...(o.malgreCharge && { malgre_charge: true }), duree_s, modeles_exacts: modelesExacts(env) })}\n`);
+    ...(e && { eclair_ok: e.ok }), ...(o.niveau && { niveau: o.niveau }), ...(o.malgreCharge && { malgre_charge: true }), ...marque, duree_s, modeles_exacts: modelesExacts(env) })}\n`);
   o.out(`${titreVerdict(v)} — ${duree_s} s — rapport : ${base}.md`);
   return { ...v, eclair_ok: e?.ok };
 }
@@ -402,7 +403,7 @@ function comparer(racine: string, [a, b]: string[], io: Io): number {
   return ligne.startsWith('Environnement identique') ? 0 : 1;
 }
 
-export async function bench(args: string[], io: Io, repo = REPO): Promise<number> {
+export async function bench(args: string[], io: Io, repo = REPO, machine: Machine = {}): Promise<number> { // machine (L911) : charge et attente, remplacées par les tests
   const [sous, ...reste] = args;
   if (sous === '_banc' && reste[0]) return bancEnfant(reste[0], io.out);
   const racine = racineBanc(io.env);
@@ -441,7 +442,7 @@ export async function bench(args: string[], io: Io, repo = REPO): Promise<number
   if (sous === 'bruit') return remesurerBruit(racine, bancs, emp, repo, io);
   const choix = sous === 'lancer' ? (bancs ? { numeros: bancs.split(',') } : null) : Object.hasOwn(SOUS, sous ?? '') ? SOUS[sous!] : null;
   if (choix === null) {
-    io.err('usage : cadence2 bench micro|mecanique|court|hebdo|eclair|lancer --bancs 1,3|bruit [--bancs 3,7]|complet|statut|verifier-publication|comparer <a> <b>|ajouter [--candidat c] [--reference r] [--repetitions N] [--paralleles N] [--garder-clones] [--malgre-charge]');
+    io.err('usage : cadence2 bench micro|mecanique|court|hebdo|eclair|lancer --bancs 1,3|bruit [--bancs 3,7]|complet|statut|verifier-publication|comparer <a> <b>|ajouter [--candidat c] [--reference r] [--repetitions N] [--paralleles N] [--garder-clones] [--malgre-charge] [--attendre [min]]');
     return 2;
   }
   const rep = entierOption(reste, 'repetitions', 1);
@@ -449,15 +450,9 @@ export async function bench(args: string[], io: Io, repo = REPO): Promise<number
   if (rep === null || demande === null) { io.err('usage : --repetitions N et --paralleles N (entiers ≥ 1) avec micro|mecanique|court|hebdo|eclair|lancer'); return 2; }
   const par = bancsALaFois(choix.niveau, demande);
   if (typeof par === 'string') { io.err(`bench refusé : ${par}`); return 2; }
-  // L762 : le banc mécanique ne part pas sous la charge du lead (runs de cadence run, sessions de lead hold), sauf --malgre-charge, noté au rapport
-  const forcer = reste.includes('--malgre-charge');
-  if (forcer && choix.niveau !== 'mecanique') { io.err('bench refusé : --malgre-charge ne va qu\'avec mecanique'); return 2; }
-  let malgreCharge: string[] | undefined;
-  if (choix.niveau === 'mecanique') {
-    const occ = occupants(registreCreneaux(io.env), io.now());
-    if (forcer) { malgreCharge = nommer(occ); io.out(`banc mécanique forcé malgré la charge (--malgre-charge) : ${malgreCharge.length ? malgreCharge.join(' ; ') : 'aucun run ni session du lead'} ; noté au rapport`); }
-    else { const r = refusCharge(occ); if (r) { io.err(`bench refusé : ${r}`); return 2; } }
-  }
+  const avant = await avantLeBanc(reste, choix.niveau, io, machine); // L762, L911 : pas de banc mécanique sous la charge (refus, --attendre, --malgre-charge)
+  if ('refus' in avant) { io.err(`bench refusé : ${avant.refus}`); return 2; }
+  const { malgreCharge } = avant;
   const ref = option(reste, 'reference') ?? PUBLIE.reference; const cand = option(reste, 'candidat') ?? PUBLIE.candidat;
   let refus: string | null;
   try {

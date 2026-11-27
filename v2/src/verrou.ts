@@ -17,7 +17,8 @@ export function debutProcessus(pid: number): string | undefined {
     return spawnSync('ps', ['-p', String(pid), '-o', 'lstart='], { encoding: 'utf8' }).stdout?.trim() || undefined;
   }
 }
-function vivant(pid: number, start?: string): boolean {
+/** Le pid vit encore et, quand `start` est connu, a la même heure de démarrage (L911 : vagues d'orchestrate, `waves/<pid>.json`). */
+export function vivant(pid: number, start?: string): boolean {
   try { process.kill(pid, 0); } catch (x) { if ((x as NodeJS.ErrnoException).code !== 'EPERM') return false; }
   return !start || debutProcessus(pid) === start;
 }

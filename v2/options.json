@@ -18,6 +18,8 @@
     "bench --settings": "docs/v2/2026-11-08-banc-sequence-design.md",
     "bench env CLAUDE_CONFIG_DIR": "docs/v2/banc.md",
     "bench --malgre-charge": "docs/v2/banc.md",
+    "bench --attendre": "docs/v2/banc.md",
+    "bench env CADENCE_BANC_CHARGE_MAX": "docs/v2/banc.md",
     "bench --liste": "docs/v2/2026-11-09-cadence-run.md",
     "bench env CADENCE_HOME": "docs/v2/banc.md",
     "bench env CADENCE_BANC_CONSTRUIT": "docs/v2/banc.md",

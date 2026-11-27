@@ -17,9 +17,12 @@ export interface ResultatBanc { banc: string; taille: Taille; visible: boolean; 
   /** L733 : bras qui n'ont livré aucun fichier hors plan et doc, et la raison ; le banc n'est alors pas mesuré (sans juge seulement). */
   non_livre?: Record<string, string> }
 /** `bruit` (L737) : banc de base -> plus grand écart de temps (rapport ≥ 1) mesuré entre deux bras identiques dans l'historique récent (`bruitParBanc`, 14 jours depuis L738). */
-export interface Barre { temps_max: number; temps_max_retouche: number; reference_absolue: { caches: number; mutations: number }; bruit?: Record<string, number> }
-export interface Critere { nom: string; valeur: string; seuil: string; ok: boolean; bloquant: boolean }
-/** `non_mesurable` (L733, ligne (d) des cinq règles de `verdictSansJuge`) : bancs dont un bras n'a pas livré le travail, posé seulement si aucun critère bloquant n'est rouge ; le passage n'est ni vert ni rouge, il est à rejouer. */
+/** `charge_haute` (L911) : raison pour laquelle les temps du passage ne se mesurent pas (charge au-dessus de cœurs ÷ 2, `chargeHaute` de charge.ts). */
+export interface Barre { temps_max: number; temps_max_retouche: number; reference_absolue: { caches: number; mutations: number }; bruit?: Record<string, number>; charge_haute?: string }
+/** `non_mesurable` (L911) : critère de temps hors seuil sous la charge, non bloquant, avec sa raison ; il rend le passage non mesurable, pas rouge. */
+export interface Critere { nom: string; valeur: string; seuil: string; ok: boolean; bloquant: boolean; non_mesurable?: string }
+/** `non_mesurable` (L733, ligne (d) des cinq règles de `verdictSansJuge`) : bancs dont un bras n'a pas livré le travail, posé seulement si aucun critère bloquant n'est rouge ; le passage n'est ni vert ni rouge, il est à rejouer.
+ * L911 : y entre aussi « temps sous la charge (…) » quand un critère de temps hors seuil a été mesuré sous une charge au-dessus de cœurs ÷ 2. */
 export interface Verdict { vert: boolean; criteres: Critere[]; non_mesurable?: string[] }
 export const titreVerdict = (v: Verdict): string => (v.non_mesurable ? 'NON MESURABLE (à rejouer)' : v.vert ? 'VERT' : 'ROUGE');
 
@@ -137,6 +140,13 @@ const nb = (x: number) => String(Math.round(x * 100) / 100).replace('.', ',');
  * sont déjà sortis (L733, règle (a)) ; temps total et retouches restent bloquants sur les bancs non bruités (règle (b)).
  */
 function criteresTemps(res: ResultatBanc[], ref: string, cand: string, barre: Barre): Critere[] {
+  const cs = criteresTempsAuCalme(res, ref, cand, barre), raison = barre.charge_haute;
+  // L911 : sous la charge, un temps hors seuil ne dit rien du candidat ; le critère n'est plus bloquant et le passage devient non mesurable
+  return raison ? cs.map((x) => (x.ok ? x : { ...x, bloquant: false, non_mesurable: raison })) : cs;
+}
+
+/** Les critères de temps tels que mesurés, sans regarder la charge. */
+function criteresTempsAuCalme(res: ResultatBanc[], ref: string, cand: string, barre: Barre): Critere[] {
   const t = (rs: ResultatBanc[], b: string) => somme(rs.map((r) => r.mesures[b]?.duree_s ?? 0));
   const e = (r: ResultatBanc) => barre.bruit?.[banBase(r.banc)] ?? 1;
   const bruites = res.filter((r) => e(r) >= BRUIT_MAX), fiables = res.filter((r) => !bruites.includes(r)), ret = fiables.filter((r) => r.taille === 'retouche');
@@ -251,9 +261,15 @@ export function verdictSansJuge(tous: ResultatBanc[], ref: string, cand: string,
     ...k.apres,
     ...(nonLivres.length ? [c('bras qui ont livré le travail', nonLivres.flatMap((r) => Object.entries(r.non_livre!).map(([b, x]) => `${r.banc}/${b} : ${x}`)).join(' ; '), 'tous', false, false)] : [])];
   const rouge = criteres.some((x) => x.bloquant && !x.ok); // (c)
-  const nonMesurable = !rouge && nonLivres.length > 0; // (d)
-  return { vert: !rouge && !nonMesurable, criteres, ...(nonMesurable && { non_mesurable: nonLivres.map((r) => r.banc) }) }; // (e)
+  const nm = [...nonLivres.map((r) => r.banc), ...tempsSousCharge(criteres)], nonMesurable = !rouge && nm.length > 0; // (d), et L911 : temps sous la charge
+  return { vert: !rouge && !nonMesurable, criteres, ...(nonMesurable && { non_mesurable: nm }) }; // (e)
 }
+
+/** L911 : l'entrée de `non_mesurable` quand un critère de temps hors seuil a été mesuré sous la charge. */
+const tempsSousCharge = (criteres: Critere[]): string[] => {
+  const x = criteres.filter((k) => k.non_mesurable && !k.ok);
+  return x.length ? [`temps sous la charge (${x[0].non_mesurable} ; ${x.map((k) => k.nom).join(', ')})`] : [];
+};
 
 export function verdict(res: ResultatBanc[], ref: string, cand: string, barre: Barre): Verdict {
   const jug = res.filter((r) => r.jugement).map((r) => r.jugement!);
@@ -277,7 +293,8 @@ export function verdict(res: ResultatBanc[], ref: string, cand: string, barre: B
     c(`tests cachés (07-11 : ${barre.reference_absolue.caches})`, `${caches(cand)}`, `≥ ${barre.reference_absolue.caches}`, caches(cand) >= barre.reference_absolue.caches, false),
     c(`mutations (07-11 : ${pct(barre.reference_absolue.mutations)})`, pct(mut(cand)), `≥ ${pct(barre.reference_absolue.mutations)}`, mut(cand) >= barre.reference_absolue.mutations, false),
   ];
-  return { vert: criteres.every((x) => x.ok || !x.bloquant), criteres };
+  const nm = criteres.some((x) => x.bloquant && !x.ok) ? [] : tempsSousCharge(criteres); // L911 : temps hors seuil sous la charge, sans autre rouge
+  return { vert: criteres.every((x) => x.ok || !x.bloquant) && !nm.length, criteres, ...(nm.length && { non_mesurable: nm }) };
 }
 
 const okRouge = (x: boolean | null | undefined) => (x === null || x === undefined ? '–' : x ? 'ok' : 'ROUGE');
@@ -304,15 +321,17 @@ export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdi
     ...(e.duree_s !== undefined ? [`Durée du passage : ${e.duree_s} s`] : []), ...(e.charge ?? []), '', // L762 : charge de la machine
     `| Banc | Temps ${ref} | Temps ${cand} | Tokens ${ref} | Tokens ${cand} | Préféré | Cachés ${ref} · ${cand} | Mutations ${ref} · ${cand} | Suite ${ref} · ${cand} | Attendu ${ref} · ${cand} | Taille déclarée ${ref} · ${cand} |`,
     '|---|---|---|---|---|---|---|---|---|---|---|', ...lignes, '', '| Critère | Valeur | Seuil | Résultat |', '|---|---|---|---|',
-    ...v.criteres.map((c) => `| ${c.nom} | ${c.valeur} | ${c.seuil} | ${c.ok ? 'ok' : c.bloquant ? '**ROUGE**' : c.nom === 'bras qui ont livré le travail' ? '**non livré**' : [FUITES_SIGNALEES, ECART_DANS_LE_BRUIT].includes(c.nom) ? '**signalé**' : 'en dessous (indicatif)'} |`), '',
+    ...v.criteres.map((c) => `| ${c.nom} | ${c.valeur} | ${c.seuil} | ${c.ok ? 'ok' : c.non_mesurable ? '**non mesurable** (charge)' : c.bloquant ? '**ROUGE**' : c.nom === 'bras qui ont livré le travail' ? '**non livré**' : [FUITES_SIGNALEES, ECART_DANS_LE_BRUIT].includes(c.nom) ? '**signalé**' : 'en dessous (indicatif)'} |`), '',
     ...(rejoues.length ? ['## Suites rejouées', '', 'Rouge pendant que les autres bancs tournaient, rejouée seule après eux : le rejeu compte (L734).', '', ...rejoues, ''] : []),
+    ...(v.criteres.some((k) => k.non_mesurable && !k.ok) ? ['## Temps non mesurables (charge)', '', `La machine était chargée par d'autres travaux pendant le passage (${v.criteres.find((k) => k.non_mesurable)!.non_mesurable}) : un temps hors seuil n'y dit rien du candidat (L911). Il n'est pas compté rouge ; rejouer le passage au calme.`, '',
+      ...v.criteres.filter((k) => k.non_mesurable && !k.ok).map((k) => `- ${k.nom} : ${k.valeur} (seuil ${k.seuil})`), ''] : []),
     ...(nonLivres.length ? ['## Bancs non mesurables', '', 'Un bras n\'a livré aucun fichier hors plan et doc : son temps ne compte pas, ni en victoire ni en défaite. Rejouer le passage.', '', ...nonLivres, ''] : []),
     ...(e.eclair ? ['## Contrôles éclair', '', ...e.eclair.map((l) => `- ${l}`), ''] : []),
     ...[['Lectures à vérifier', lectures], ['Questions posées', questions]].flatMap(([t, l]) => (l.length ? [`## ${t}`, '', ...l, ''] : []))].join('\n');
 }
 
 export const ligneHistorique = (v: Verdict, e: { type?: 'sequence'; sequence?: string; run?: string; repetition?: number; repetitions?: number; date: string; empreinte: string; candidat: string; reference: string; modele_candidat: string; bancs: string[]; hebdo: boolean; frais: number; eclair_ok?: boolean;
-  niveau?: string; malgre_charge?: boolean; duree_s?: number; modeles_exacts?: Record<string, string[] | 'id non lu'> }) => // L756 : modele_candidat est l'alias de bras.yaml (garde) ; modeles_exacts, ce que les sessions ont dit
+  niveau?: string; malgre_charge?: boolean; charge_haute?: string; duree_s?: number; modeles_exacts?: Record<string, string[] | 'id non lu'> }) => // L756 : modele_candidat est l'alias de bras.yaml (garde) ; modeles_exacts, ce que les sessions ont dit
   JSON.stringify({ ...e, vert: v.vert, rouges: v.criteres.filter((c) => c.bloquant && !c.ok).map((c) => c.nom), ...(v.non_mesurable && { non_mesurable: v.non_mesurable }) });
 
 const PARIS = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });

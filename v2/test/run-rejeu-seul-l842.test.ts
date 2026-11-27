@@ -163,7 +163,10 @@ it('vide au depart', () => expect(cache).toHaveLength(0));\n`);
     expect(brut.suite).not.toMatch(/\u001b\[/);
     expect(colore.suite).toMatch(/\u001b\[/); // la suite est bien colorée
     expect(colore.rejoues.join('')).toMatch(/\u001b\[/); // et le rejeu aussi
-    expect(colore.suite).not.toMatch(/a\.test\.ts > s > charge/); // le nom brut est coupé par les couleurs : la regex d'avant ne le trouvait pas
+    // le nom est coupé par les couleurs sur au moins une ligne FAIL : la regex d'avant ne l'y trouvait pas. L925 : pas d'absence partout,
+    // sous GitHub Actions le reporter github-actions de vitest écrit aussi le nom brut (« ::error … title=a.test.ts > s > charge (lente) »)
+    const failCharge = colore.suite.split('\n').filter((l) => l.includes('FAIL') && l.includes('charge'));
+    expect(failCharge.some((l) => /\u001b\[/.test(l) && !/a\.test\.ts > s > charge/.test(l))).toBe(true);
     expect(brut.j).toEqual({ sensibles: ['a.test.ts > s > charge (lente)'], rouges: ['b.test.ts > s > vrai'] });
     expect(colore.j).toEqual(brut.j);
   }, 60_000);

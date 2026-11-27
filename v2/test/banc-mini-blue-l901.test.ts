@@ -2,10 +2,11 @@
 // de Big-Blue. Ici, le transport local (BANC_MB_TRANSPORT=local) remplace ssh et scp : même scripts, même dossier d'échange, sans réseau ;
 // la commande de fumée remplace le banc (aucun modèle) et vérifie, depuis « là-bas », ce que le banc y trouverait.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { empreinte } from '../src/bench/cli.js';
+import { statut } from '../src/bench/verdict.js';
 import { dossierTemp } from './temp.js';
 
 const SCRIPT = join(import.meta.dirname, '..', 'scripts', 'banc-mini-blue.sh');
@@ -39,6 +40,10 @@ describe('banc détaché sur mini-blue (L901)', () => {
     const sha = depotGit(depot, { 'v2/src/a.ts': 'export {}\n', 'v2/briefs/b.md': 'brief\n', 'v2/hooks/h.mjs': '// hook\n' });
     const base = depotGit(source, { 'index.js': '1\n' });
     git(source, 'commit', '-q', '--allow-empty', '-m', 'après la base'); // la source a avancé : la base doit rester joignable là-bas
+    // revue L901 : un « git stash -u » garde les fichiers non suivis (.env et ses clés) sous refs/stash ; rien de cela ne part sur mini-blue
+    writeFileSync(join(source, '.env'), 'ANTHROPIC_API_KEY=sk-secret\n');
+    git(source, 'stash', 'push', '-q', '-u', '-m', 'wip');
+    const nonSuivis = git(source, 'rev-parse', 'refs/stash^3');
     for (const [f, c] of Object.entries({
       'bras.yaml': `A:\n  modele: opus\n  brief: ${depot}/v2/briefs/b.md\n`,
       'bancs/1-a/banc.yaml': `projet: p\nsource: "${source}"\nbase: ${base}\ninstall: "true"\ntests: "true"\ntaille: retouche\n`,
@@ -73,6 +78,13 @@ describe('banc détaché sur mini-blue (L901)', () => {
     expect(existsSync(join(racine, 'runs', 'p1', '1-a', 'resultat.json'))).toBe(true);
     expect(existsSync(join(racine, 'runs', 'p1', '1-a', 'c1', 'node_modules'))).toBe(false); // le lourd reste là-bas
     expect(readdirSync(join(racine, 'rapports')).sort()).toEqual(['ancien.json', 'ancien.md', 'p1.json', 'p1.md']);
+
+    // le miroir de la source là-bas n'a ni refs/stash ni l'objet des fichiers non suivis ; le .env est resté sur Big-Blue
+    const [miroir] = readdirSync(join(t, 'mini-blue', 'sources'));
+    const m = join(t, 'mini-blue', 'sources', miroir);
+    expect(git(m, 'for-each-ref', '--format=%(refname)')).not.toContain('refs/stash');
+    expect(spawnSync('git', ['cat-file', '-e', nonSuivis], { cwd: m }).status).not.toBe(0);
+    expect(spawnSync('git', ['cat-file', '-e', base], { cwd: m }).status).toBe(0);
 
     // rien ne revient deux fois, et l'état se lit sans aller-retour
     expect(sh('recup').stdout).toContain('aucun banc fini à ramener');
@@ -115,5 +127,83 @@ describe('banc détaché sur mini-blue (L901)', () => {
     const r = spawnSync('bash', [SCRIPT, 'lance', 'court'], { env: { ...process.env, BANC_MB_TRANSPORT: 'local', BANC_MB_ECHANGE: join(t, 'e'), BANC_MB_JOBS: join(t, 'j'), BENCH_ROOT: t }, encoding: 'utf8' });
     expect(r.status).toBe(2);
     expect(r.stderr).toContain('bras.yaml absent');
+  });
+
+  /** Racine et dépôt minimaux, et le lanceur du script en transport local. */
+  const banc = (prefixe: string, extra: Record<string, string> = {}) => {
+    const t = dossierTemp(prefixe);
+    const depot = join(t, 'cadence'), racine = join(t, 'bench-cadence');
+    depotGit(depot, { 'v2/src/a.ts': '\n', 'v2/briefs/b.md': '\n' });
+    mkdirSync(racine); writeFileSync(join(racine, 'bras.yaml'), 'A: {}\n');
+    const env = { ...process.env, BANC_MB_TRANSPORT: 'local', BANC_MB_ECHANGE: join(t, 'echange'), BANC_MB_JOBS: join(t, 'jobs'), BANC_MB_BASE: join(t, 'mb'), BENCH_ROOT: racine, BANC_MB_PAS: '1', ...extra };
+    const sh = (...a: string[]) => spawnSync('bash', [SCRIPT, ...a], { env, encoding: 'utf8', timeout: 60_000 });
+    return { t, depot, racine, sh };
+  };
+
+  it('les lignes rapatriées sont insérées à leur date : un mécanique vert de mini-blue ne passe pas après un éclair rouge local plus récent', () => {
+    const { depot, racine, sh } = banc('l901-ordre-');
+    const ligne = (date: string, x: Record<string, unknown>) => JSON.stringify({ date, empreinte: 'e1', candidat: 'cadence-run', reference: 'A', modele_candidat: 'opus', hebdo: false, frais: 0, ...x });
+    const avant = ligne('2026-11-27T08:00:00.000Z', { niveau: 'mecanique', bancs: ['1-a', '3-b', '7-c'], vert: true, empreinte: 'e0' });
+    const meca = ligne('2026-11-27T09:30:00.000Z', { niveau: 'mecanique', bancs: ['1-a', '3-b', '7-c'], vert: true });
+    const eclair = ligne('2026-11-27T11:00:00.000Z', { bancs: ['1-a'], vert: false, eclair_ok: false });
+    writeFileSync(join(racine, 'historique.jsonl'), `${avant}\n`);
+    // « mini-blue » écrit son mécanique vert, puis attend que l'éclair rouge local soit écrit avant de finir
+    const cmd = `echo '${meca}' >> "$BENCH_ROOT/historique.jsonl"; sleep 3`;
+    expect(sh('lance', '--depot', depot, '--sans-construction', '--commande', cmd, 'mecanique').status).toBe(0);
+    writeFileSync(join(racine, 'historique.jsonl'), `${avant}\n${eclair}\n`); // éclair local rouge, écrit pendant le banc
+    const a = sh('attendre');
+    expect(a.status).toBe(0);
+    expect(a.stdout).toContain("1 ligne(s) d'historique");
+    const h = readFileSync(join(racine, 'historique.jsonl'), 'utf8').split('\n').filter(Boolean);
+    expect(h).toEqual([avant, meca, eclair]);
+    // la garde lit cet ordre : le rouge suit le vert, la publication de l'empreinte reste refusée
+    expect(statut(h, new Date('2026-11-27T12:00:00Z'), 'e1', { 'cadence-run': 'opus' }).publication_ok).toBe(false);
+    // et sans l'éclair, le même mécanique l'aurait permise (le test mesure bien l'ordre)
+    expect(statut([avant, meca], new Date('2026-11-27T12:00:00Z'), 'e1', { 'cadence-run': 'opus' }).publication_ok).toBe(true);
+  });
+
+  it('mini-blue injoignable : état inconnu, jamais fini — lance refuse (5), attendre réessaie puis échoue (6), rien n’est marqué ramené', () => {
+    const { t, depot, sh } = banc('l901-injoignable-', { BANC_MB_ESSAIS: '2' });
+    expect(sh('lance', '--depot', depot, '--sans-construction', '--commande', 'sleep 8; echo vert', 'court').status).toBe(0);
+    const echange = join(t, 'echange'), cache = join(t, 'echange-coupe');
+    const [job] = readdirSync(join(t, 'jobs'));
+    // couper seulement une fois le banc lancé (run.log ouvert) : la copie et le référentiel lisent le dossier d'échange avant
+    for (let k = 0; k < 100 && !existsSync(join(echange, job, 'run.log')); k++) spawnSync('sleep', ['0.1']);
+    renameSync(echange, cache); // la coupure : plus rien ne répond là-bas
+    try {
+      const l = sh('lance', '--depot', depot, '--sans-construction', '--commande', 'true', 'court');
+      expect(l.status).toBe(5);
+      expect(l.stderr).toContain('injoignable');
+      const a = sh('attendre');
+      expect(a.status).toBe(6);
+      expect(a.stderr).toContain('injoignable 2 fois de suite');
+      expect(a.stdout).not.toContain('aucun banc fini');
+      const r = sh('recup');
+      expect(r.status).toBe(5);
+      expect(r.stdout).not.toContain('aucun banc fini');
+      expect(sh('etat').stdout).toMatch(/etat=injoignable recupere=non/);
+    } finally { renameSync(cache, echange); }
+    expect(existsSync(join(t, 'jobs', job, 'recupere'))).toBe(false);
+    // revenu : attendre va au bout et ramène le banc
+    const a = sh('attendre');
+    expect(a.status).toBe(0);
+    expect(a.stdout).toContain('fini rc=0');
+  });
+
+  it('un banc complet arrêté là-bas avant de mesurer pose complet-refus.txt, au format de noterRefus', () => {
+    const { depot, racine, sh } = banc('l901-complet-');
+    expect(sh('lance', '--depot', depot, 'complet').status).toBe(0); // ni package.json ni lock : npm ci échoue là-bas (rc 94)
+    expect(sh('attendre').stdout).toMatch(/fini rc=94 avant le banc/);
+    const [date, cause] = readFileSync(join(racine, 'complet-refus.txt'), 'utf8').trim().split('\n');
+    expect(Number.isNaN(Date.parse(date))).toBe(false);
+    expect(cause).toMatch(/banc complet sur mini-blue .* arrêté avant de mesurer, rc=94 : npm ci racine/);
+  });
+
+  it('le dossier d’échange vu du WSL suit l’utilisateur de MINI_BLUE_HOTE, ou MINI_BLUE_ECHANGE_WSL', () => {
+    const src = readFileSync(SCRIPT, 'utf8');
+    expect(src).not.toMatch(/\/Users\/sylva\b/);
+    const dossier = (env: Record<string, string>) => spawnSync('bash', ['-c', `${src.split('\nusage()')[0]}\necho "$ECH_WSL"`], { env: { ...process.env, ...env }, encoding: 'utf8' }).stdout.trim();
+    expect(dossier({ MINI_BLUE_HOTE: 'bob@hote' })).toBe('/mnt/c/Users/bob/mini-blue-banc');
+    expect(dossier({ MINI_BLUE_HOTE: 'bob@hote', MINI_BLUE_ECHANGE_WSL: '/mnt/d/echange' })).toBe('/mnt/d/echange');
   });
 });

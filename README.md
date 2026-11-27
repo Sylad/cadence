@@ -1,10 +1,10 @@
 # cadence
 
 A small working method that lives in your repository: a versioned plan linked to your commits,
-one AI session per request ([`cadence run`](docs/v2/2026-11-09-cadence-run.md)), and deliveries proved by their effect.
-It is for solo developers and AI-assisted sessions who lose track of *what is left to do* and *what each commit was for*:
-cadence keeps both in plain files next to the code, and [Claude Code](https://claude.com/claude-code) skills turn it into rituals.
-New to the words (lot, wave, hold…)? [docs/concepts.md](docs/concepts.md) explains each notion, with four figures.
+one AI session per request ([`cadence run`](docs/v2/2026-11-09-cadence-run.md)), and deliveries proved by their effect. It is for solo developers and
+AI-assisted sessions who lose track of *what is left to do* and *what each commit was for*: cadence keeps both in plain files next to the code, and
+[Claude Code](https://claude.com/claude-code) skills turn it into rituals. New to the words (lot, wave, hold…)? [docs/concepts.md](docs/concepts.md) explains
+each notion, with four figures. [The case study](https://claude-code-codex-25m.pages.dev/en/case-studies/cadence/) shows cadence at work.
 
 ## Start
 

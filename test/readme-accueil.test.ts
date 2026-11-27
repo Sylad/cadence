@@ -174,4 +174,11 @@ describe('README en page d’accueil (L232)', () => {
     expect(agent).toMatch(/behaviour[^\n]*docs\//);
     expect(read('docs/news.md')).toMatch(/README[^\n]*(only a link|a link only)/i);
   });
+
+  it('R13 — l’introduction renvoie à l’étude de cas de cadence sur le site codex, version anglaise (L921, D-42)', () => {
+    const intro = lignesIntro(readme).join(' ');
+    expect(intro).toMatch(/\[[^\]]+\]\(https:\/\/claude-code-codex-25m\.pages\.dev\/en\/case-studies\/cadence\/\)/);
+    // la version française (sans /en/) n’est pas celle du README anglais
+    expect(intro).not.toContain('pages.dev/case-studies/cadence');
+  });
 });

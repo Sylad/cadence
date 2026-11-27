@@ -28,7 +28,7 @@ if (tool === 'run') {
   process.exitCode = await ecriture.main(args, io);
 } else if (tool === 'raf') {
   process.exitCode = await run(args, io);
-} else if (['news', 'session', 'deliver', 'verify', 'eval', 'skills', 'orchestrate', 'lead', 'corrections', 'perf', 'cost', 'inspect', 'spec', 'ref', 'config', 'release', 'local', 'claude-hook'].includes(tool)) {
+} else if (['news', 'session', 'deliver', 'verify', 'eval', 'skills', 'orchestrate', 'lead', 'suivant', 'corrections', 'perf', 'cost', 'inspect', 'spec', 'ref', 'config', 'release', 'local', 'claude-hook'].includes(tool)) {
   process.exitCode = await run([tool, ...args], io);
 } else if (tool === '--version' || tool === '-v') {
   process.exitCode = await run([tool], io);

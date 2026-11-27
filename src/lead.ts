@@ -322,13 +322,24 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE, name = basena
  * Un dossier qui n'a aucun sous-projet mais est lui-même un projet donne la ligne de ce projet seul (la bande l'interroge depuis le dossier de la session).
  */
 export function leadTour(parent: string, today: Day, idle = TOUR_IDLE, depth?: number): TourRow[] {
-  const problems: TourRow[] = [];
+  return leadTourEntries(parent, today, idle, depth).map((e) => e.row);
+}
+
+/** Une ligne du tour avec le dossier de son projet (absent d'une ligne d'erreur du cadence.yaml du dossier) : `cadence suivant` (L931) lit les dépôts dans l'ordre du tour. */
+export interface TourEntry {
+  dir?: string;
+  row: TourRow;
+}
+
+/** `leadTour` avec le dossier de chaque projet, dans le même ordre (L931) : un seul calcul de l'ordre et des lots tirables aux ressources libres, partagé par le tour et `cadence suivant`. */
+export function leadTourEntries(parent: string, today: Day, idle = TOUR_IDLE, depth?: number): TourEntry[] {
+  const problems: TourEntry[] = [];
   const attempt = <T>(read: () => T, fallback: T): T => {
     try {
       return read();
     } catch (e) {
       const error = (e instanceof Error ? e.message : String(e)).split('\n')[0]!;
-      if (!problems.some((p) => p.error === error)) problems.push({ ...empty('cadence.yaml'), error }); // un yaml illisible l'est pour les deux clés : une seule ligne
+      if (!problems.some((p) => p.row.error === error)) problems.push({ row: { ...empty('cadence.yaml'), error } }); // un yaml illisible l'est pour les deux clés : une seule ligne
       return fallback;
     }
   };
@@ -344,11 +355,11 @@ export function leadTour(parent: string, today: Day, idle = TOUR_IDLE, depth?: n
 }
 
 /** Joint à chaque ligne ses lots prêts aux ressources libres (L252), calculés sur tous les projets du tour : ce qu'un projet tient en retire aux autres. */
-function withFree(rows: { dir: string; row: TourRow }[]): TourRow[] {
+function withFree(rows: { dir: string; row: TourRow }[]): TourEntry[] {
   const ok = rows.filter((x) => !x.row.error);
   const free = readyFree(ok.map((x) => x.dir), cadenceHome());
   for (const x of ok) if (free.has(x.dir)) x.row.free = free.get(x.dir);
-  return rows.map((x) => x.row);
+  return rows.map((x) => ({ dir: x.dir, row: x.row }));
 }
 
 /** La ligne « tirables, ressources libres » du tour, ou null quand aucun lot tirable n'est libre. */

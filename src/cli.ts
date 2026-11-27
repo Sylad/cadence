@@ -12,7 +12,7 @@ import { cmdSpec, cmdSpecChecks } from './cli/spec-commands.js';
 import { cmdSession, cmdSessionAll } from './cli/session-commands.js';
 import { cmdConstat, cmdDeliver, cmdLocal, cmdVerify } from './cli/deliver-commands.js';
 import { corrections, cost, inspect, perf } from './cli/stats-commands.js';
-import { cmdConfig, cmdLead } from './cli/lead-commands.js';
+import { cmdConfig, cmdLead, cmdSuivant } from './cli/lead-commands.js';
 import { cmdAttente, heldPlanWrite } from './cli/attente-commands.js';
 import { cmdDemande } from './cli/demande-commands.js';
 import { cmdEval } from './cli/eval-commands.js';
@@ -89,6 +89,7 @@ Une seule aide : « raf --help », « cadence --help » et « cadence help » im
   cadence orchestrate <projet>:<lot>[@modèle]… [--budget 2M] [--goal "…"] [--dry-run] [--wave nom] [--no-fill] [--continue [--until HH:MM] [--priority a,b]]   une session claude neuve par étape ; une vague de lots nommés remplit ses créneaux libres avec les lots tirables du plan jusqu'à la fin du budget, --no-fill la borne aux lots donnés ; --queue [<projet>:<lot>…] [--until HH:MM] (la vague démarre sur la file approuvée) ; queue add|show|drop <projet>:<lot>… (la file approuvée : une liste ordonnée de lots que toute vague vivante tire avant le plan à chaque créneau libre, poussée par --add dans la vague qui tient le dépôt) ; --status [vague] [--watch [--interval s]] ; --follow [--wave vague] [--interval s] [--since horodatage|ligne] (le journal réduit aux lignes qui demandent un geste du lead, écrites après l'armement, plus les questions ouvertes ; --since rejoue depuis un horodatage ISO ou une ligne ; « fin de vague » 6 relevés après l'arrêt) ; --resume [vague | --wave vague] [--budget 1M] [--budget projet:lot=+300k] [--answer projet:lot "réponse"] [--drop projet:lot] ; --drop projet:lot [--wave vague] ; --stop-after-current [--wave vague] ; --waits [--since AAAA-MM-JJ]
                         mode worktree par lot (orchestrate.worktrees: true)  (activé par défaut dans cadence, désactivé ailleurs tant que la clé est absente) ; ses options : --resume --wave <vague> --integrate projet:lot (rejoue un lot rendu à l'intégration) · --resume --wave <vague> --replay projet:lot (idem, et après une écriture de plan refusée) · --remove-worktree projet:lot [--abandon-commits] (retire le worktree et la branche conservés) ; la liste des worktrees conservés : orchestrate --status et lead tour
   cadence lead tour [dossier] [--idle 3] [--depth n] [--json]   le tableau du lead, sans modèle (et, sous les lignes, ⚠ N lots done depuis le dernier tag v<x.y.z> quand des lots en service ne sont pas publiés) : une ligne par sous-dossier qui a un plan, ou la ligne du dossier seul s'il est lui-même un projet (en cours, dérive, notes de clôture, prochain lot tirable, dépôt), précédées de l'en-tête perf : une ligne par ⚠ de cadence perf, rien si tout est stable
+  cadence suivant [dossier] [--depth n] [--json]   l'orchestrateur minimal (L931), sans modèle et sans rien lancer : le prochain projet:lot à lancer depuis le dossier parent, ou « rien » avec la raison ; ordre priority: du cadence.yaml du dossier (sinon celui du tour), créneaux libres du registre (0 : rien), dépôt tenu sauté (cadence run vivant, vague, porte, banc), un lot en cours sans run vivant avant un lot neuf, puis les tirables aux ressources libres hors « à décider » et orchestrate.continue (exclude, maxEstimate, « non tirable ») ; code 0 un lot, 1 rien ; lead tour en donne la ligne « prochain dans l'ordre »
   cadence lead priority <projet> --before|--after <projet> [dossier] [--depth n]   range un projet dans la liste priority: du cadence.yaml du dossier (ordre du tour, de orchestrate --continue et du panneau des lots), commentaires gardés ; ne commite pas
   cadence lead hold <étiquette> [--ttl minutes] | lead release <étiquette>   déclare (60 min par défaut), puis rend, une session lancée à la main par le lead : elle est soustraite des créneaux libres de orchestrate --status et de lead tour ; au TTL échu, les deux la signalent en ⚠ jusqu'au release
   cadence lead plafond [<n> | aucun]   le plafond que le lead s'applique sous CADENCE_MAX_SESSIONS (rythme du quota…) : les créneaux de la bande cadence-hud, de orchestrate --status et de lead tour se comptent sur lui, un lancement de vague le respecte ; jamais au-dessus du réglage ; sans argument, le plafond appliqué
@@ -161,6 +162,7 @@ function failure(e: unknown, io: Io): number {
 /** Les commandes qui ne lisent pas le plan (ni le cadence.yaml du dossier courant) : rendent `null` quand l'appel en particulier, lui, en a besoin et passe à la table suivante. */
 const BEFORE_PLAN: Record<string, (c: EarlyCtx) => number | Promise<number> | null> = {
   lead: cmdLead,
+  suivant: cmdSuivant,
   config: cmdConfig,
   corrections: (c) => corrections(c.rest, c.values, c.io),
   perf: (c) => perf(c.rest, c.values, c.today, c.io),
@@ -238,6 +240,10 @@ function beforePlan(command: string, argv: string[], base: EarlyCtx): number | P
   return Object.hasOwn(BEFORE_PLAN, command) ? BEFORE_PLAN[command]!(base) : null;
 }
 
+/** Les commandes qui prennent `--all` ou `--depth` (session start|close, config set) et celles qui ne prennent que `--depth` (le tour, L931 : `suivant`). */
+const DEPTH_OK = new Set(['session', 'config']);
+const TOUR_DEPTH = new Set(['lead', 'suivant']);
+
 function dispatch(argv: string[], io: Io): number | Promise<number> {
   const { values, positionals } = parseCli(argv);
   const [command, ...rest] = positionals;
@@ -245,7 +251,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     io.out(HELP);
     return 0;
   }
-  if (command !== 'session' && command !== 'config' && !(command === 'lead' && !values.all) && (values.all || values.depth !== undefined)) throw new RafError(`${values.all ? '--all' : '--depth'} ne va qu'avec session start ou session close`);
+  if (!DEPTH_OK.has(command) && !(TOUR_DEPTH.has(command) && !values.all) && (values.all || values.depth !== undefined)) throw new RafError(`${values.all ? '--all' : '--depth'} ne va qu'avec session start ou session close`);
   const today: Day = io.env.RAF_TODAY ?? toDay(io.now());
   if (!isDay(today)) throw new RafError(`RAF_TODAY invalide : ${today} (attendu AAAA-MM-JJ)`);
   // Avant la mise en attente (L722) : un done, review ou ux d'une session orchestrée ne passe pas par le plan en attente pour être joué plus tard.

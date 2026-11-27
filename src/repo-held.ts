@@ -40,8 +40,8 @@ export function holdRepo(root: string, kind: string, label: string): () => void 
   return () => rmSync(file, { force: true });
 }
 
-/** Les programmes vivants qui tiennent le dépôt ; un fichier d'un processus mort est retiré au passage. */
-export function repoHolders(root: string): Holder[] {
+/** Les programmes vivants qui tiennent le dépôt ; un fichier d'un processus mort est retiré au passage, sauf `prune: false` (une lecture qui n'écrit rien, `cadence suivant`, L931). */
+export function repoHolders(root: string, prune = true): Holder[] {
   const dir = join(gitCommonDir(root), 'cadence', HELD_DIR);
   if (!existsSync(dir)) return [];
   return readdirSync(dir).filter((f) => f.endsWith('.json')).flatMap((f) => {
@@ -52,7 +52,7 @@ export function repoHolders(root: string): Holder[] {
       return [];
     }
     if (holderAlive(Number(h.pid), h.start)) return [h];
-    rmSync(join(dir, f), { force: true });
+    if (prune) rmSync(join(dir, f), { force: true });
     return [];
   });
 }

@@ -7,7 +7,7 @@ import { RafError } from '../plan.js';
 import { issueLines } from '../issues.js';
 import { configSet } from '../config-set.js';
 import { movePriority } from '../priority.js';
-import { findProjects, isProject, leadTour, readDepth, tourCiLines, tourFreeLine, tourLine, tourNoTestLines, tourSettingsLines, tourStaleBranchLines, tourUnpublishedLines, tourWorktreeLines } from '../lead.js';
+import { findProjects, isProject, leadTour, leadTourEntries, readDepth, tourCiLines, tourFreeLine, tourLine, tourNoTestLines, tourSettingsLines, tourStaleBranchLines, tourUnpublishedLines, tourWorktreeLines } from '../lead.js';
 import { tourMemoryLines } from '../memory-index.js';
 import { localOverdueLines } from '../local-task.js';
 import { expiredHoldLines, shownCap, slotsLine } from '../orchestrate/command.js';
@@ -19,6 +19,7 @@ import { tourInspectLines } from '../inspect-read.js';
 import { tourQuotaLines } from '../quota-tour.js';
 import { tourBancLines } from '../bench-tour.js';
 import { readPerf } from '../perf-read.js';
+import { suivant, suivantLine, suivantLines } from '../suivant.js';
 import { type EarlyCtx, type Io } from './context.js';
 
 /** Les dossiers des projets du tour (la clé `depth:` du dossier, un seul niveau si elle est illisible : le tour a déjà sa ligne d'erreur). */
@@ -152,7 +153,8 @@ export function cmdLead(c: EarlyCtx): number {
   if (depth !== undefined && !(Number.isInteger(depth) && depth >= 1)) throw new RafError(`--depth invalide : ${values.depth} (un entier ≥ 1)`);
   const parent = resolve(io.cwd, rest[1] ?? '.');
   if (!existsSync(parent)) throw new RafError(`lead tour : dossier introuvable : ${parent}`);
-  const rows = leadTour(parent, today, idle, depth);
+  const entries = leadTourEntries(parent, today, idle, depth);
+  const rows = entries.map((e) => e.row);
   if (values.json) io.out(JSON.stringify(rows, null, 2));
   else if (rows.length === 0) io.out(`aucun projet sous ${parent} (.cadence/raf.yaml, docs/plan/raf.yaml ou cadence.yaml avec plan:)`);
   else {
@@ -184,8 +186,29 @@ export function cmdLead(c: EarlyCtx): number {
     const roots = tourRoots(parent, depth);
     // … puis l'alerte de la garde de publication (L730, D-22) : un banc complet du samedi rouge, ou manqué, fait revenir la garde au banc complet
     for (const l of [...expiredHoldLines(io.now()), ...localOverdueLines(roots, io.now()), ...tourQuotaLines(io.env, roots, io.now().getTime()), ...tourBancLines(roots, io.env)]) io.out(l);
+    // … puis ce que cadence suivant rendrait (L931) : le même calcul sur les lignes du tour, dépôts tenus sautés, lot en cours sans run vivant d'abord
+    io.out(suivantLine(suivant(parent, today, { cap, env: io.env, now: io.now(), entries })));
     // les réglages lead.chain (L772) puis lead.ux (L197) du cadence.yaml du dossier : le lead les lit ici, au lieu d'ouvrir le fichier
     for (const l of tourSettingsLines(parent)) io.out(l);
   }
   return 0;
+}
+
+/**
+ * `cadence suivant [dossier] [--depth n] [--json]` (L931, D-44) : le prochain projet:lot à lancer depuis un dossier parent, sans modèle et sans rien lancer.
+ * Code 0 quand un lot est rendu, 1 pour « rien » (créneaux pleins, dépôts tenus, aucun lot tirable), 2 pour un appel mal formé.
+ */
+export function cmdSuivant(c: EarlyCtx): number {
+  const { rest, values, io, today } = c;
+  const usage = 'usage : cadence suivant [dossier] [--depth n] [--json]';
+  if (rest.length > 1) throw new RafError(usage);
+  const depth = values.depth === undefined ? undefined : Number(values.depth);
+  if (depth !== undefined && !(Number.isInteger(depth) && depth >= 1)) throw new RafError(`--depth invalide : ${values.depth} (un entier ≥ 1)`);
+  const parent = resolve(io.cwd, rest[0] ?? '.');
+  if (!existsSync(parent)) throw new RafError(`suivant : dossier introuvable : ${parent}`);
+  const { cap } = shownCap(io.env);
+  const s = suivant(parent, today, { cap, env: io.env, now: io.now(), depth });
+  if (values.json) io.out(JSON.stringify(s, null, 2));
+  else for (const l of suivantLines(s)) io.out(l);
+  return s.next ? 0 : 1;
 }

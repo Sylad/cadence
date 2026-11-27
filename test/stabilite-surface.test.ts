@@ -49,7 +49,7 @@ describe('stabilite.md — le statut de chaque surface que le code lit (L605)', 
     const bin = read('bin/cadence.js');
     const list = /\[((?:'[a-z-]+',? ?)+)\]\.includes\(tool\)/.exec(bin)![1]!;
     const tools = ['raf', ...[...list.matchAll(/'([a-z-]+)'/g)].map((m) => m[1]!)];
-    expect(tools.length).toBe(19); // 19 depuis `eval` (L755)
+    expect(tools.length).toBe(20); // 20 depuis `suivant` (L931)
     // `raf` est l'outil de base : ses sous-commandes sont le sujet de R2.
     for (const t of tools.filter((x) => x !== 'raf')) expect(status(t, 'command'), t).toHaveLength(1);
   });

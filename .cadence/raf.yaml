@@ -4913,6 +4913,11 @@ lots:
     status: todo
     estimate: 1
     created: 2026-11-27
+  - id: L934
+    title: "livreur : cadence verify --gate lancé dans un Bash au délai par défaut (120-180 s) passe en arrière-plan, le livreur relance une seconde porte en parallèle sur le même arbre ; la première finit en dépassement (npm test code 124) et rend une Question à tort — vécu 27-11 L111 codex. Geste : l'agent livreur lance la porte avec timeout 600000 (ou run_in_background + attente de la notification), jamais deux portes sur le même arbre ; verify refuse une seconde porte concurrente sur le même dépôt. Mesure : aucune Question du livreur pour une porte doublée"
+    status: todo
+    estimate: 1
+    created: 2026-11-27
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

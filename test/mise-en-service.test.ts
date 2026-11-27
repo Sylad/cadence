@@ -478,7 +478,7 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     chmodSync(oldest, 0o000);
     try {
       const r = await miseEnServiceCli([fifth, '--root', root, '--bin-dir', binDir, '--repo', dir], { ...process.env, PATH: `${shim}:${process.env.PATH}`, CADENCE_HOME: join(tempDir(), 'home') });
-      expect(r.status).toBe(0);
+      expect(r.status, r.stderr).toBe(0);
       expect(r.stdout).toContain('empreinte : ');
       expect(r.stderr).toContain('avertissement : purge des anciennes copies interrompue');
       expect(git(join(root, 'service'), 'rev-parse', 'HEAD')).toBe(fifth);
@@ -624,7 +624,7 @@ describe('L419 — la mise en service met aussi à jour la copie locale du mod c
     writeFileSync(join(shim, 'npm'), `#!/bin/sh\nln -s '${join(REPO, 'node_modules')}' node_modules\n`, { mode: 0o755 });
     writeFileSync(join(shim, 'npx'), `#!/bin/sh\nshift\nexec '${join(REPO, 'node_modules/.bin/tsc')}' "$@"\n`, { mode: 0o755 });
     const r = await miseEnServiceCli([sha, '--root', root, '--bin-dir', binDir, '--repo', dir, '--mod-dir', modDir], { ...process.env, PATH: `${shim}:${process.env.PATH}`, CADENCE_HOME: join(tempDir(), 'home') });
-    expect(r.status).toBe(0);
+    expect(r.status, r.stderr).toBe(0);
     expect(r.stdout).toContain(`mod cadence-hud : copie locale mise à jour (${modDir})`);
     expect(readFileSync(join(modDir, 'hooks/lots.ts'), 'utf8')).toBe('// v2\n');
   }, 120_000);

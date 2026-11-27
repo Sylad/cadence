@@ -4720,7 +4720,7 @@ lots:
     estimate: 1
     created: 2026-11-26
     started: 2026-11-27
-    review: { date: 2026-11-27, verdict: "non-compliant: 3 major (refs/stash in bundle --all, history order bypasses publication guard, unreachable mini-blue taken as finished); fix pass 2 launched", commit: 7df3f80388b63b8e947325a054438382666277bb }
+    review: { date: 2026-11-27, verdict: "non-compliant (pass 2): 5 previous points fixed and tested; 1 new major: failed lance (mini-blue off) leaves an orphan job, every later lance refused as unreachable (code 5)", commit: 2a7ae80e2f8e7899707435090c2f42c7ad805654 }
   - id: L902
     title: "D-39 Banc parallèle : jouer en même temps les 3 bancs du banc court et les répétitions r1/r2 des séquences (aujourd'hui « 1 banc(s) à la fois »), sur mini-blue, chaque bras avec son clone et ses ports ; décider par le banc de bruit que le parallèle ne fait pas sortir les mesures de temps du seuil de bruit (sinon rester séquentiel pour les critères de temps). Vécu 26-11 : séquence aether-b68 = 2 h 40 par répétition, jouées l'une après l'autre. Mesure : banc complet ≤ 3 h (5 à 6 h aujourd'hui), mêmes verdicts sur deux bancs rejoués"
     status: todo
@@ -4899,6 +4899,11 @@ lots:
     estimate: 1
     created: 2026-11-27
     started: 2026-11-27
+  - id: L932
+    title: "Porte : un outil d'analyse tué par un signal (code ≥ 128, ex. V8 « Trace/breakpoint trap » 133 sans rapport) est rejoué une fois avant de passer la porte au rouge, et la correction n'est jamais lancée sur ce cas. Vécu 27-11 codex L110 : ESLint planté une fois (15 passes saines ensuite), la session de correction a changé la commande eslint de cadence.yaml (refusé par analyse --contre), 9,18 $ et un run rendu. Mesure : aucun run rendu en porte-rouge pour un outil tué par signal."
+    status: todo
+    estimate: 1
+    created: 2026-11-27
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

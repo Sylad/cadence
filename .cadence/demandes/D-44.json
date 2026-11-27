@@ -1,0 +1,8 @@
+{
+ "id": "D-44",
+ "texte": "on a viré un orchestrator dans la V1, mais je me demande si on ne devrait pas en avoir un minimaliste  qui retourne un projet + lot disponible en fonction de ce qu'il tourne",
+ "date": "2026-11-27",
+ "etat": "ouverte",
+ "preuve": "",
+ "lots": ["L931", "L930", "L927"]
+}

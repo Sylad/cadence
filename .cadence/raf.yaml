@@ -4790,9 +4790,10 @@ lots:
     created: 2026-11-27
   - id: L913
     title: "Correctif bloquant de 2.0.19 : la CI de publication rejouée par cadence release est rouge sur v2/test/run-rejeu-seul-l842.test.ts:112 — la sortie du vitest imbriqué y est en couleurs (« a.test.ts␛[2m > ␛[22ms »), la regex du nom de test ne trouve rien. Retirer les codes ANSI là où le rejeu (rejouerRouges) lit les noms de tests dans une sortie, pas seulement dans le test, et lancer le vitest imbriqué du test sans couleur ; un test prouve qu'une sortie colorée donne les mêmes rouges qu'une sortie sans couleur. Vécu 27-11 09 h 08 et 09 h 19 (deux refus de release). Mesure : cadence release patch --dry-run puis la vraie préparation vertes"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-27
+    started: 2026-11-27
   - id: L914
     title: "Mesurer le détecteur d'impeccable (npx impeccable detect <url>, déterministe, sans modèle ; testé le 27-11, reject + watchlist) contre nos défauts connus de libellés qui se chevauchent ou débordent : légende Pression MSL de maritime (version d'avant correctif), et 2-3 autres cas tirés des revues UX. Le lancer en bac à sable (HOME isolé, DO_NOT_TRACK=1) sur ces pages, compter ce que ses règles text-occlusion / text-overflow / clipped-overflow-container attrapent et ce que les sondes de l'ux-reviewer avaient vu. Mesure : s'il attrape un cas raté par nos sondes, proposer de l'ajouter comme contrôle optionnel de l'ux-reviewer (règles « quality » seules) ; sinon, rien et la fiche se ferme"
     status: todo

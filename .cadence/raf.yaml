@@ -4866,6 +4866,11 @@ lots:
     started: 2026-11-27
     review: { date: 2026-11-27, verdict: "conforme (revue du lead, diff de 4 lignes) : cause trouvée (reporter github-actions de vitest écrit le nom brut), précondition remplacée par une ligne FAIL coupée par les couleurs, assertions de comportement inchangées ; 17/17 sous CI=true GITHUB_ACTIONS=true, CI=true et sans", commit: 2acc0fed3a1ea7f465c9d185e08fdf8fb855debf }
     finished: 2026-11-27
+  - id: L926
+    title: "cadence deliver : deliveredIds (src/deliver-lots.ts:41) ignore les commits « registre: » qui ne touchent que .cadence/demandes/ — vécu 27-11 maritime RAF-REG1 : un commit de registre citant un lot en cours l'aurait annoncé livré ; mesure : test d'un commit registre citant un lot, non compté livré"
+    status: todo
+    estimate: 1
+    created: 2026-11-27
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

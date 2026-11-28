@@ -164,8 +164,9 @@ exclude the `CLAUDE.md` of the folders above the repository (`claudeMdExcludes`:
 deny the agents of the user (`<config>/agents`) and of the kept plugins (`permissions.deny` `Agent(<name>)`), turn off the user's skills
 that neither the request, the brief nor a kept `CLAUDE.md` names (`skillOverrides`), deny the user's MCP servers (`mcpServers` of
 `.claude.json`, `deniedMcpServers`), and add the lead's built-in tools (`Artifact`, `Workflow`, `ScheduleWakeup`, `SendMessage`, …) to the
-disallowed tools. The user's `CLAUDE.md`, the project's own agents, skills and servers, the built-in ones, the hooks and the plugins cadence
-and playwright stay. First call: 70k → 25k tokens ([measure](mesures/socle-run-2026-11-28.md)). A project keeps what it needs:
+disallowed tools. The user's `CLAUDE.md`, the project's own agents, skills and servers, the built-in ones, the hooks, the plugins cadence
+and playwright, and any browser MCP server whatever its source (a name matching `playwright`, `puppeteer`, `chrome-devtools` or `browser`,
+such as one added by `claude mcp add playwright`) stay. First call: 70k → 25k tokens ([measure](mesures/socle-run-2026-11-28.md)). A project keeps what it needs:
 
 ```yaml
 run:
@@ -177,8 +178,12 @@ run:
     keepMcpServers: [context7]    # user MCP servers kept
 ```
 
-Any other key or a malformed value is refused by `cadence run` and by the gate that validates `cadence.yaml`, with the key at fault. The
-bench does not take these cuts.
+A skill is kept when the request, the brief or a kept `CLAUDE.md` names it as a word. It is cut when only something else names it: an
+`@import`, a page or script of the repository, another skill, the excluded parent `CLAUDE.md`. If a run of the project needs such a
+skill (one the model calls on its own for a kind of lot), list it in `keepSkills`. Agents are never kept by a mention, only by `keepAgents`.
+
+Any other key or a malformed value is refused by `cadence run` before the worktree is created, and by the gate that validates `cadence.yaml`,
+with the key at fault. The bench does not take these cuts.
 
 ## Short writing: `ecriture:`
 

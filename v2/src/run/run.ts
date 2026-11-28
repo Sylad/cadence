@@ -473,7 +473,7 @@ export function executerRun(a: { id?: string; repo: string; demande: string; pie
   if (a.lot) commiterStart(repo, a.lot, id, a.out); // L796 (3) : avant le worktree, qui part du commit
   // L722 : D-1.json modifié à la main pendant un run (13-11) a fait refuser l'intégration ; ce qui n'est pas commité au départ est nommé (lu avant le worktree).
   const sales = fichiersNonCommites(repo) ?? [];
-  const runs = dossierRuns(repo), worktree = cheminWorktree(repo, runs, `${basename(repo)}-${id}`); // L705 (C1) : hors du dépôt avec run.worktreeOutside ; état, verrou, journal dans runs
+  const runs = dossierRuns(repo), worktree = cheminWorktree(repo, runs, `${basename(repo)}-${id}`); // L705 (C1) : hors du dépôt avec run.worktreeOutside (run.session validé aussi, L936) ; état, verrou, journal dans runs
   // L726 : Opus par défaut, Fable à la 3e passe de correction du lot ou après deux revues non conformes (runs précédents du lot, revue du plan au lancement)
   const depart = modeleDeDepart({ modele: choisi, raison: a.modele ? a.modeleRaison ?? '--modele' : 'par défaut' }, a.lot,
     a.lot ? runsDuLot(runs, repo, a.lot, id) : [], a.lot ? revueDuPlan(repo, a.lot, a.raf ?? RAF) : {});

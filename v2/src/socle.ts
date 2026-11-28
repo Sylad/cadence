@@ -1,7 +1,8 @@
 // L705 (D-7) : coupes du socle d'une session de cadence run, chiffrées par L694 (docs/mesures/socle-session-2026-11-11.md) et mesurées sur de vraies
 // sessions le 12-11 (même page, « Coupes appliquées ») : C2, C3 et C4 sont des réglages passés par --settings, actifs dans chaque run ; C1 (worktree hors
-// de l'arborescence du dépôt, sans le CLAUDE.md parent) est une option du dépôt (`run.worktreeOutside` de cadence.yaml), désactivée par défaut, car ce
-// CLAUDE.md porte des consignes de sécurité (maritime-atlas : kubectl pointe sur la prod). Le banc ne prend aucune de ces coupes.
+// de l'arborescence du dépôt) est une option du dépôt (`run.worktreeOutside` de cadence.yaml), désactivée par défaut. Depuis L936, le CLAUDE.md des
+// dossiers au-dessus du dépôt est exclu par défaut (`claudeMdExcludes`, `run.session.parentClaudeMd`) quel que soit l'emplacement du worktree : la sécurité
+// d'un run ne repose pas sur lui, mais sur `orchestrate.prodAccess` (sans lui : ni kubectl, ni helm, ni KUBECONFIG). Le banc ne prend aucune de ces coupes.
 import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -48,6 +49,12 @@ export const OUTILS_DU_LEAD = ['Artifact', 'ArtifactComments', 'ArtifactData', '
   'EnterWorktree', 'ExitWorktree', 'ListAgents', 'SendMessage', 'ListPlugins', 'ListSkills', 'SearchPlugins', 'SearchSkills', 'SuggestPluginInstall', 'SuggestSkills',
   'SendUserFile', 'PushNotification', 'RemoteTrigger', 'ReportFindings', 'Monitor'];
 
+/**
+ * L936 (revue, M1) : un serveur MCP de navigateur sert aux sondes d'un lot visible ; il reste par défaut quelle que soit sa source (plugin playwright,
+ * ou serveur ajouté par `claude mcp add` dans `.claude.json`), sans qu'un projet ait à le nommer dans `keepMcpServers`. Reconnu à son nom.
+ */
+export const SERVEUR_NAVIGATEUR = /playwright|puppeteer|chrome-devtools|browser/i;
+
 /** Options `run.session` du cadence.yaml du worktree (scripts/regeneration.mjs, le code de la validation de cadence.yaml) ; sans fichier : les défauts. */
 export function optionsSession(worktree: string): SessionRun {
   const f = join(worktree, 'cadence.yaml');
@@ -89,7 +96,8 @@ function claudeMdParents(worktree: string, utilisateur: string): string[] {
  * - `permissions.deny` `Agent(<nom>)` : agents de l'utilisateur (`<config>/agents`) et des plugins gardés, sauf `keepAgents` ; ceux du projet et les intégrés restent ;
  * - `skillOverrides` `off` : skills de l'utilisateur (`<config>/skills`), sauf `keepSkills` et ceux que `cites` (demande et brief) ou un CLAUDE.md gardé
  *   nomment ; ceux du projet, des plugins (Claude Code 2.1.325 ne les coupe pas ainsi, mesuré le 28-11 : la liste les garde) et les intégrés restent ;
- * - `deniedMcpServers` : serveurs MCP de l'utilisateur (`mcpServers` de `.claude.json`), sauf `keepMcpServers` ; ceux du projet et des plugins restent.
+ * - `deniedMcpServers` : serveurs MCP de l'utilisateur (`mcpServers` de `.claude.json`), sauf `keepMcpServers` et ceux de navigateur (SERVEUR_NAVIGATEUR) ;
+ *   ceux du projet et des plugins restent.
  */
 export function coupesSession(worktree: string, env: NodeJS.ProcessEnv, pluginsGardes: string[], cites = ''): Record<string, unknown> {
   const o = optionsSession(worktree), conf = dossierClaude(env), utilisateur = join(conf, 'CLAUDE.md');
@@ -102,7 +110,7 @@ export function coupesSession(worktree: string, env: NodeJS.ProcessEnv, pluginsG
   const skills = skillsDe(join(conf, 'skills')).filter((n) => !o.keepSkills.includes(n) && !cite(n));
   let mcp: string[] = [];
   try { mcp = Object.keys((JSON.parse(readFileSync(env.CLAUDE_CONFIG_DIR ? join(conf, '.claude.json') : join(env.HOME || homedir(), '.claude.json'), 'utf8')) as { mcpServers?: object }).mcpServers ?? {}); } catch { /* sans fichier : aucun */ }
-  mcp = mcp.filter((n) => !o.keepMcpServers.includes(n));
+  mcp = mcp.filter((n) => !o.keepMcpServers.includes(n) && !SERVEUR_NAVIGATEUR.test(n));
   return { ...(exclus.length ? { claudeMdExcludes: exclus } : {}), ...(agents.length ? { permissions: { deny: [...new Set(agents)].map((n) => `Agent(${n})`) } } : {}),
     ...(skills.length ? { skillOverrides: Object.fromEntries(skills.map((n) => [n, 'off'])) } : {}), ...(mcp.length ? { deniedMcpServers: mcp.map((serverName) => ({ serverName })) } : {}) };
 }
@@ -125,11 +133,13 @@ function premierPlan(bras?: string): { hooks: Record<string, unknown[]>; env: Re
 }
 
 /** C1 : `run.worktreeOutside: true` dans le cadence.yaml du dépôt (une autre valeur que true ou false est refusée avant toute création) met le worktree sous
- * CADENCE_HOME/run-worktrees (défaut ~/.cadence/orchestrate), loin de tout CLAUDE.md de projet ; sinon sous `runs` (../.cadence-run). Crée son dossier parent. */
+ * CADENCE_HOME/run-worktrees (défaut ~/.cadence/orchestrate), loin de tout CLAUDE.md de projet ; sinon sous `runs` (../.cadence-run). Crée son dossier parent.
+ * L936 (revue, m3) : `run.session` mal formé est refusé ici aussi, avant toute création, et non à la première session (worktree et branche déjà faits). */
 export function cheminWorktree(repo: string, runs: string, nom: string): string {
   const f = join(repo, 'cadence.yaml');
   const v = (existsSync(f) ? (parse(readFileSync(f, 'utf8')) as { run?: { worktreeOutside?: unknown } } | null)?.run : undefined)?.worktreeOutside;
   if (v !== undefined && typeof v !== 'boolean') throw new Error(`cadence.yaml : run.worktreeOutside : true ou false attendu (reçu « ${String(v)} »)`);
+  optionsSession(repo);
   const w = join(v ? join(dossierCadence(), 'run-worktrees') : runs, nom);
   mkdirSync(dirname(w), { recursive: true });
   return w;

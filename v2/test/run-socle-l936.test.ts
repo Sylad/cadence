@@ -1,6 +1,7 @@
 // L936 (D-45, piste 1) : le socle d'une session de cadence run ne garde de la configuration de l'utilisateur que ce qui sert à un run. Coupés par
 // défaut : CLAUDE.md des dossiers au-dessus du dépôt, agents et skills de l'utilisateur et des plugins gardés, serveurs MCP de l'utilisateur, outils
 // intégrés du lead ; `run.session` du cadence.yaml en garde ce que le projet nomme. Mesure : docs/mesures/socle-run-2026-11-28.md. Le banc ne change pas.
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -109,6 +110,23 @@ describe('L936 : socle allégé de cadence run', () => {
       expect(() => lireRegeneration({ session }, 'cadence.yaml')).toThrow(`cadence.yaml : ${attendu}`);
     }
     expect(lireSessionRun(undefined, 'f')).toEqual({ parentClaudeMd: false, userClaudeMd: true, keepAgents: [], keepSkills: [], keepMcpServers: [] });
+  });
+
+  it('revue M1 : un serveur MCP de navigateur de l\'utilisateur (claude mcp add playwright) reste par défaut, les autres sont refusés', () => {
+    ecrire(join(conf, '.claude.json'), JSON.stringify({ mcpServers: { playwright: {}, 'chrome-devtools': {}, docs: {} } }));
+    expect(coupesSession(worktree().wt, process.env, []).deniedMcpServers).toEqual([{ serverName: 'docs' }]);
+  });
+
+  it('revue m3 : run.session mal formé refusé avant toute création (ni worktree, ni branche, ni session)', () => {
+    const repo = depot();
+    writeFileSync(join(repo, 'cadence.yaml'), 'run:\n  session:\n    keepSkills: oui\n');
+    execFileSync('git', ['-C', repo, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qam', 'run.session mal formé'], { stdio: 'ignore' });
+    let appels = 0;
+    const exec = fauxClaude([() => { appels++; }]);
+    expect(() => executerRun({ repo, demande: 'x', exec, out: () => {} })).toThrow('cadence.yaml : run.session.keepSkills : liste de noms attendue');
+    expect(appels).toBe(0);
+    expect(execFileSync('git', ['-C', repo, 'branch', '--list', 'cadence/run-*'], { encoding: 'utf8' }).trim()).toBe('');
+    expect(execFileSync('git', ['-C', repo, 'worktree', 'list'], { encoding: 'utf8' }).trim().split('\n')).toHaveLength(1);
   });
 
   it('le banc ne change pas : ni outil du lead interdit, ni réglage du socle pour un bras', () => {

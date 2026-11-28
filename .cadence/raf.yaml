@@ -4941,11 +4941,14 @@ lots:
     created: 2026-11-27
   - id: L936
     title: "Alléger le socle fixe d'un cadence run (D-45, piste 1). Bilan d'usage 7 j du 27-11 : au premier appel, un run porte déjà ~71k jetons (médiane, min 64k) de consignes, CLAUDE.md, mémoire, outils, skills, agents et MCP ; sa seule relecture coûte ~240 $ sur 1 164 $ estimés pour les 348 runs (~21 %), plus les écritures de cache. Inventorier ce qui compose ce socle dans un run réel, retirer ce dont un run n'a pas besoin (serveurs MCP, skills et agents hors sujet, CLAUDE.md et mémoire du dossier parent destinés au lead), sans toucher au brief gagnant du banc. Mesure : socle médian sous 35k au premier appel, réussite et durée au banc inchangées, coût par lot réussi en baisse (touche v2/ : banc requis)"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-27
     started: 2026-11-28
-    review: { date: 2026-11-28, verdict: "conforme après 1 correctif : M1 serveur MCP utilisateur playwright refusé (socle.ts:105-106) ; mineurs m1 justification périmée du CLAUDE.md parent, m2 skill cité hors CLAUDE.md coupé, m3 run.session validé après le worktree", commit: 592a6764f2408dff5572680534be6c855087c9f6 }
+    review: { date: 2026-11-28, verdict: "conforme (2e revue, 2fcb196c) : M1, m1, m2, m3 corrigés ; notes : règle par nom des serveurs de navigateur trop large et trop étroite à la fois, raf start commité avant la vérification de run.session", commit: 2fcb196c0e8af29f92fd226ce3788e7ed38998ee }
+    finished: 2026-11-28
+    notes:
+      - { date: 2026-11-28, text: "notes de la 2e revue à reprendre : SERVEUR_NAVIGATEUR (socle.ts) reconnaît un navigateur à son nom seul, garde trop (« browser » dans tout nom) et trop peu ; raf start commité avant la vérification de run.session" }
   - id: L937
     title: "Banc mécanique de semaine moins coûteux (D-45, piste 2). Bilan d'usage 7 j du 27-11 : le banc de semaine joue de vraies sessions de modèle (aether-b68, r1/r2, c1/c2) et coûte 136 à 162 $ estimés par jour où il tourne (25 et 26-11), ~5-6 % du quota hebdo à chaque passage, 22 % du coût de la semaine avec le banc complet. Réduire ce que joue le banc de semaine (un seul scénario court, une seule répétition, ou rejeu seulement quand le brief ou le noyau de run change), le banc complet restant au week-end (D-39). Vérifier aussi que le hook d'arrêt de 20 h couvre son lancement : un banc porte l'horodatage 2026-11-25-2147. Mesure : coût d'un banc de semaine sous 2 % du quota hebdo, et les régressions qu'il a trouvées sur les 4 dernières semaines toujours trouvées (rejeu)"
     status: todo

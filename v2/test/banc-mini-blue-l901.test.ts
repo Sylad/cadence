@@ -25,6 +25,9 @@ test -f "$BENCH_ROOT/secrets/1-a/cache.test.ts"
 src=$(sed -n 's/^source: //p' "$BENCH_ROOT/bancs/1-a/banc.yaml")
 case $src in "$BIGBLUE"*) echo "source non réécrite : $src"; exit 7 ;; esac
 git clone -q "$src" "$BENCH_ROOT/verif" && git -C "$BENCH_ROOT/verif" cat-file -e "$BASE_SOURCE"
+inst=$(sed -n 's/^install: //p' "$BENCH_ROOT/bancs/1-a/banc.yaml")
+case $inst in *"$BIGBLUE"*) echo "install non réécrite : $inst"; exit 8 ;; esac
+test "$(bash -c "$inst")" = 1   # L941 : git -C <miroir nu> show <base>:index.js
 grep -q "brief: $PWD/v2/briefs/b.md" "$BENCH_ROOT/bras.yaml"
 mkdir -p "$BENCH_ROOT/rapports" "$BENCH_ROOT/runs/p1/1-a/c1/node_modules/x"
 echo '# passage p1' > "$BENCH_ROOT/rapports/p1.md"; echo '{}' > "$BENCH_ROOT/rapports/p1.json"
@@ -46,7 +49,7 @@ describe('banc détaché sur mini-blue (L901)', () => {
     const nonSuivis = git(source, 'rev-parse', 'refs/stash^3');
     for (const [f, c] of Object.entries({
       'bras.yaml': `A:\n  modele: opus\n  brief: ${depot}/v2/briefs/b.md\n`,
-      'bancs/1-a/banc.yaml': `projet: p\nsource: "${source}"\nbase: ${base}\ninstall: "true"\ntests: "true"\ntaille: retouche\n`,
+      'bancs/1-a/banc.yaml': `projet: p\nsource: "${source}"\nbase: ${base}\ninstall: git -C ${source} show ${base}:index.js\ntests: "true"\ntaille: retouche\n`,
       'secrets/1-a/cache.test.ts': 'caché\n',
       'historique.jsonl': '{"run":"a"}\n{"run":"b"}\n',
       'rapports/ancien.json': '{}\n', 'rapports/ancien.md': '# ancien\n',

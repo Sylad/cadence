@@ -13,9 +13,21 @@ vivant() { local p; p=$(cat "$1/pid" 2>/dev/null) || return 1; [ -n "$p" ] && ki
 remplacer() {
   awk -v o="$2" -v n="$3" '{ s = $0; r = ""; while ((i = index(s, o)) > 0) { r = r substr(s, 1, i - 1) n; s = substr(s, i + length(o)) } print r s }' "$1" > "$1.tmp" && mv "$1.tmp" "$1"
 }
-# la ligne « source: <o> » (guillemets admis) devient « source: <n> »
+# chaque occurrence du chemin $2 devient $3 dans le fichier $1 : la ligne « source: » comme les commandes qui le citent
+# (install: git -C <source> show …, L941 ; git -C sur le miroir nu accepte show). Un chemin dont $2 n'est qu'un préfixe
+# (…/ol-companion-x pour …/ol-companion) ou un suffixe (/x…/ol-companion) reste tel quel ; « $2/sous-dossier » est réécrit.
 resourcer() {
-  awk -v o="$2" -v n="$3" '/^source:/ { v = $0; sub(/^source:[ \t]*/, "", v); gsub(/^["\047]|["\047][ \t]*$/, "", v); sub(/[ \t]+$/, "", v); if (v == o) $0 = "source: " n } { print }' "$1" > "$1.tmp" && mv "$1.tmp" "$1"
+  awk -v o="$2" -v n="$3" '{
+    s = $0; r = ""
+    while ((i = index(s, o)) > 0) {
+      p = i > 1 ? substr(s, i - 1, 1) : substr(r, length(r), 1)
+      q = substr(s, i + length(o), 1)
+      if (p !~ /[A-Za-z0-9._\/~-]/ && q !~ /[A-Za-z0-9._~-]/) r = r substr(s, 1, i - 1) n
+      else r = r substr(s, 1, i - 1 + length(o))
+      s = substr(s, i + length(o))
+    }
+    print r s
+  }' "$1" > "$1.tmp" && mv "$1.tmp" "$1"
 }
 
 lance() {

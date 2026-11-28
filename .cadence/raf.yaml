@@ -4945,6 +4945,7 @@ lots:
     estimate: 1
     created: 2026-11-27
     started: 2026-11-28
+    review: { date: 2026-11-28, verdict: "conforme après 1 correctif : M1 serveur MCP utilisateur playwright refusé (socle.ts:105-106) ; mineurs m1 justification périmée du CLAUDE.md parent, m2 skill cité hors CLAUDE.md coupé, m3 run.session validé après le worktree", commit: 592a6764f2408dff5572680534be6c855087c9f6 }
   - id: L937
     title: "Banc mécanique de semaine moins coûteux (D-45, piste 2). Bilan d'usage 7 j du 27-11 : le banc de semaine joue de vraies sessions de modèle (aether-b68, r1/r2, c1/c2) et coûte 136 à 162 $ estimés par jour où il tourne (25 et 26-11), ~5-6 % du quota hebdo à chaque passage, 22 % du coût de la semaine avec le banc complet. Réduire ce que joue le banc de semaine (un seul scénario court, une seule répétition, ou rejeu seulement quand le brief ou le noyau de run change), le banc complet restant au week-end (D-39). Vérifier aussi que le hook d'arrêt de 20 h couvre son lancement : un banc porte l'horodatage 2026-11-25-2147. Mesure : coût d'un banc de semaine sous 2 % du quota hebdo, et les régressions qu'il a trouvées sur les 4 dernières semaines toujours trouvées (rejeu)"
     status: todo

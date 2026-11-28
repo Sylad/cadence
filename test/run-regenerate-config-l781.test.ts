@@ -32,7 +32,7 @@ describe('run.regenerate de cadence.yaml (L781)', () => {
   it('une forme mal formée est refusée pareil par validateConfig et cadence run, en nommant la clé', () => {
     for (const [yaml, raison] of [
       ['run: abc\n', 'run doit être un objet'],
-      ['run:\n  regenerat: []\n', 'run.regenerat inconnu (attendu : purgeAfterDays, worktreeOutside, regenerate, fastGate)'],
+      ['run:\n  regenerat: []\n', 'run.regenerat inconnu (attendu : purgeAfterDays, worktreeOutside, regenerate, fastGate, session)'],
       ['run:\n  regenerate: npm run news\n', 'run.regenerate : liste non vide de { command, dir } attendue'],
       ['run:\n  regenerate: []\n', 'run.regenerate : liste non vide de { command, dir } attendue'],
       ['run:\n  regenerate:\n    - npm run news\n', 'run.regenerate[0] : objet { command, dir } attendu'],

@@ -4,8 +4,8 @@
 // (v2/src/run/regenerer.ts) et par la validation de cadence.yaml (src/config.ts, readRunConfig) : un fichier que l'une accepte, l'autre l'accepte.
 // JavaScript sans dépendance, comme scripts/references.mjs : src et v2 l'importent hors de leur rootDir. Il lit la valeur déjà analysée (pas de yaml ici).
 
-const FORME = 'run: { purgeAfterDays: <jours>, worktreeOutside: <true|false>, regenerate: [{ command: <commande>, dir: <dossier du dépôt> }], fastGate: <true|{ command, dir, full }> }';
-const CLES_RUN = ['purgeAfterDays', 'worktreeOutside', 'regenerate', 'fastGate']; // les clés de run: lues ailleurs : v2/src/run/purger.ts, v2/src/socle.ts ; fastGate : scripts/porte-rapide.mjs (L838)
+const FORME = 'run: { purgeAfterDays: <jours>, worktreeOutside: <true|false>, regenerate: [{ command: <commande>, dir: <dossier du dépôt> }], fastGate: <true|{ command, dir, full }>, session: { parentClaudeMd, userClaudeMd, keepAgents, keepSkills, keepMcpServers } }';
+const CLES_RUN = ['purgeAfterDays', 'worktreeOutside', 'regenerate', 'fastGate', 'session']; // les clés de run: lues ailleurs : v2/src/run/purger.ts, v2/src/socle.ts ; fastGate : scripts/porte-rapide.mjs (L838) ; session : ici (L936), lue par v2/src/socle.ts
 const estObjet = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const texte = (v) => typeof v === 'string' && v.trim() !== '';
 
@@ -27,6 +27,7 @@ export function lireRegeneration(valeur, fichier) {
   try {
     if (!estObjet(valeur)) throw new Error(`run doit être un objet ${FORME}`);
     for (const k of Object.keys(valeur)) if (!CLES_RUN.includes(k)) throw new Error(`run.${k} inconnu (attendu : ${CLES_RUN.join(', ')})`);
+    sessionRun(valeur.session);
     const r = valeur.regenerate;
     if (r == null) return [];
     if (!Array.isArray(r) || r.length === 0) throw new Error('run.regenerate : liste non vide de { command, dir } attendue');
@@ -37,6 +38,42 @@ export function lireRegeneration(valeur, fichier) {
       if (!texte(e.command)) throw new Error(`${ou}.command : commande non vide attendue`);
       return { command: e.command.trim(), dir: e.dir == null ? '.' : dossier(e.dir, `${ou}.dir`) };
     });
+  } catch (e) {
+    throw new Error(`${fichier} : ${e.message}`);
+  }
+}
+
+// L936 (D-45) : `run.session`, ce que le socle d'une session de cadence run garde de la configuration de l'utilisateur (v2/src/socle.ts). Défauts :
+// le CLAUDE.md des dossiers au-dessus du dépôt coupé (destiné au lead), celui de l'utilisateur gardé ; agents, skills et serveurs MCP de l'utilisateur
+// et des plugins gardés coupés, sauf ceux nommés ici (et, pour un skill, ceux que la demande, le brief ou un CLAUDE.md gardé citent).
+const CLES_SESSION = ['parentClaudeMd', 'userClaudeMd', 'keepAgents', 'keepSkills', 'keepMcpServers'];
+const FORME_SESSION = 'run.session: { parentClaudeMd: <true|false>, userClaudeMd: <true|false>, keepAgents: [<nom>], keepSkills: [<nom>], keepMcpServers: [<nom>] }';
+
+const booleen = (s, k, d) => {
+  if (s[k] == null) return d;
+  if (typeof s[k] !== 'boolean') throw new Error(`run.session.${k} : true ou false attendu (reçu « ${String(s[k])} »)`);
+  return s[k];
+};
+const noms = (s, k) => {
+  if (s[k] == null) return [];
+  if (!Array.isArray(s[k]) || !s[k].every(texte)) throw new Error(`run.session.${k} : liste de noms attendue`);
+  return s[k].map((n) => n.trim());
+};
+
+function sessionRun(s) {
+  if (s == null) return { parentClaudeMd: false, userClaudeMd: true, keepAgents: [], keepSkills: [], keepMcpServers: [] };
+  if (!estObjet(s)) throw new Error(`run.session doit être un objet ${FORME_SESSION}`);
+  const inconnue = Object.keys(s).find((k) => !CLES_SESSION.includes(k));
+  if (inconnue) throw new Error(`run.session.${inconnue} inconnu (attendu : ${CLES_SESSION.join(', ')})`);
+  return { parentClaudeMd: booleen(s, 'parentClaudeMd', false), userClaudeMd: booleen(s, 'userClaudeMd', true),
+    keepAgents: noms(s, 'keepAgents'), keepSkills: noms(s, 'keepSkills'), keepMcpServers: noms(s, 'keepMcpServers') };
+}
+
+/** `valeur` : ce que le YAML donne sous `run:`. Rend les options de `run.session`, leurs défauts sans la clé ; une forme mal formée lève une Error `fichier : …`. */
+export function lireSessionRun(valeur, fichier) {
+  try {
+    if (valeur != null && !estObjet(valeur)) throw new Error(`run doit être un objet ${FORME}`);
+    return sessionRun(valeur?.session);
   } catch (e) {
     throw new Error(`${fichier} : ${e.message}`);
   }

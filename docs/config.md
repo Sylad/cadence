@@ -157,6 +157,29 @@ gate that validates `cadence.yaml`. Measure on cadence itself: [porte-rapide-l83
 The gate of a run is played by the **installed** cadence: declare the key only once every machine runs a version that knows it.
 An older cadence refuses `cadence.yaml` (« run.fastGate inconnu ») and every run of the project ends red at its gate.
 
+## Session base of a run: `run.session`
+
+Each session of `cadence run` keeps from the user's Claude Code configuration only what a run uses (L936). By default its `--settings`
+exclude the `CLAUDE.md` of the folders above the repository (`claudeMdExcludes`: they speak to the session that leads, not to the run),
+deny the agents of the user (`<config>/agents`) and of the kept plugins (`permissions.deny` `Agent(<name>)`), turn off the user's skills
+that neither the request, the brief nor a kept `CLAUDE.md` names (`skillOverrides`), deny the user's MCP servers (`mcpServers` of
+`.claude.json`, `deniedMcpServers`), and add the lead's built-in tools (`Artifact`, `Workflow`, `ScheduleWakeup`, `SendMessage`, …) to the
+disallowed tools. The user's `CLAUDE.md`, the project's own agents, skills and servers, the built-in ones, the hooks and the plugins cadence
+and playwright stay. First call: 70k → 25k tokens ([measure](mesures/socle-run-2026-11-28.md)). A project keeps what it needs:
+
+```yaml
+run:
+  session:
+    parentClaudeMd: true          # default false: keep the CLAUDE.md of the folders above the repository
+    userClaudeMd: false           # default true: also exclude the user's CLAUDE.md
+    keepAgents: [gis-expert]      # agents of the user or of a kept plugin (cadence:code-reviewer) the run may call
+    keepSkills: [norme-etude]     # user skills kept even when nothing names them
+    keepMcpServers: [context7]    # user MCP servers kept
+```
+
+Any other key or a malformed value is refused by `cadence run` and by the gate that validates `cadence.yaml`, with the key at fault. The
+bench does not take these cuts.
+
 ## Short writing: `ecriture:`
 
 `ecriture:` sets the thresholds of `cadence ecriture` (L803): words per sentence (`phrase`, 25), per instruction (`consigne`, 20),

@@ -16,7 +16,7 @@ import { heureLocale, reconnaitreQuota, type Quota } from './quota.js';
 import { causeSession } from '../trace.js';
 import { arreterGroupe, dansGroupe, dormir, type AvecGroupe } from '../processus.js';
 import { CONSIGNE_FINI, garderRapport, origineRapport, type EtatRapport } from '../rapport.js';
-import { cheminWorktree, HOOKS, reglagesRun } from '../socle.js';
+import { cheminWorktree, HOOKS, OUTILS_DU_LEAD, reglagesRun } from '../socle.js';
 import { briefRegistre, entreeCommitee, preparerRegistre, registreOuvert, registreTouche } from '../registre.js';
 import { fichiersNonCommites, nommerFichiers, PLAN_EN_ATTENTE } from '../../../scripts/arbre-non-commite.mjs'; // L722 : même lecture que src/repo-held.ts
 import { environnementPerime, ignorerPerime, lignesPerime } from '../../../scripts/environnement-porte.mjs'; // L764 : même lecture que src/verify-gate.ts
@@ -184,11 +184,11 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false, sujet?: string
   // orchestrate.prodAccess (comme les vagues de la v1) : sans lui, ni kubectl, ni helm, ni KUBECONFIG ; avec lui, la session joue le banc du projet ; L808 (revue r1) : jamais la garde de lecture d'un bras de banc (CADENCE_LECTURE_BORNEE, _ZONES), un run lit ses pièces hors du worktree
   const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !LIEN_HOTE.test(k) && !/^CADENCE_(RUN_JOURNAL|RUN_ID|LECTURE_BORNEE|LECTURE_ZONES)$/.test(k))), CADENCE_CLONE: e.worktree, CADENCE_PIECES: JSON.stringify(e.pieces), CADENCE_BANC_RACINE: dossierRuns(e.repo), ...(e.acces_cluster ? {} : { KUBECONFIG: '/dev/null' }) };
   const coupes = e.acces_cluster ? OUTILS_INTERDITS.filter((x) => !/kubectl|helm/.test(x)) : OUTILS_INTERDITS;
-  const interdits = interditsDuRun(coupes, { specCheck: e.spec_check }); // L840 : cadence analyse permise ; L792 : cadence spec check aussi quand le brief la nomme
+  const interdits = [...interditsDuRun(coupes, { specCheck: e.spec_check }), ...OUTILS_DU_LEAD]; // L840 : cadence analyse permise ; L792 : cadence spec check aussi quand le brief la nomme ; L936 : les outils du lead coupés
   e.passes = [...(e.passes ?? []), { quoi: quoiPasse(e, neuve, sujet), modele: e.modele ?? 'opus', raison: e.modele_raison ?? (e.modele ? 'choisi au lancement' : 'par défaut') }]; // L726
   sauver(e);
   const bras = { ...(e.mode === 'leger' ? BRAS_LEGER : BRAS_COMPLET), modele: e.modele ?? 'opus' }; // L763 : ses hooks s'ajoutent à ceux du socle
-  const socle = reglagesRun(e.worktree, process.env, bras.settings);
+  const socle = reglagesRun(e.worktree, process.env, bras.settings, `${e.demande}\n${readFileSync(bras.brief, 'utf8')}`); // L936 : skills cités par la demande ou le brief gardés, les mêmes à chaque session du run
   const reglages = avecRefusCadence(socle, HOOKS, { specCheck: e.spec_check }); // L840, L792 (revue r1, M1) : tout cadence ou raf hors analyse bornée et spec check|qa refusé par hook
   // L705 : coupes du socle (../socle.ts) ; L842 : ce que commite une session de correction s'ajoute à sa correction (avecMesure)
   const brut = avecMesure(e.corrections, e.worktree, sujet === SUJET_CORRECTION,

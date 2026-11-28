@@ -164,6 +164,8 @@ run:
 
 Le worktree va alors sous `$CADENCE_HOME/run-worktrees/<projet>-<id>` (défaut `~/.cadence/orchestrate/run-worktrees/`) ; l'état, le verrou et le journal restent dans `../.cadence-run/`. Une autre valeur que `true` ou `false` est refusée avant toute création.
 
+**Socle allégé (L936, D-45).** Les mêmes réglages excluent le `CLAUDE.md` des dossiers au-dessus du dépôt (`claudeMdExcludes` : il parle au lead), refusent les agents de l'utilisateur et des plugins gardés (`permissions.deny`), coupent les skills de l'utilisateur que ni la demande, ni le brief, ni un `CLAUDE.md` gardé ne nomment (`skillOverrides`) et les serveurs MCP de l'utilisateur (`deniedMcpServers`) ; les outils intégrés du lead (`OUTILS_DU_LEAD` de `v2/src/socle.ts` : `Artifact`, `Workflow`, `ScheduleWakeup`, `SendMessage`…) s'ajoutent aux `--disallowedTools`. Premier appel en Opus : 70 115 → 24 925 jetons (−64 %, [mesure](../mesures/socle-run-2026-11-28.md)). `run.session` du `cadence.yaml` garde ce dont le projet a besoin ([config](../config.md#session-base-of-a-run-runsession)). Tests : `v2/test/run-socle-l936.test.ts`.
+
 En cas d'échec, le worktree est gardé avec l'état du run (`../.cadence-run/<projet>-<id>.json`). Le run s'arrête alors dans l'un de ces états : `sans-commit`, `conflit`, `porte-rouge`, `sans-porte` ou `refus-integration`.
 
 ## Pourquoi ces options
@@ -182,6 +184,7 @@ En cas d'échec, le worktree est gardé avec l'état du run (`../.cadence-run/<p
 | `--fond` | Le run se détache et survit à la session qui l'a lancée (vécu au compte pro le 10-11 : un lot mort avec la session précédente, puis deux runs le 11-11, issue #55) ; journal dans `../.cadence-run/`. Ses sessions ne gardent aucun lien avec la session lanceuse (L709). Le journal dit qui était le run et ce qui l'a arrêté (L711). |
 | `KUBECONFIG` | Comme les vagues : sans `orchestrate.prodAccess: true`, la session n'a ni `kubectl`, ni `helm`, ni `KUBECONFIG` ; avec, elle joue le banc du projet. |
 | `run.worktreeOutside` | Couper le `CLAUDE.md` parent (−5,3 k jetons au premier tour, mesuré le 12-11), dépôt par dépôt : il porte parfois des consignes de sécurité, d'où le défaut `false` (L705). |
+| `run.session` | Garder du socle ce qu'un projet utilise (CLAUDE.md parent, agents, skills, serveurs MCP de l'utilisateur), le reste étant coupé par défaut : −45 k jetons au premier appel (L936). |
 | `--purger`, `run.purgeAfterDays` | Le dossier des runs grossit sans fin (51 dossiers de captures, 174 états le 17-11) : retirer les fichiers des runs finis depuis N jours, jamais ceux d'un run qui se reprend ou dont le worktree est gardé ; `--dry-run` pour lister d'abord (L767). |
 | `--sans-porte` | Un dépôt sans porte déclarée n'est pas intégré en silence : il faut le choisir explicitement. |
 | `--help`, `-h` | L'usage, sans rien créer (issue #54 : « --help » partait en demande, laissait worktree, branche et état). Un autre argument qui commence par `-` est refusé en code 2 avant toute création. |
